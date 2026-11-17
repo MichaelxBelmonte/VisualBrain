@@ -568,4 +568,10 @@ export const en: Record<string, string> = {
   "Nessuna anteprima disponibile": "No preview available",
   "Nuova sessione con un altro modello": "New session with a different model",
   "Nessun terminale disponibile": "No terminals available",
+  "Modello all’avvio": "Model at launch",
+  "Copia /model e apri": "Copy /model and open",
+  "Usa /model nel terminale per scegliere il modello.": "Use /model in the terminal to choose the model.",
+  "Caricamento anteprima…": "Loading preview…",
+  "Menu rapido terminali": "Terminal quick menu",
+  "Menu rapido terminali (Ctrl+Maiusc+Spazio)": "Terminal quick menu (Ctrl+Shift+Space)",
 };

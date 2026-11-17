@@ -4,8 +4,9 @@ interface TerminalQuickItem {
   id: string;
   label: string;
   model?: string;
-  preview: () => string;
+  preview: () => string | Promise<string>;
   canChangeModel: boolean;
+  nativeModel?: boolean;
 }
 
 interface TerminalQuickMenuOptions {
@@ -14,13 +15,15 @@ interface TerminalQuickMenuOptions {
   selectedId?: string | null;
   onOpen: (id: string) => void;
   onModel: (id: string) => void;
+  onNativeModel?: (id: string) => void;
 }
 
 let dismissCurrent: (() => void) | undefined;
 
 /** A non-modal terminal picker. Selecting a row previews it; activating it opens the terminal. */
-export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onModel }: TerminalQuickMenuOptions): () => void {
+export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onModel, onNativeModel }: TerminalQuickMenuOptions): () => void {
   dismissCurrent?.();
+  const previousFocus = document.activeElement;
   const menu = document.createElement('section');
   menu.id = 'terminal-quick-menu';
   menu.className = 'terminal-quick-menu';
@@ -43,7 +46,7 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
     row.append(label);
     if (item.model) {
       const model = document.createElement('small');
-      model.textContent = item.model;
+      model.textContent = t('Modello all’avvio') + ': ' + item.model;
       row.append(model);
     }
     row.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') select(index); });
@@ -60,7 +63,30 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
   modelButton.type = 'button';
   modelButton.className = 'btn terminal-quick-model';
   modelButton.textContent = t('Nuova sessione con un altro modello');
+  const nativeButton = document.createElement('button');
+  nativeButton.type = 'button';
+  nativeButton.className = 'btn terminal-quick-native-model';
+  nativeButton.textContent = t('Copia /model e apri');
+  const actions = document.createElement('div');
+  actions.className = 'terminal-quick-actions';
+  actions.append(nativeButton, modelButton);
   let active = -1;
+  let previewRequest = 0;
+  async function showPreview(item: TerminalQuickItem) {
+    const request = ++previewRequest;
+    let text = '';
+    try {
+      const output = item.preview();
+      if (typeof output === 'string') text = output;
+      else {
+        preview.textContent = t('Caricamento anteprima…');
+        text = await output;
+      }
+    } catch { /* An ended or disconnected terminal may have no preview. */ }
+    if (request !== previewRequest || signal.aborted) return;
+    preview.textContent = text || t('Nessuna anteprima disponibile');
+    preview.scrollTop = preview.scrollHeight;
+  }
   function select(index: number) {
     if (active === index) return;
     rows[active]?.setAttribute('aria-selected', 'false');
@@ -68,15 +94,20 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
     const row = rows[index], item = items[index];
     row.setAttribute('aria-selected', 'true');
     list.setAttribute('aria-activedescendant', row.id);
-    preview.textContent = item.preview() || t('Nessuna anteprima disponibile');
-    preview.scrollTop = preview.scrollHeight;
+    void showPreview(item);
     modelButton.hidden = !item.canChangeModel;
+    nativeButton.hidden = !(item.nativeModel && onNativeModel);
+    actions.hidden = nativeButton.hidden && modelButton.hidden;
   }
   modelButton.addEventListener('click', () => {
     const item = items[active];
     if (item?.canChangeModel) { close(); onModel(item.id); }
   });
-  if (items.length) menu.append(list, preview, modelButton);
+  nativeButton.addEventListener('click', () => {
+    const item = items[active];
+    if (item?.nativeModel && onNativeModel) { close(); onNativeModel(item.id); }
+  });
+  if (items.length) menu.append(list, preview, actions);
   else menu.textContent = t('Nessun terminale disponibile');
   document.body.append(menu);
   const oldControls = anchor.getAttribute('aria-controls');
@@ -84,7 +115,7 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
   anchor.setAttribute('aria-controls', menu.id);
   const events = new AbortController();
   const { signal } = events;
-  function close() {
+  function close(focusTarget: HTMLElement = anchor) {
     if (signal.aborted) return;
     const restoreFocus = menu.contains(document.activeElement);
     events.abort();
@@ -92,7 +123,7 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
     anchor.setAttribute('aria-expanded', 'false');
     if (oldControls === null) anchor.removeAttribute('aria-controls');
     else anchor.setAttribute('aria-controls', oldControls);
-    if (restoreFocus && anchor.isConnected) anchor.focus({ preventScroll: true });
+    if (restoreFocus && focusTarget.isConnected) focusTarget.focus({ preventScroll: true });
     dismissCurrent = undefined;
   }
   dismissCurrent = close;
@@ -116,10 +147,17 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
     if (!menu.contains(e.target as Node) && !anchor.contains(e.target as Node)) close();
   }, { signal });
   menu.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      const origin = previousFocus instanceof HTMLElement && previousFocus !== document.body && previousFocus.isConnected ? previousFocus : anchor;
+      close(origin);
+      if (document.activeElement === document.body && anchor.isConnected) anchor.focus({ preventScroll: true });
+      return;
+    }
     if (e.key === 'Tab') {
-      if (e.shiftKey && e.target === modelButton) return;
-      if (!e.shiftKey && e.target === list && !modelButton.hidden) return;
+      const last = !modelButton.hidden ? modelButton : !nativeButton.hidden ? nativeButton : list;
+      if (items.length && (e.shiftKey ? e.target !== list : e.target !== last)) return;
       if (e.shiftKey) e.preventDefault();
       close();
       return;

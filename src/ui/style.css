@@ -1491,5 +1491,6 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .terminal-quick-option[aria-selected="true"] { background: var(--g1); box-shadow: inset 2px 0 var(--fg); }
 .terminal-quick-list:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
 .terminal-quick-preview { flex: 0 1 auto; min-height: 2em; max-height: 18vh; overflow: auto; margin: 0; padding: 8px 9px; border-radius: 5px; background: var(--g1); color: var(--g5); font: 11.5px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-.terminal-quick-model { align-self: flex-start; max-width: 100%; white-space: normal; }
-.terminal-quick-model[hidden] { display: none; }
+.terminal-quick-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.terminal-quick-actions .btn { max-width: 100%; white-space: normal; }
+.terminal-quick-actions[hidden], .terminal-quick-actions .btn[hidden] { display: none; }
