@@ -54,7 +54,7 @@ export class GraphView {
   private dpr = 1;
   private w = 0;
   private h = 0;
-  private dirty = true;
+  private framePending = false;
   private colors!: Colors;
   private drag: Drag | null = null;
   private mouse: { x: number; y: number } | null = null;
@@ -75,7 +75,7 @@ export class GraphView {
     this.readColors();
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement!);
     this.resize();
-    for (const ev of ['graph', 'select', 'hover'] as const) store.on(ev, () => { this.dirty = true; });
+    for (const ev of ['graph', 'select', 'hover'] as const) store.on(ev, () => this.invalidate());
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
@@ -90,16 +90,6 @@ export class GraphView {
     });
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    const loop = (now: number) => {
-      if (this.animEnd > 0) {
-        if (now < this.animEnd) this.step(now);
-        else { this.step(this.animEnd); this.animEnd = 0; }
-        this.dirty = true;
-      }
-      if (this.dirty) { this.dirty = false; this.draw(); }
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
   }
 
   readColors(): void {
@@ -107,7 +97,7 @@ export class GraphView {
     const v = (n: string) => cs.getPropertyValue(n).trim();
     this.colors = { bg: v('--bg'), stage: translucent(v('--bg'), Number(v('--stage-alpha') || 1)), fg: v('--fg'), g1: v('--g1'), g2: v('--g2'), g3: v('--g3'), g4: v('--g4'), g5: v('--g5'), font: v('--font'), mono: v('--mono') };
     this.measureCache.clear();
-    this.dirty = true;
+    this.invalidate();
   }
 
   fonts(): Fonts {
@@ -128,7 +118,21 @@ export class GraphView {
 
   aspect(): number { return this.h > 0 ? this.w / this.h : 1.6; }
 
-  invalidate(): void { this.dirty = true; }
+  invalidate(): void {
+    if (this.framePending) return;
+    this.framePending = true;
+    requestAnimationFrame(this.paintFrame);
+  }
+
+  private paintFrame = (now: number): void => {
+    this.framePending = false;
+    if (this.animEnd > 0) {
+      this.step(Math.min(now, this.animEnd));
+      if (now < this.animEnd) this.invalidate();
+      else this.animEnd = 0;
+    }
+    this.draw();
+  };
 
   /** Last non-empty size and a fit asked for while the map was hidden (Operativa open): both keep the camera centred when it shows again. */
   private seenW = 0;
@@ -147,7 +151,7 @@ export class GraphView {
     }
     this.canvas.width = Math.max(1, Math.round(this.w * this.dpr));
     this.canvas.height = Math.max(1, Math.round(this.h * this.dpr));
-    this.dirty = true;
+    this.invalidate();
   }
 
   // ---------------------------------------------------------------- layout and animation
@@ -171,7 +175,7 @@ export class GraphView {
     this.layout = l;
     if (first) { this.animEnd = 0; this.step(0, true); }
     else { this.animStart = performance.now(); this.animEnd = this.animStart + ANIM_MS; }
-    this.dirty = true;
+    this.invalidate();
   }
 
   private step(now: number, snap = false): void {
@@ -193,7 +197,7 @@ export class GraphView {
     this.k = Math.max(0.12, Math.min(1.4, Math.min((this.w - pad * 2) / bw, (this.h - pad * 2) / bh)));
     this.tx = this.w / 2 - ((b.x0 + b.x1) / 2) * this.k;
     this.ty = this.h / 2 - ((b.y0 + b.y1) / 2) * this.k;
-    this.dirty = true;
+    this.invalidate();
   }
 
   focus(id: number, minK = 1): void {
@@ -202,7 +206,7 @@ export class GraphView {
     this.k = Math.max(this.k, minK);
     this.tx = this.w / 2 - (b.tx + b.w / 2) * this.k;
     this.ty = this.h / 2 - (b.ty + Math.min(b.h, 120) / 2) * this.k;
-    this.dirty = true;
+    this.invalidate();
   }
 
   /** Pans as little as needed to show the box (its target rectangle); zooms out when the box is larger than the viewport. */
@@ -218,7 +222,7 @@ export class GraphView {
     else if (x1 > this.w - margin) this.tx -= x1 - (this.w - margin);
     if (y0 < margin) this.ty += margin - y0;
     else if (y1 > this.h - margin) this.ty -= y1 - (this.h - margin);
-    this.dirty = true;
+    this.invalidate();
   }
 
   /** Share of the top-level boxes whose centre is inside the viewport. */
@@ -239,14 +243,14 @@ export class GraphView {
     this.k = nk;
     this.tx = cx - wx * nk;
     this.ty = cy - wy * nk;
-    this.dirty = true;
+    this.invalidate();
   }
 
   private onWheel(e: WheelEvent): void {
     e.preventDefault();
     this.userMoved = true;
     if (e.ctrlKey || e.metaKey) this.zoomBy(Math.exp(-e.deltaY * 0.01), e.offsetX, e.offsetY);
-    else { this.tx -= e.deltaX; this.ty -= e.deltaY; this.dirty = true; }
+    else { this.tx -= e.deltaX; this.ty -= e.deltaY; this.invalidate(); }
   }
 
   // ---------------------------------------------------------------- hit testing
@@ -322,21 +326,21 @@ export class GraphView {
         g.x += ddx; g.y += ddy; g.tx += ddx; g.ty += ddy; g.sx += ddx; g.sy += ddy;
         for (const b of g.boxes) if (!b.pinned) this.shiftBox(b, ddx, ddy);
       }
-      this.dirty = true;
+      this.invalidate();
       return;
     }
     const hit = this.hitBox(wx, wy);
     const hot = hit ? this.inChevron(hit, wx, wy) : false;
-    if (hot !== this.chevronHot) { this.chevronHot = hot; this.dirty = true; }
+    if (hot !== this.chevronHot) { this.chevronHot = hot; this.invalidate(); }
     this.canvas.classList.toggle('pointer', hit !== null);
     const id = hit ? hit.id : null;
     if (id !== this.store.hovered) {
       this.hoverSince = performance.now();
       clearTimeout(this.hoverTimer);
-      if (id !== null) this.hoverTimer = window.setTimeout(() => { this.dirty = true; }, 420);
+      if (id !== null) this.hoverTimer = window.setTimeout(() => this.invalidate(), 420);
     }
     this.store.hover(id);
-    this.dirty = true;
+    this.invalidate();
   }
 
   private onUp(e: PointerEvent): void {
@@ -359,7 +363,7 @@ export class GraphView {
     } else {
       this.cb.onSelect(null);
     }
-    this.dirty = true;
+    this.invalidate();
   }
 
   // ---------------------------------------------------------------- drawing

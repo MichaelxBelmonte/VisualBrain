@@ -1,7 +1,7 @@
 // HTTP + WebSocket server: API, static UI, live events, terminals, filesystem watcher.
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createReadStream, existsSync, readFileSync, statSync, watch, type FSWatcher } from 'node:fs';
-import { join, extname, basename } from 'node:path';
+import { join, extname, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { Db } from './db.ts';
@@ -14,8 +14,9 @@ import { Updater } from './updater.ts';
 import { folderAccess } from './access.ts';
 import { startTeamWatch } from './team-watch.ts';
 import { stopHarnessInstalls } from './harness-installer.ts';
-import { handleApi, type ApiCtx } from './api.ts';
-import { runIndexOffThread } from './index-runner.ts';
+import { graphJson, handleApi, sendJsonText, type ApiCtx } from './api.ts';
+import { mapQuery, StartupMap } from './startup-map.ts';
+import { dbFileOf, runIndexOffThread } from './index-runner.ts';
 import { coalesceSubtrees } from './scan.ts';
 import { makeProvider } from './llm/provider.ts';
 import { analyze, buildPayload } from './llm/analyze.ts';
@@ -66,13 +67,39 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   const cache = new GraphCache();
   // runs left «running» by a previous process can never finish: mark them so the UI does not wait for them
   db.run("UPDATE llm_runs SET status = 'error', error = 'interrotta: server riavviato', finished_at = ? WHERE status = 'running'", Date.now());
-  // The map loads in slices after the port opens: the window, the terminals and the settings answer at once, the requests
-  // that read the map wait for it (see `needsMap`).
-  let mapReady = false;
-  const mapLoaded = cache.loadAsync(db, cfg)
-    .catch((err) => { console.error('[cache] mappa non caricata:', err instanceof Error ? err.message : err); })
-    .finally(() => { mapReady = true; });
+  // The version comes from the desktop shell (VISUAL_BRAIN_VERSION); a development checkout reads its package.json.
+  const version = process.env.VISUAL_BRAIN_VERSION || (() => { try { return String(JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf8')).version); } catch { return '0.0.0'; } })();
+  const file = dbFileOf(db);
+  const openStartupMap = () => file && cfg.setupComplete
+    ? new StartupMap(cfg.dataDir, JSON.stringify([version, file, cfg.roots, cfg.containers, cfg.notContainers]))
+    : undefined;
+  const startupMap = openStartupMap();
+  let preview = startupMap?.current;
+  let verifiedPreview: string | undefined;
   const events = new Broadcaster();
+  let mapReady = false, mapFailed = false;
+  const loadMap = async () => {
+    try {
+      await cache.loadAsync(db, cfg);
+    } catch (err) {
+      mapFailed = true;
+      console.error('[cache] mappa non caricata:', err instanceof Error ? err.message : err);
+    }
+    if (preview && !mapFailed) {
+      try {
+        const json = graphJson(cache, new URL('/api/graph?' + preview.query, 'http://local'));
+        if (preview.json === json) verifiedPreview = preview.id;
+        else startupMap?.save(preview.query, json, cache.stats);
+      } catch (err) {
+        console.error('[cache] verifica anteprima:', err instanceof Error ? err.message : err);
+      }
+      if (!verifiedPreview) events.send({ type: 'index:map', stats: cache.stats });
+    }
+    preview = null;
+    mapReady = true;
+  };
+  // An existing preview lets the server open its port before SQLite starts streaming the nodes.
+  let mapLoaded = preview ? undefined : loadMap();
   const teams = new Teams(cfg.dataDir);
   let terms: TerminalService;
   terms = await TerminalService.open(cfg.dataDir, cfg.port, (id, code) => {
@@ -169,15 +196,14 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     savePreferences(cfg, settings);
     resetWatchers();
     cache.load(db, cfg);
+    ctx.startupMap = openStartupMap();
   };
 
-  // The version comes from the desktop shell (VISUAL_BRAIN_VERSION); a development checkout reads its package.json.
-  const version = process.env.VISUAL_BRAIN_VERSION || (() => { try { return String(JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf8')).version); } catch { return '0.0.0'; } })();
   const updater = new Updater({ dataDir: cfg.dataDir, version, liveSessions: () => terms.list().filter(t => t.alive).length, persistentTerminals: true });
   // A folder macOS refused is mapped again as soon as the user allows it in System Settings.
   const access = folderAccess(() => cfg.setupComplete ? cfg.roots : [], () => { startIndex(); });
   const ctx: ApiCtx = {
-    db, cfg, cache, terms, teams, updater, access, state, startIndex, startAnalyze, configure,
+    db, cfg, cache, startupMap, terms, teams, updater, access, state, startIndex, startAnalyze, configure,
     previewAnalyze: (consent) => buildPayload(db, cfg, cache, consent),
     changed: (reason) => events.send({ type: 'graph:changed', reason }),
   };
@@ -187,12 +213,25 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     let p = decodeURIComponent(new URL(req.url ?? '/', 'http://local').pathname);
     if (p === '/' || p === '') p = '/index.html';
     const file = join(uiDir, p);
-    if (!file.startsWith(uiDir) || !existsSync(file) || !statSync(file).isFile()) {
+    const info = file.startsWith(uiDir + sep) ? statSync(file, { bigint: true, throwIfNoEntry: false }) : undefined;
+    if (!info?.isFile()) {
       res.writeHead(404, { 'content-type': 'text/plain' });
       res.end(existsSync(uiDir) ? 'non trovato' : 'UI non compilata: esegui `npm run build:ui`');
       return;
     }
-    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache' });
+    const tag = `"${info.ino.toString(16)}-${info.ctimeNs.toString(16)}-${info.size.toString(16)}"`;
+    const headers = { 'cache-control': 'no-cache', etag: 'W/' + tag };
+    const matches = req.headers['if-none-match']?.split(',').some(value => {
+      const candidate = value.trim();
+      return candidate === '*' || candidate === tag || candidate === headers.etag;
+    });
+    if ((req.method === 'GET' || req.method === 'HEAD') && matches) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    res.writeHead(200, { ...headers, 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
+    if (req.method === 'HEAD') { res.end(); return; }
     createReadStream(file).pipe(res);
   };
 
@@ -212,7 +251,7 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   /** Everything but the health probe, updates, preferences and the terminal list reads the map. */
   const needsMap = (req: IncomingMessage): boolean => {
     const path = (req.url ?? '').split('?')[0];
-    if (path === '/api/health' || path.startsWith('/api/update') || path === '/api/preferences' || path === '/api/models') return false;
+    if (path === '/api/health' || path.startsWith('/api/update') || (path === '/api/preferences' && req.method === 'GET') || path === '/api/models') return false;
     return !(path === '/api/terminals' && req.method === 'GET');
   };
   let stopping = false;
@@ -223,8 +262,20 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE' && !upload && !req.headers['content-type']?.startsWith('application/json')) { res.writeHead(415); res.end('JSON required'); return; }
     if (stopping || (!terms.connected && req.url !== '/api/health')) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'Servizio terminali disconnesso. Riapri Visual Brain per riconnetterti.' })); return; }
     if ((req.url ?? '').startsWith('/api/')) {
-      if (mapReady || !needsMap(req)) void handleApi(ctx, req, res);
-      else void mapLoaded.then(() => handleApi(ctx, req, res));
+      if (preview && req.method === 'GET') {
+        const url = new URL(req.url!, 'http://local');
+        if (url.pathname === '/api/status' || (url.pathname === '/api/graph' && mapQuery(url) === preview.query)) {
+          if (url.pathname === '/api/graph') startupMap?.select(preview.query, req.headers['x-vb-startup-map'] === '1');
+          void handleApi(ctx, req, res, preview);
+          return;
+        }
+      }
+      if (!needsMap(req)) { void handleApi(ctx, req, res); return; }
+      const respond = () => {
+        if (mapFailed) sendJsonText(res, 503, JSON.stringify({ error: 'Mappa non disponibile.' }));
+        else void handleApi(ctx, req, res);
+      };
+      if (mapReady) respond(); else void mapLoaded!.then(respond);
     } else serveStatic(req, res);
   });
 
@@ -235,6 +286,11 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     if (url.pathname === '/ws/events') {
       wss.handleUpgrade(req, socket, head, (ws) => {
         events.clients.add(ws);
+        // The canvas opens its socket after the first response. Replay a correction it may have missed.
+        const clientPreview = url.searchParams.get('preview');
+        if (clientPreview && clientPreview !== (preview?.id ?? verifiedPreview)) {
+          ws.send(JSON.stringify({ type: 'index:map', stats: cache.stats } satisfies EventMessage));
+        }
         ws.on('close', () => events.clients.delete(ws));
       });
     } else if (url.pathname === '/ws/term') {
@@ -355,6 +411,9 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   };
   resetWatchers();
 
+  if (!mapLoaded) {
+    mapLoaded = new Promise<void>(resolve => server.once('listening', () => setImmediate(resolve))).then(loadMap);
+  }
   try { await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(cfg.port, cfg.host, resolve); }); }
   catch (error) { await terms.detach(); throw error; }
   updater.start();
@@ -363,6 +422,7 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   console.log(`Visual Brain: ${url}`);
   // an empty index is only known once the map has loaded
   void mapLoaded.then(() => {
+    if (mapFailed) return;
     console.log(`[cache] mappa: nodi ${cache.stats.nodes}, archi ${cache.stats.edges}, ${cache.loadedAt} ms`);
     if (cfg.setupComplete && cfg.roots.length && (opts.indexOnStart || cache.stats.nodes === 0)) startIndex();
   });

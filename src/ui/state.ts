@@ -86,6 +86,11 @@ export class Store {
   }
 
   setGraph(g: GraphPayload): void {
+    // Hydration can finish between the first status and graph requests, before the events socket exists.
+    if (this.status && JSON.stringify(this.status.stats) !== JSON.stringify(g.stats)) {
+      this.status = { ...this.status, stats: g.stats };
+      this.emit('status');
+    }
     this.nodes = new Map(g.nodes.map((n) => [n.id, n]));
     this.edges = g.edges;
     this.areas = g.areas;

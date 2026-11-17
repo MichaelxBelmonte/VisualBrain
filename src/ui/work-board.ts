@@ -1,6 +1,7 @@
-// "Lavoro": one board per node in four columns — Da fare, In corso, Serve te, Fatto. Squads, the Main Brain and the
-// node's reminders are filters of the same board; what needs the person (blocked tasks, held reports, permission
-// requests, proposals) sits together in "Serve te". Squad settings live behind the ··· menu, messages in a strip below.
+// "Lavoro": one board per node. On top "Serve te" — what needs the person (blocked tasks, held reports, permission
+// requests, proposals) or, when nothing does, one line saying what the squad is doing and the next useful move. Below,
+// three plain columns: Da fare, In corso, Fatto. Squads, the Main Brain and the node's reminders are filters of the
+// same board. Squad settings live behind the ··· menu, messages in a strip below.
 // Reads every 4 seconds only while visible; nothing here calls a model or types into a terminal.
 import { t as tr, ui } from './i18n.ts';
 import { api } from './api.ts';
@@ -18,7 +19,8 @@ const MEMORY: Array<[ClaudeMemory, string, string]> = [
   ['off', tr('Spenta'), tr('Nessun agente Claude della squadra usa la memoria automatica.')],
 ];
 export type LaneId = 'todo' | 'doing' | 'you' | 'done';
-const LANES: Array<[LaneId, string]> = [['todo', 'Da fare'], ['doing', 'In corso'], ['you', 'Serve te'], ['done', 'Fatto']];
+/** The columns under "Serve te"; the 'you' lane is the strip above them. */
+const LANES: Array<[Exclude<LaneId, 'you'>, string]> = [['todo', 'Da fare'], ['doing', 'In corso'], ['done', 'Fatto']];
 /** Lane of a squad task: blocked work waits on the person. Pure, so the rule is testable. */
 export function taskLane(t: Pick<TeamTask, 'status'>): LaneId {
   return t.status === 'pending' ? 'todo' : t.status === 'working' ? 'doing' : t.status === 'blocked' ? 'you' : 'done';
@@ -26,6 +28,31 @@ export function taskLane(t: Pick<TeamTask, 'status'>): LaneId {
 /** Lane of a sorting-board item: held reports wait on the person until forwarded or archived. */
 export function inboxLane(i: Pick<InboxItem, 'column'>): LaneId { return i.column === 'new' || i.column === 'ready' ? 'you' : 'done'; }
 export const REMINDERS = 'reminders';
+
+/** One line under a task title: who has it and what happens next, in plain words. Pure, so the wording is testable. */
+export function taskStatus(t: Pick<TeamTask, 'status' | 'assignedTo'>, assignee?: { code?: string; name?: string; alive: boolean }): { text: string; tone: string } {
+  const code = assignee?.code || assignee?.name || '';
+  if (t.status === 'done') return { text: code ? ui`Completato · ${code}` : tr('Completato'), tone: 'done' };
+  if (t.status === 'blocked') return { text: code ? ui`Bloccato · ${code} aspetta una tua decisione` : tr('Bloccato · serve una tua decisione'), tone: 'blocked' };
+  // Assigned to a session that has ended or is gone: the task will not move by itself.
+  const gone = !!t.assignedTo && !assignee?.alive;
+  if (t.status === 'working') return gone ? { text: code ? ui`${code} si è fermato · riassegnalo` : tr('L’agente si è fermato · riassegnalo'), tone: 'stale' } : { text: code ? ui`${code} ci sta lavorando` : tr('In corso'), tone: 'active' };
+  if (gone) return { text: tr('Assegnato a una sessione terminata · riassegnalo'), tone: 'stale' };
+  return t.assignedTo ? { text: ui`Assegnato a ${code} · non ancora iniziato`, tone: 'idle' } : { text: tr('Da assegnare'), tone: 'idle' };
+}
+
+/** When nothing waits on the person: what the squad is doing and the one useful next move. Pure. */
+export function boardHint(tasks: Array<Pick<TeamTask, 'status' | 'assignedTo'>>, live: number): { text: string; action?: 'agent' | 'task' } {
+  const count = (s: TeamTask['status']) => tasks.filter(t => t.status === s).length;
+  const pending = count('pending'), working = count('working');
+  const unassigned = tasks.filter(t => t.status === 'pending' && !t.assignedTo).length;
+  if (!live) return { text: tr('Squadra ferma: nessun agente attivo.'), action: 'agent' };
+  if (!tasks.length) return { text: tr('Nessun incarico ancora. Creane uno o scrivi all’orchestratore.'), action: 'task' };
+  if (working) return { text: pending ? ui`In corso: ${working} · in coda: ${pending}. Nessuna azione per te.` : ui`In corso: ${working}. Nessuna azione per te.` };
+  if (unassigned) return { text: ui`Da assegnare: ${unassigned}. Apri la scheda per scegliere l’agente, o attendi l’orchestratore.` };
+  if (pending) return { text: ui`In attesa di partire: ${pending}.` };
+  return { text: tr('Tutti gli incarichi sono completati.'), action: 'task' };
+}
 
 export interface BoardCallbacks {
   open(sessionId: string): void;
@@ -105,6 +132,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     const addLabel = team === REMINDERS ? tr('+ Promemoria') : team === 'brain' ? '' : tr('+ Incarico');
     el.innerHTML = ui`<div class="board lavoro"><header class="lavoro-head">${nodes.length > 1 ? ui`<select data-node class="lavoro-node" aria-label="Nodo">${nodeOptions}</select>` : `<strong class="lavoro-node">${esc(nodes[0]?.name ?? '')}</strong>`}<nav class="lavoro-filters" aria-label="Squadre e promemoria"></nav><span class="lavoro-tools">${addLabel ? `<button class="btn small primary" data-new>${esc(addLabel)}</button>` : ''}<details class="work-overflow lavoro-menu"><summary class="btn small ghost" aria-label="${esc(tr('Menu della squadra'))}">···</summary><div>${isSquad() ? ui`<button data-add-agent><span>Aggiungi agente</span><small>nella squadra, con il suo ruolo</small></button><button data-panel="settings"><span>Impostazioni della squadra</span><small>obiettivo, consegna, memoria, limiti</small></button>` : ''}${team === 'brain' ? ui`<button data-panel="settings"><span>Riepilogo del Main Brain</span><small>e consegna dei rapporti</small></button>` : ''}<button data-panel="link"><span>Collega a…</span><small>un altro nodo, per scambiare messaggi</small></button><button data-reveal><span>Mostra nella mappa</span></button>${isSquad() ? ui`<div class="sep"></div><button data-archive class="danger"><span>Archivia la squadra</span><small>il ramo Git resta</small></button>` : ''}</div></details></span></header>
       <div class="lavoro-goal" data-goal></div><div class="board-error" role="alert"></div><div class="lavoro-panel" data-panel-box></div>
+      ${team === REMINDERS ? '' : ui`<section class="lavoro-you" data-lane="you" aria-live="polite"><h3>Serve te<span class="kanban-count"></span></h3><div class="lavoro-cards"></div></section>`}
       <div class="lavoro-lanes">${LANES.map(([id, label]) => ui`<section class="lavoro-lane" data-lane="${id}"><h3>${tr(label)}<span class="kanban-count"></span></h3><div class="lavoro-cards"></div></section>`).join('')}</div>
       ${team === REMINDERS ? '' : ui`<details class="lavoro-messages"><summary>Messaggi <span data-message-count></span></summary><div class="board-messages" aria-live="polite"></div><form data-message class="board-row"><select name="to" aria-label="Destinatario"></select><textarea name="text" maxlength="1200" rows="1" required placeholder="Istruzione, risposta o decisione…" aria-label="Messaggio"></textarea><button class="btn small">Invia</button></form></details>`}</div>`;
     paintPanel();
@@ -178,9 +206,16 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
       else if (d.reminder) void act(() => api.updateReminder(d.reminder!, { status: d.to as NodeReminder['status'] }));
       else if (d.proposalStart) { const p = view?.proposals?.find(x => x.id === d.proposalStart); if (p) cb.launch(nodeId!, { squad: true, teamId: 'new', proposal: p }); }
       else if (d.proposalDiscard) void act(() => api.discardProposal(nodeId!, d.proposalDiscard!));
-      else if (d.card && t.tagName !== 'BUTTON' && !(e.target as HTMLElement).closest('input,select,textarea,a,button')) { openCard = openCard === d.card ? null : d.card; signature = ''; paint(); }
+      else if (d.card && t.tagName !== 'BUTTON' && !(e.target as HTMLElement).closest('input,select,textarea,a,button')) toggleCard(d.card);
+    });
+    // Keyboard: Enter or Space on a focused card opens and closes it.
+    el.querySelector('.lavoro')!.addEventListener('keydown', e => {
+      const k = e as KeyboardEvent, card = (k.target as HTMLElement).dataset?.card;
+      if (card && (k.key === 'Enter' || k.key === ' ')) { k.preventDefault(); toggleCard(card); }
     });
   }
+
+  function toggleCard(card: string): void { openCard = openCard === card ? null : card; signature = ''; paint(); }
 
   function setPanel(next: typeof panel): void { panel = next; shell = ''; paint(); if (next === 'link') void refresh(true); el.querySelector<HTMLElement>('[data-panel-box] input, [data-panel-box] textarea')?.focus(); }
 
@@ -190,8 +225,8 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     const needs = (t: TeamSummary) => t.tasks.blocked + t.inbox;
     const chip = (id: string, body: string, title = '') => `<button class="squad-tab ${team === id ? 'selected' : ''}" data-filter="${esc(id)}" aria-pressed="${team === id}" title="${esc(title)}">${body}</button>`;
     const open = reminders.filter(r => r.status !== 'done').length;
-    const html = list.filter(t => !t.archived || t.id === team).map(t => chip(t.id, ui`${swatch(t)}<span>${esc(t.name)}</span><small>${t.alive ? ui`${t.alive} attivi` : tr('ferma')}</small>${needs(t) ? `<b class="needs-badge">${needs(t)}</b>` : ''}`, t.objective ?? '')).join('')
-      + chip('brain', ui`${swatch(undefined)}<span>Main Brain</span><small>${brainSession ? esc(brainSession.code ?? '') : tr('non attivo')}</small>`)
+    const html = list.filter(t => !t.archived || t.id === team).map(t => chip(t.id, ui`${swatch(t)}<span>${esc(t.name)}</span>${needs(t) ? `<b class="needs-badge">${needs(t)}</b>` : ''}`, [t.alive ? ui`${t.alive} attivi` : tr('ferma'), t.objective ?? ''].filter(Boolean).join(' · '))).join('')
+      + chip('brain', ui`${swatch(undefined)}<span>Main Brain</span>`, brainSession ? brainSession.code ?? '' : tr('non attivo'))
       + chip(REMINDERS, ui`<span>Promemoria</span>${team === REMINDERS && open ? `<small>${open}</small>` : ''}`, tr('Promemoria del nodo, senza agenti'))
       + ui`<button class="squad-tab add" data-new-squad title="Avvia un’altra squadra nello stesso nodo, con la sua bacheca">＋ Squadra</button>`;
     if (nav.innerHTML !== html) nav.innerHTML = html;
@@ -223,16 +258,29 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
       for (const s of (team === 'brain' ? (view.brain ? [view.brain] : []) : view.sessions)) if (s.alive && sessionTone(s) === 'attention') lanes.you.unshift(ui`<article class="lavoro-card" data-tone="attention"><header><span class="work-code">${esc(s.code ?? '')}</span><small>${esc(s.name || roleName(s))}</small></header><strong>${esc(toneReason(s))}</strong><footer><button class="btn small primary" data-goto="${esc(s.id)}">Apri terminale</button></footer></article>`);
       for (const i of view.inbox ?? []) if (inboxLane(i) === 'you') lanes.you.push(inboxCard(i)); else if (lanes.done.length < 14) lanes.done.push(inboxCard(i));
     }
-    const empty: Record<LaneId, string> = { todo: tr('Niente da fare'), doing: tr('Nessuno sta lavorando'), you: tr('Niente per te'), done: '—' };
-    for (const [id] of LANES) {
-      const lane = el.querySelector(`[data-lane="${id}"]`)!;
+    const empty: Record<LaneId, string> = { todo: tr('Niente in coda'), doing: tr('Nessuno sta lavorando'), you: '', done: '—' };
+    // Only a field being typed in holds a lane still; a focused card is repainted and gets its focus back.
+    const active = document.activeElement as HTMLElement | null;
+    const typing = active?.matches('input,select,textarea') ? active : null;
+    const focusedCard = !typing ? active?.closest<HTMLElement>('[data-card]')?.dataset.card : undefined;
+    for (const id of ['you', ...LANES.map(([lane]) => lane)] as LaneId[]) {
+      const lane = el.querySelector(`[data-lane="${id}"]`); if (!lane) continue;
       const cards = id === 'done' ? lanes.done.slice(0, 14) : lanes[id];
-      lane.querySelector('.kanban-count')!.textContent = String(lanes[id].length);
+      lane.querySelector('.kanban-count')!.textContent = lanes[id].length ? String(lanes[id].length) : '';
       lane.classList.toggle('alert', id === 'you' && lanes.you.length > 0);
-      if (!lane.contains(document.activeElement)) lane.querySelector('.lavoro-cards')!.innerHTML = cards.join('') || `<p class="kanban-empty muted">${esc(empty[id])}</p>`;
+      if (!typing || !lane.contains(typing)) lane.querySelector('.lavoro-cards')!.innerHTML = cards.join('') || (id === 'you' ? hintLine() : `<p class="kanban-empty muted">${esc(empty[id])}</p>`);
     }
+    if (focusedCard && document.activeElement === document.body) el.querySelector<HTMLElement>(`[data-card="${CSS.escape(focusedCard)}"]`)?.focus({ preventScroll: true });
     paintMessages();
     paintError();
+  }
+
+  /** "Serve te" when empty: one sentence on the squad and, if useful, the button for the next move. */
+  function hintLine(): string {
+    if (team === 'brain') return ui`<p class="lavoro-hint"><span>✓ Niente per te: nessuna proposta da valutare.</span></p>`;
+    const hint = boardHint(view!.tasks, view!.sessions.filter(s => s.alive && s.role).length);
+    const button = hint.action === 'agent' ? ui`<button class="btn small primary" data-add-agent>＋ Agente</button>` : hint.action === 'task' ? ui`<button class="btn small" data-new>＋ Incarico</button>` : '';
+    return `<p class="lavoro-hint"><span>${hint.action === 'agent' ? '' : '✓ '}${esc(hint.text)}</span>${button}</p>`;
   }
 
   /** One line under the filters: objective, summary, and who is on the squad. */
@@ -242,8 +290,8 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     const info = team === 'brain' ? null : view!.team;
     const objective = info?.objective || '', summary = view!.summary;
     const members = (team === 'brain' ? (view!.brain ? [view!.brain] : []) : view!.sessions).slice().sort((a, b) => Number(b.alive) - Number(a.alive) || Number(b.role === 'orchestrator') - Number(a.role === 'orchestrator'));
-    const memberHtml = members.map(s => ui`<button class="member-chip" data-goto="${s.id}" data-tone="${sessionTone(s) ?? ''}" title="${esc([s.agent, s.model, s.effort, toneReason(s)].filter(Boolean).join(' · '))}"><i></i>${esc(s.code ?? s.id)}<small>${esc(s.name || roleName(s))}</small></button>`).join('');
-    const html = `<div class="lavoro-objective">${objective ? `<p><b>${esc(tr('Obiettivo'))}</b> ${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? `<p class="muted">${esc(tr('Nessun obiettivo. Impostalo dal menu ···'))}</p>` : ''}</div><div class="lavoro-members">${memberHtml}${info ? ui`<button class="member-chip add" data-add-agent>＋ Agente</button>` : ''}</div>`;
+    const memberHtml = members.map(s => ui`<button class="member-chip" data-goto="${s.id}" data-tone="${sessionTone(s) ?? ''}" title="${esc([s.name || roleName(s), toneReason(s), s.agent, s.model, s.effort].filter(Boolean).join(' · '))}"><i></i>${esc(s.code ?? s.id)}</button>`).join('');
+    const html = `<div class="lavoro-objective">${objective ? `<p class="clamp" title="${esc(objective)}">${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? `<p class="muted">${esc(tr('Nessun obiettivo. Impostalo dal menu ···'))}</p>` : ''}</div><div class="lavoro-members">${memberHtml}${info ? ui`<button class="member-chip add" data-add-agent title="Aggiungi agente">＋</button>` : ''}</div>`;
     if (box.innerHTML !== html) box.innerHTML = html;
   }
 
@@ -311,7 +359,10 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
       t.status !== 'done' ? ui`<button class="btn small ghost" data-task-done="${t.id}">Segna completato</button>` : ui`<button class="btn small ghost" data-task-reopen="${t.id}">Riapri</button>`,
     ].join('');
     const assign = open && t.status !== 'done' && live.length ? ui`<div class="board-row"><select data-assign-to="${t.id}" aria-label="Assegna a">${live.map(s => `<option value="${esc(s.id)}" ${s.id === t.assignedTo ? 'selected' : ''}>${esc(who(s.id))}</option>`).join('')}</select><button class="btn small" data-task-assign="${t.id}">Assegna</button></div>` : '';
-    return ui`<article class="lavoro-card ${open ? 'open' : ''}" data-card="${id}" data-status="${t.status}" tabindex="0"><header>${assignee ? `<span class="work-code">${esc(assignee.code ?? '')}</span>` : ''}<small>${t.assignedTo ? esc(who(t.assignedTo)) : tr('Non assegnato')}</small>${t.held ? ui`<em class="held-flag">In smistamento</em>` : ''}</header><strong>${esc(t.title)}</strong>${t.result ? `<p class="${open ? '' : 'clamp'}">${codeLinks(esc(t.result))}</p>` : ''}${open && t.scope.length ? `<small class="muted">${esc(t.scope.join(', '))}</small>` : ''}${open ? `${assign}<footer>${actions}</footer>` : ''}</article>`;
+    const status = taskStatus(t, assignee);
+    // Done cards stay one line until opened; the others show their latest result.
+    const result = t.result && (open || t.status !== 'done') ? `<p class="lavoro-result ${open ? '' : 'clamp'}">${codeLinks(esc(t.result))}</p>` : '';
+    return ui`<article class="lavoro-card ${open ? 'open' : ''}" data-card="${id}" data-status="${t.status}" tabindex="0" aria-expanded="${open}"><strong>${esc(t.title)}</strong><p class="lavoro-status" data-tone="${status.tone}"><i></i>${codeLinks(esc(status.text))}${t.held ? ui` · <em class="held-flag">In smistamento</em>` : ''}</p>${result}${open && t.scope.length ? `<small class="muted lavoro-scope">${esc(t.scope.join(', '))}</small>` : ''}${open ? `${assign}<footer>${actions}</footer>` : ''}</article>`;
   }
 
   function inboxCard(i: InboxItem): string {

@@ -58,11 +58,9 @@ const terminals = new Terminals(document.getElementById('terminals')!, {
     }
     graph.invalidate();
   },
+  // the terminals already read the links with every session sync: the map reuses that read
+  linksChanged: (links) => { store.sessionLinks = links; graph.invalidate(); },
 });
-
-setInterval(() => { void api.teamLinks().then(links => {
-  if (JSON.stringify(links) !== JSON.stringify(store.sessionLinks)) { store.sessionLinks = links; graph.invalidate(); }
-}).catch(() => {}); }, 4000);
 
 let fitAfterLoad = false;
 function toggleCompact(): void {
@@ -213,7 +211,7 @@ store.on('extra', () => void loadGraph());
 store.on('pins', () => relayout());
 
 function connectEvents(): void {
-  const ws = new WebSocket(ui`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/events`);
+  const ws = new WebSocket(ui`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/events${api.graphEventQuery()}`);
   let graphTimer = 0;
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data) as EventMessage;

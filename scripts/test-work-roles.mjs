@@ -67,6 +67,7 @@ for (const tone of ['attention', 'stale']) assert.ok(TONES.includes(tone), `${to
 assert.equal(toneFlag('attention'), 'Da rispondere');
 assert.equal(toneFlag('stale'), 'Inattivo');
 assert.equal(toneFlag('active'), '');
+assert.equal(toneFlag('blocked'), 'Bloccato');
 assert.equal(toneFlag('attention', { ...op, attention: 'permission' }), 'Permesso richiesto');
 assert.equal(sessionTone({ ...op, workState: 'idle' }), 'idle', '`now` defaults to the clock');
 

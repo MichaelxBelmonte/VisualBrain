@@ -82,7 +82,7 @@ export function toneReason(s: ToneSession, now = Date.now()): string {
 
 /** A visible word next to the tones that colour and shape alone would undersell; '' for the others. */
 export function toneFlag(tone: SessionTone | null, session?: ToneSession): string {
-  return tone === 'attention' ? (session?.attention === 'permission' ? tr('Permesso richiesto') : tr('Da rispondere')) : tone === 'stale' ? tr('Inattivo') : '';
+  return tone === 'attention' ? (session?.attention === 'permission' ? tr('Permesso richiesto') : tr('Da rispondere')) : tone === 'blocked' ? tr('Bloccato') : tone === 'stale' ? tr('Inattivo') : '';
 }
 
 /** Whole minutes an operator / reviewer has been waiting with nothing to do; null when it is not idle or only just became so. */

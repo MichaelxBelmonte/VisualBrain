@@ -37,6 +37,7 @@ jobs:
           npm run typecheck
           npm run test:work
           node scripts/test-update.mjs
+          node scripts/test-release-guard.mjs
           node scripts/test-launch.mjs
           node scripts/test-terminal-service.mjs
           node scripts/test-terminal-runtime.mjs

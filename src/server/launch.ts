@@ -1,7 +1,7 @@
 // Launching Claude Code, Codex CLI or Hermes from a node, with the node's context as the first prompt.
-import { closeSync, mkdirSync, openSync, readdirSync, readSync, realpathSync, writeFileSync } from 'node:fs';
+import { accessSync, closeSync, constants, mkdirSync, openSync, readdirSync, readSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -252,13 +252,17 @@ export function forgetAgents(): void { agentsCache = null; }
 export function hasAgents(cfg: Config): { claude: boolean; codex: boolean; hermes: boolean; agy: boolean } {
   if (agentsCache) return agentsCache;
   const home = homedir();
-  const path = [`${home}/.local/bin`, `${home}/.local/node/bin`, '/opt/homebrew/bin', '/usr/local/bin', process.env.PATH ?? ''].join(':');
+  const dirs = new Set([`${home}/.local/bin`, `${home}/.local/node/bin`, '/opt/homebrew/bin', '/usr/local/bin', ...(process.env.PATH ?? '').split(':')]);
   const which = (bin: string): boolean => {
-    try {
-      return spawnSync('/usr/bin/which', [bin], { env: { ...process.env, PATH: path }, encoding: 'utf8' }).status === 0;
-    } catch {
-      return false;
-    }
+    if (!bin || typeof bin !== 'string') return false;
+    const candidates = bin.includes('/') ? [bin] : [...dirs].map(dir => `${dir || '.'}/${bin}`);
+    return candidates.some(file => {
+      try {
+        if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return false;
+        accessSync(file, constants.X_OK);
+        return true;
+      } catch { return false; }
+    });
   };
   agentsCache = { claude: which(cfg.agents.claude), codex: which(cfg.agents.codex), hermes: which(cfg.agents.hermes), agy: which(cfg.agents.agy) };
   return agentsCache;

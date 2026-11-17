@@ -1,13 +1,22 @@
 # Release e aggiornamenti automatici
 
-Visual Brain segue lo stesso schema di JetTrace: il codice è in un repository **privato** (`MichaelxBelmonte/VisualBrain`), i pacchetti e il feed degli aggiornamenti in uno **pubblico** (`MichaelxBelmonte/VisualBrain-releases`). Le app installate leggono solo quello pubblico.
+Il codice è nel repository **pubblico** `MichaelxBelmonte/VisualBrain` (open source dalla 0.2.48: ogni commit e ogni tag sono visibili a tutti), i pacchetti e il feed degli aggiornamenti in `MichaelxBelmonte/VisualBrain-releases`. Le app installate leggono solo il secondo.
 
 ## Pubblicare una versione
 
-1. Aumenta la versione in `package.json`, `package-lock.json`, `app/src-tauri/Cargo.toml`, `app/src-tauri/Cargo.lock` (pacchetto `visual-brain-app`), `app/src-tauri/tauri.conf.json` e nella prima riga di `docs/INSTALL-IT.txt` / `INSTALL-EN.txt`.
-2. `git commit`, poi `git tag vX.Y.Z` e `git push --follow-tags`. Il workflow **Build Visual Brain** gira su un Mac di GitHub: typecheck, test, indicizzatore nativo, pacchetto universal, verifica. Non pubblica nulla: conserva il pacchetto in una release privata in bozza `build-ID` (le quote degli artefatti di Actions si esauriscono).
-3. A build riuscita: `npm run release:publish -- ID_BUILD [--notes "cosa cambia"]` (l'ID è nell'indirizzo della run). Lo script scarica il pacchetto, ricontrolla checksum, firma e versione, **firma il feed su questo Mac** con `.release-keys/update-private.pem`, crea la release `vX.Y.Z` nel repository pubblico e verifica il feed senza autenticazione. Una versione già pubblicata non si sovrascrive. `--dry-run` fa solo i controlli.
-4. Senza GitHub Actions: `npm run package:mac` e `npm run release:publish -- --zip release/Visual-Brain-X.Y.Z-mac-universal.zip`.
+L'ordine conta: **commit → build verde → pacchetto → prova → pubblicazione → tag**. Il workflow non pubblica e non firma: è la prova del commit. Il pacchetto pubblico si crea su questo Mac, perché solo qui c'è la firma stabile.
+
+1. Aumenta la versione in `package.json`, `package-lock.json`, `app/src-tauri/Cargo.toml`, `app/src-tauri/Cargo.lock` (pacchetto `visual-brain-app`), `app/src-tauri/tauri.conf.json` e nella prima riga di `docs/INSTALL-IT.txt` / `INSTALL-EN.txt`. Scrivi `docs/releases/RELEASE-X.Y.Z.md`.
+2. `git commit` e `git push` (senza tag). Avvia la build su quel commit: `gh workflow run build.yml --ref main`, poi `gh run watch`. Typecheck, test, indicizzatore nativo, pacchetto universal, verifica su un Mac di GitHub. Se fallisce si corregge con un nuovo commit e si riparte da qui: nulla è ancora pubblico.
+3. A build verde, senza altre modifiche nella cartella: `npm run package:mac`. Il pacchetto registra in `release/build.json` il commit da cui nasce.
+4. `npm run release:publish -- --zip release/Visual-Brain-X.Y.Z-mac-universal.zip --dry-run`. Ricontrolla checksum, firma stabile e versione, e rifiuta il pacchetto se non viene da un commit pulito, già su origin e con la build riuscita (`scripts/release-guard.mjs`). Senza `--dry-run`, e con `--notes "cosa cambia"`, **firma il feed su questo Mac** con `.release-keys/update-private.pem`, crea la release `vX.Y.Z` nel repository dei pacchetti e verifica il feed senza autenticazione. Una versione già pubblicata non si sovrascrive.
+5. Solo ora `git tag vX.Y.Z` e `git push origin vX.Y.Z`: il tag indica il commit del pacchetto pubblicato. Installa l'aggiornamento da un'app con la versione precedente (**Altro → Cerca aggiornamenti**) e controlla che i terminali restino aperti.
+
+`--allow-untested` pubblica anche se un controllo fallisce e scrive quale: solo per un'emergenza, mai per abitudine. `release:publish -- ID_BUILD` scarica il pacchetto del workflow, che dalla 0.2.45 viene rifiutato perché ha la firma ad-hoc: resta per quando il workflow avrà una firma propria.
+
+### Cosa è andato storto nella 0.2.49 (17 novembre 2026)
+
+Il pacchetto è stato creato alle 20:58, **due minuti prima del commit di release** (21:00), quindi da file non ancora in git. È stato pubblicato alle 21:10:05, cinque secondi prima che il tag arrivasse su GitHub. La build del tag è poi **fallita** (`test-terminal-service`, attesa del ridisegno dopo il riaggancio), corretta dal commit successivo `c9d5898`, che **non è nel pacchetto pubblicato**. In più lo script di pubblicazione è stato modificato durante la pubblicazione stessa (`a5fb14b`). Il pacchetto pubblico quindi non corrisponde a un commit verificato. I controlli del punto 4 nascono da qui; la 0.2.50 deve contenere `c9d5898`.
 
 ## Come si aggiornano le app installate
 
@@ -44,9 +53,9 @@ Riferimenti: [Apple: requisiti e identità autofirmate](https://developer.apple.
 
 ## Releases and automatic updates (English)
 
-Same layout as JetTrace: code in the **private** repository `MichaelxBelmonte/VisualBrain`, packages and the update feed in the **public** `MichaelxBelmonte/VisualBrain-releases`.
+Code in the **public** repository `MichaelxBelmonte/VisualBrain` (open source since 0.2.48), packages and the update feed in `MichaelxBelmonte/VisualBrain-releases`.
 
-**Publish:** bump the version (the files listed above), commit, `git tag vX.Y.Z`, `git push --follow-tags`; the *Build Visual Brain* workflow tests and packages on a GitHub Mac and publishes nothing. Then `npm run release:publish -- BUILD_ID [--notes "..."]` re-checks the package, signs the feed on this Mac, creates the public release and verifies the feed unauthenticated. Published versions are never overwritten; `--dry-run` only checks.
+**Publish**, in this order: bump the version (the files listed above) and write the release notes; commit and push without a tag; `gh workflow run build.yml --ref main` and wait for a green build (it tests the commit and publishes nothing); `npm run package:mac` on this Mac, the only place with the stable signature; `npm run release:publish -- --zip release/Visual-Brain-X.Y.Z-mac-universal.zip --dry-run`, then again without `--dry-run` and with `--notes "..."`; finally `git tag vX.Y.Z` and push the tag. Publishing re-checks the package, refuses one that does not come from a clean, pushed commit with a green build, signs the feed on this Mac, creates the public release and verifies the feed unauthenticated. Published versions are never overwritten. 0.2.49 was packaged before its release commit and published before its tag was built, and that build failed: the checks exist because of it.
 
 **Installed apps** check the feed 30 s after launch and every 6 h (**Altro → Cerca aggiornamenti** checks now). The Ed25519-signed feed, the releases-repository URL and the package SHA256 are all verified; downgrades are refused. The package downloads in the background and a banner offers **Installa / Più tardi**. Installing moves the running app aside and puts the new one at the same path: no terminal is touched, sessions started in 0.2.17 keep running even when you quit (⌘Q) and reopen, through an independent terminal service. Sessions started in 0.2.16 or earlier cannot be transferred: finish their work before the first restart. Graph and team APIs are unavailable while the app is closed. The moved-aside copy is deleted once no process uses it, so one app is on disk at any time. An app opened from Downloads without moving it runs translocated from a read-only copy: then (or when its folder is not writable) the update is installed into Applications instead (an existing copy there is swapped, else /Applications, else ~/Applications), the translocated copy is left alone, and the app reopens from Applications after ⌘Q. Updates run only in the installed app, never in local runs or the Trial package. The private key lives only in `.release-keys/`: keep a protected copy and never regenerate it.
 

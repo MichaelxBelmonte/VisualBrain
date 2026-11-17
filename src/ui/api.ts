@@ -5,16 +5,21 @@ import type { NodeReminder, ReminderBoard, AgentName, ModelChoice, TeamLink, Tea
 /** One agent CLI as Impostazioni → Agenti shows it (src/server/agent-clis.ts). */
 export interface AgentCli { id: AgentName; label: string; command: string; path: string | null; version: string | null; signedIn: boolean | null; account: string | null; installCommand: string; canLogout: boolean; docs: string }
 
-async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const r = await fetch(url, { method, headers: body === undefined ? {} : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+let graphPreview: string | null = null;
+let firstGraph = true;
+
+async function call<T>(method: string, url: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
+  const r = await fetch(url, { method, headers: body === undefined ? headers : { 'content-type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await r.text();
   let data: unknown = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }
   if (!r.ok) throw new Error((data as { error?: string })?.error ?? ui`${method} ${url}: ${r.status}`);
+  if (url.startsWith('/api/graph?')) graphPreview = r.headers.get('x-vb-map-preview');
   return data as T;
 }
 
 export const api = {
+  graphEventQuery: (): string => graphPreview ? '?' + new URLSearchParams({ preview: graphPreview }) : '',
   readReminderBoard: (nodeId: number) => call<ReminderBoard>('GET', `/api/reminder-board?nodeId=${nodeId}`),
   reminders: () => call<NodeReminder[]>('GET', '/api/reminders'),
   createReminder: (body: { nodeId: number; title: string; notes: string; folderId?: string; status: NodeReminder['status'] }) => call<NodeReminder>('POST', '/api/reminders', body),
@@ -31,13 +36,16 @@ export const api = {
   graph: (q: { expanded: number[]; kinds: string[] | null; min: number; symlinks: boolean; externals: boolean; extra: number[] }) => {
     const p = new URLSearchParams();
     p.set('view', 'projects');
+    p.set('detail', 'map');
     if (q.expanded.length) p.set('expanded', q.expanded.join(','));
     if (q.kinds) p.set('kinds', q.kinds.join(','));
     if (q.min > 0) p.set('min', String(q.min));
     if (q.symlinks) p.set('symlinks', '1');
     if (q.externals) p.set('externals', '1');
     if (q.extra.length) p.set('extra', q.extra.join(','));
-    return call<GraphPayload>('GET', ui`/api/graph?${p}`);
+    const headers = firstGraph ? { 'x-vb-startup-map': '1' } : undefined;
+    firstGraph = false;
+    return call<GraphPayload>('GET', ui`/api/graph?${p}`, undefined, headers);
   },
   node: (id: number) => call<NodeDetail>('GET', ui`/api/node/${id}`),
   children: (id: number, limit = 200, offset = 0, sort = 'importance') => call<{ children: GraphNode[]; total: number }>('GET', ui`/api/node/${id}/children?limit=${limit}&offset=${offset}&sort=${sort}`),

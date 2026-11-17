@@ -15,7 +15,12 @@ export interface SettingsHooks {
   appVersion(): string;
 }
 let hooks: SettingsHooks | null = null;
-export function setSettingsHooks(value: SettingsHooks): void { hooks = value; }
+export function setSettingsHooks(value: SettingsHooks): void {
+  hooks = value;
+  // The canvas and the terminals copy the colours once. With "Sistema" they change when macOS does, and the Mac window
+  // takes a new appearance a moment after the choice: re-read them when the scheme really changes.
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => hooks?.onThemeChange());
+}
 
 type Theme = 'light' | 'dark' | 'system';
 function currentTheme(): Theme { try { const v = localStorage.getItem('vb:theme'); return v === 'light' || v === 'dark' ? v : 'system'; } catch { return 'system'; } }

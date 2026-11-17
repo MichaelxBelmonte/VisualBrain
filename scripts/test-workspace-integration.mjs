@@ -253,3 +253,34 @@ assert.match(panel.innerHTML,/data-link-with="session:op"/,'a node may link dire
 sidebar.railLinkSource='session:dead'; sidebar.renderRailLinks();
 assert.equal(panel.innerHTML,''); assert.equal(sidebar.railLinkSource,null,'expired source closes the panel');
 console.log('PASS sidebar connection panel: deduplicated node choices, explicit operators and expired source cleanup');
+
+// Opening Lavoro before the pinned node is ready should repaint it as soon as restore resolves.
+const restoring = Object.create(Terminals.prototype);
+const nodeRequested = Promise.withResolvers();
+const nodeResponse = Promise.withResolvers();
+const originalFetch = globalThis.fetch;
+let boardPaints = 0;
+memory.set('vb:work-nodes', '[138]');
+Object.assign(restoring, {
+  nodes: new Map(), pendingNodes: new Map(), sideOpen: true, boardOpen: false,
+  isOpen: () => true, renderList() {}, refreshLinks: async () => {},
+  renderBody() { assert.equal(this.nodes.get(138)?.name, 'Pinned'); boardPaints++; },
+});
+try {
+  globalThis.fetch = async url => {
+    if (url === '/api/terminals') return Response.json([]);
+    assert.equal(url, '/api/node/138');
+    nodeRequested.resolve();
+    return nodeResponse.promise;
+  };
+  const restored = restoring.restore();
+  await nodeRequested.promise;
+  restoring.boardOpen = true;
+  nodeResponse.resolve(Response.json({ id: 138, name: 'Pinned' }));
+  await restored;
+  assert.equal(boardPaints, 1);
+} finally {
+  globalThis.fetch = originalFetch;
+  memory.delete('vb:work-nodes');
+}
+console.log('PASS opening the board during restore shows its pinned node when the detail arrives');

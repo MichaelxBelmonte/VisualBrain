@@ -29,6 +29,8 @@ export interface CProject extends ProjectInfo {
 }
 
 export interface GraphQuery {
+  /** The canvas needs the visible projects and edge geometry. The node panel requests evidence separately. */
+  mapOnly?: boolean;
   expanded: number[];
   kinds: Set<string> | null;
   /** Minimum importance of the files shown inside folders with more than 40 entries. */
@@ -437,18 +439,18 @@ export class GraphCache {
       if (prev) {
         prev.count += e.count;
         prev.confidence = Math.max(prev.confidence, e.confidence);
-        if (prev.sample.length < 3) prev.sample.push(e.id);
+        if (!q.mapOnly && prev.sample.length < 3) prev.sample.push(e.id);
         if (prev.origin !== e.origin) prev.origin = 'misto';
         if (prev.id !== undefined) delete prev.id;
       } else {
-        rolled.set(key, { id: e.id, src: a, dst: b, kind: e.kind as GraphEdge['kind'], verified: e.verified, confidence: e.confidence, count: e.count, evidence: [], origin: e.origin, sample: [e.id] });
+        rolled.set(key, { id: e.id, src: a, dst: b, kind: e.kind as GraphEdge['kind'], verified: e.verified, confidence: e.confidence, count: e.count, evidence: [], origin: e.origin, sample: q.mapOnly ? [] : [e.id] });
       }
     }
     // A sample of evidence (at most three) for each rolled-up edge, read now for just these edges.
-    const evidence = this.evidence([...rolled.values()].flatMap((r) => r.sample));
+    const evidence = q.mapOnly ? null : this.evidence([...rolled.values()].flatMap((r) => r.sample));
     const edges: GraphEdge[] = [];
     for (const { sample, ...edge } of rolled.values()) {
-      for (const id of sample) { const first = evidence.get(id)?.[0]; if (first) edge.evidence.push(first); }
+      if (evidence) for (const id of sample) { const first = evidence.get(id)?.[0]; if (first) edge.evidence.push(first); }
       edges.push(edge);
     }
     return {
@@ -457,7 +459,7 @@ export class GraphCache {
       expanded: [...applied],
       view: q.view,
       topLevel: [...top].filter((id) => visible.has(id)),
-      projects: [...this.projects.values()],
+      projects: [...this.projects.values()].filter(p => !q.mapOnly || visible.has(p.nodeId)),
     };
   }
 

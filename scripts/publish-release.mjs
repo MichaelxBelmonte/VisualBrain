@@ -1,6 +1,9 @@
 // Publishes a tested build as a public release and updates the feed that installed apps read.
-//   node scripts/publish-release.mjs RUN_ID [--notes "testo"] [--dry-run]    pacchetto compilato da GitHub Actions (consigliato)
-//   node scripts/publish-release.mjs --zip FILE.zip [--notes "testo"] [--dry-run]   pacchetto locale (prima pubblicazione o emergenza)
+//   node scripts/publish-release.mjs --zip FILE.zip [--notes "testo"] [--dry-run]   the package made here by `npm run package:mac`
+//   node scripts/publish-release.mjs RUN_ID [--notes "testo"] [--dry-run]    a package built by GitHub Actions
+// Since 0.2.45 only a package signed with the local identity passes: the workflow has no key, so its package is the test
+// of the commit, not what gets published. A local package must come from a clean, pushed commit with a green build
+// (scripts/release-guard.mjs); --allow-untested publishes anyway and says which checks failed.
 // Needs `gh` logged in as the owner. A published version is never overwritten. The feed is signed here, on this Mac.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -10,6 +13,7 @@ import { UPDATE_PUBLIC_KEY } from '../src/server/update-key.ts';
 import { UPDATE_REPO, forget, parseFeed } from '../src/server/updater.ts';
 import { buildFeed, signFeed } from './make-feed.mjs';
 import { verifyReleaseIdentity } from './local-signing.mjs';
+import { sourceFacts, sourceProblems } from './release-guard.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const CODE_REPO = 'MichaelxBelmonte/VisualBrain';
@@ -47,6 +51,11 @@ if (plist('CFBundleIdentifier') !== 'com.jethr.visualbrain' || plist('CFBundleSh
 await forget(probe); // the extracted copy leaves Launch Services and the disk: no "forbidden" icon in Launchpad
 const pkgVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 if (!zip.startsWith(work) && pkgVersion !== version) throw Error(`package.json è ${pkgVersion}, il pacchetto ${version}.`);
+if (!zip.startsWith(work)) {
+  const problems = sourceProblems(sourceFacts(root, zip, hash, CODE_REPO));
+  if (problems.length && !flag('allow-untested')) throw Error(`Il pacchetto non è pronto per la pubblicazione:\n- ${problems.join('\n- ')}`);
+  for (const problem of problems) console.warn(`ATTENZIONE (--allow-untested): ${problem}`);
+}
 
 let exists = true;
 try { gh('release', 'view', `v${version}`, '-R', UPDATE_REPO); } catch { exists = false; }

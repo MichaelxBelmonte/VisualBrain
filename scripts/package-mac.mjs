@@ -3,6 +3,7 @@ import { readFileSync, mkdirSync, writeFileSync, cpSync, readdirSync, statSync, 
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { localSigning, unlockLocalSigning, signLocal } from './local-signing.mjs';
+import { sourceState } from './release-guard.mjs';
 const root = resolve(import.meta.dirname, '..');
 const arch = process.argv.find(a => a.startsWith('--arch='))?.split('=')[1] || 'universal';
 // --trial: a separate test package. Own app name, own target dir, own output folder (release-trial/); the regular
@@ -12,6 +13,8 @@ const targetOverride = process.argv.find(a => a.startsWith('--target-dir='))?.sl
 const target = { arm64: 'aarch64-apple-darwin', x64: 'x86_64-apple-darwin', universal: 'universal-apple-darwin' }[arch];
 if (!target || process.platform !== 'darwin') throw Error('Build this package on macOS; use --arch=arm64|x64|universal.');
 const run = (file, args, cwd = root) => execFileSync(file, args, { cwd, stdio: 'inherit' });
+// Read before anything is built: publish-release refuses a package that does not come from a clean commit.
+const source = sourceState(root);
 run(process.execPath, ['scripts/build-ui.mjs']);
 const appName = trial ? 'Visual Brain Trial' : 'Visual Brain';
 // An isolated target also lets us prepare an update while an older development bundle is still running.
@@ -88,6 +91,6 @@ else {
   cpSync(join(root, 'docs/INSTALL-EN.txt'), join(release, 'README.txt'));
 }
 const runtimeManifest = JSON.parse(readFileSync(join(root, 'app/runtime/manifest.json')));
-writeFileSync(join(release, 'build.json'), JSON.stringify({ version, arch, signed: !!local || identity !== '-', signing: local ? 'local' : identity === '-' ? 'adhoc' : 'apple', notarized: !!process.env.VB_NOTARY_PROFILE, archive: name, sha256: hash, app: `${appName}.app`, engines: runtimeManifest.engines, ...(trial ? { trial: true } : {}) }, null, 2));
+writeFileSync(join(release, 'build.json'), JSON.stringify({ version, arch, signed: !!local || identity !== '-', signing: local ? 'local' : identity === '-' ? 'adhoc' : 'apple', notarized: !!process.env.VB_NOTARY_PROFILE, archive: name, sha256: hash, commit: source.commit, dirty: source.dirty, app: `${appName}.app`, engines: runtimeManifest.engines, ...(trial ? { trial: true } : {}) }, null, 2));
 console.log(`Package: ${archive}\n${local ? 'Stable local signature (non-Apple), not notarized.' : identity === '-' ? 'Internal build: ad-hoc signature, not notarized.' : 'Signed build.'}`);
 rmSync(stage, { recursive: true, force: true });

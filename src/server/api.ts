@@ -33,9 +33,11 @@ import { setAttention } from './activity.ts';
 import { SEARCH_SQL, isSearchFilter, type SearchFilter } from '../shared/search-filter.ts';
 import { connectGithub, githubRepositories } from './github-connect.ts';
 import { gitEnv } from './git.ts';
+import { mapQuery, type StartupMap } from './startup-map.ts';
 
 export interface ApiCtx {
   db: Db;
+  startupMap?: StartupMap;
   cfg: Config;
   cache: GraphCache;
   terms: TerminalStore;
@@ -62,9 +64,38 @@ export class HttpError extends Error {
 const EDGE_KINDS = new Set(['imports', 'links', 'refpath', 'mention', 'symlink', 'duplicate', 'derived', 'shared_id', 'similar', 'semantic', 'manual', 'uses', 'policy', 'external']);
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  const data = JSON.stringify(body);
+  sendJsonText(res, status, JSON.stringify(body));
+}
+
+export function sendJsonText(res: ServerResponse, status: number, data: string): void {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(data);
+}
+
+// A reload or a second window commonly asks for the same map. A cache swap or edge edit
+// replaces stats. Keep only the last canvas response and cap its retained size.
+const lastCanvasResponse = new WeakMap<GraphCache['stats'], { query: string; json: string }>();
+
+export function graphJson(cache: GraphCache, url: URL): string {
+  const mapOnly = url.searchParams.get('detail') === 'map';
+  const query = mapOnly ? mapQuery(url) : '';
+  const previous = mapOnly ? lastCanvasResponse.get(cache.stats) : undefined;
+  if (previous?.query === query) {
+    return previous.json;
+  }
+  const expanded = (url.searchParams.get('expanded') ?? '').split(',').filter(Boolean).map(Number).filter((n) => Number.isFinite(n));
+  const kindsParam = url.searchParams.get('kinds');
+  const kinds = kindsParam ? new Set(kindsParam.split(',').filter(Boolean)) : null;
+  const min = num(url.searchParams.get('min'), 0);
+  const view = url.searchParams.get('view') === 'folders' ? 'folders' : 'projects';
+  const flag = (name: string, def: boolean) => { const v = url.searchParams.get(name); return v === null ? def : v === '1' || v === 'true'; };
+  const extra = (url.searchParams.get('extra') ?? '').split(',').filter(Boolean).map(Number).filter((n) => Number.isFinite(n));
+  const g = cache.graph({ expanded, kinds, min, view, symlinks: flag('symlinks', view === 'folders'), externals: flag('externals', view === 'folders'), extra, mapOnly });
+  const json = JSON.stringify({ ...g, areas: cache.areas, stats: cache.stats });
+  if (mapOnly && json.length <= 1024 * 1024) {
+    lastCanvasResponse.set(cache.stats, { query, json });
+  }
+  return json;
 }
 
 async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -115,9 +146,14 @@ async function gitRepoView(ctx: ApiCtx, top: string) {
   return { repo: overview, agents };
 }
 
-export function nodeDetail(ctx: ApiCtx, id: number): NodeDetail {
+function requireNode(ctx: ApiCtx, id: number): GraphNode {
   const n = ctx.cache.nodes.get(id);
   if (!n) throw new HttpError(404, 'nodo non trovato');
+  return n;
+}
+
+export function nodeDetail(ctx: ApiCtx, id: number): NodeDetail {
+  const n = requireNode(ctx, id);
   const row = ctx.db.get<Record<string, unknown>>('SELECT link_target, hash, lines, complexity, pagerank FROM nodes WHERE id = ?', id) ?? {};
   const ownProject = ctx.db.get<{ id: number }>('SELECT id FROM projects WHERE node_id = ?', id);
   const project = projectInfo(ctx, ownProject ? ownProject.id : n.projectId);
@@ -194,9 +230,9 @@ function replaceEdgeInCache(ctx: ApiCtx, e: CEdge | null, id: number): void {
   ctx.cache.replaceEdge(id, e);
 }
 
-function status(ctx: ApiCtx): StatusPayload {
+function status(ctx: ApiCtx, stats = ctx.cache.stats): StatusPayload {
   return {
-    stats: ctx.cache.stats,
+    stats,
     config: { roots: ctx.cfg.roots, language: ctx.cfg.language, setupComplete: ctx.cfg.setupComplete, label: ctx.cfg.label?.slice(0, 60) || undefined, llm: { provider: ctx.cfg.llm.provider, model: ctx.cfg.llm.model, effort: ctx.cfg.llm.effort, consent: ctx.cfg.llm.consent }, agents: hasAgents(ctx.cfg) },
     indexing: ctx.state.indexing,
     analyzing: ctx.state.analyzing,
@@ -210,7 +246,7 @@ function runs(ctx: ApiCtx): LlmRun[] {
       bytesSent: Number(r.bytes_sent), nodesSent: Number(r.nodes_sent), status: r.status as LlmRun['status'], error: (r.error as string | null) ?? null, summary: (r.summary as string | null) ?? null }));
 }
 
-export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerResponse, preview?: NonNullable<StartupMap['current']>): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://local');
   const path = url.pathname;
   const method = req.method ?? 'GET';
@@ -223,6 +259,10 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     sendJson(response, status, body);
   };
   try {
+    if (preview) {
+      res.setHeader('x-vb-map-preview', preview.id);
+      return sendJsonText(res, 200, path === '/api/status' ? JSON.stringify(status(ctx, preview.stats)) : preview.json);
+    }
     if (await handleReminderBoard(ctx, req, res)) return;
     const reminderRoute = /^\/api\/reminders(?:\/([a-z0-9-]+))?$/.exec(path);
     if (reminderRoute) {
@@ -317,15 +357,12 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     if (path === '/api/status' && method === 'GET') return send(res, 200, status(ctx));
 
     if (path === '/api/graph' && method === 'GET') {
-      const expanded = (url.searchParams.get('expanded') ?? '').split(',').filter(Boolean).map(Number).filter((n) => Number.isFinite(n));
-      const kindsParam = url.searchParams.get('kinds');
-      const kinds = kindsParam ? new Set(kindsParam.split(',').filter(Boolean)) : null;
-      const min = num(url.searchParams.get('min'), 0);
-      const view = url.searchParams.get('view') === 'folders' ? 'folders' : 'projects';
-      const flag = (name: string, def: boolean) => { const v = url.searchParams.get(name); return v === null ? def : v === '1' || v === 'true'; };
-      const extra = (url.searchParams.get('extra') ?? '').split(',').filter(Boolean).map(Number).filter((n) => Number.isFinite(n));
-      const g = ctx.cache.graph({ expanded, kinds, min, view, symlinks: flag('symlinks', view === 'folders'), externals: flag('externals', view === 'folders'), extra });
-      return send(res, 200, { ...g, areas: ctx.cache.areas, stats: ctx.cache.stats });
+      const json = graphJson(ctx.cache, url);
+      if (ctx.startupMap && url.searchParams.get('detail') === 'map') {
+        const key = mapQuery(url);
+        if (ctx.startupMap.select(key, req.headers['x-vb-startup-map'] === '1')) ctx.startupMap.save(key, json, ctx.cache.stats);
+      }
+      return sendJsonText(res, 200, json);
     }
 
     let m = /^\/api\/node\/(\d+)$/.exec(path);
@@ -472,7 +509,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const b = await readJson(req);
       if (req.headers.authorization || (b.from && b.from !== 'user')) throw new HttpError(403, 'I canali si creano da Operativa');
       const srcNodeId = Number(b.srcNodeId), dstNodeId = Number(b.dstNodeId);
-      nodeDetail(ctx, srcNodeId); nodeDetail(ctx, dstNodeId);
+      requireNode(ctx, srcNodeId); requireNode(ctx, dstNodeId);
       const endpoint = (value: unknown, nodeId: number) => {
         if (value === null || value === undefined) return null;
         if (typeof value !== 'string') throw new HttpError(400, 'Sessione non valida');
@@ -494,7 +531,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     m = /^\/api\/work\/(\d+)(?:\/(messages|tasks|state|spawn|wake|inbox|forward|proposals)(?:\/([a-z0-9-]+))?)?$/.exec(path);
     if (m) {
       const nodeId = Number(m[1]);
-      const detail = nodeDetail(ctx, nodeId); // Reject unknown nodes, including before writing the board.
+      const node = requireNode(ctx, nodeId);
       const action = m[2];
       const taskId = m[3];
       const b = method === 'GET' ? {} : await readJson(req);
@@ -531,12 +568,11 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const notify = () => notifyTeam(ctx, nodeId, team);
       const visible = ({ codes: _codes, members: _members, teams: _teams, nextTeam: _next, savedSquads: _saved, ...rest }: TeamBoard) => rest;
       if (!action && method === 'GET') {
-        const teamList = ctx.teams.summaries(nodeId, all);
-        if (!member) return send(res, 200, { ...visible(board), savedSquads: ctx.teams.get(nodeId).savedSquads, messages: board.messages.slice(-50), sessions, peers, links, team: isBrain ? undefined : ctx.teams.team(nodeId, team), teamList, brain });
+        if (!member) return send(res, 200, { ...visible(board), savedSquads: ctx.teams.get(nodeId).savedSquads, messages: board.messages.slice(-50), sessions, peers, links, team: isBrain ? undefined : ctx.teams.team(nodeId, team), teamList: ctx.teams.summaries(nodeId, all), brain });
         const messages = board.messages.filter(msg => msg.id > member.seenMessage && msg.from !== actor && (!msg.to || msg.to === actor)).slice(0, 50);
         if (messages.length) member.seenMessage = messages.at(-1)!.id;
         const { inbox: _inbox, ...own } = visible(board);
-        if (isBrain) return send(res, 200, { ...own, messages, sessions, peers, links, teamList: teamList.filter(t => !t.archived) });
+        if (isBrain) return send(res, 200, { ...own, messages, sessions, peers, links, teamList: ctx.teams.summaries(nodeId, all).filter(t => !t.archived) });
         // With manual delivery a held result is not the orchestrator's yet: it sees the status, the person forwards the content.
         const held = english ? '(delivered, being sorted by the user)' : '(consegnato, in smistamento dall’utente)';
         const tasks = member.info.role === 'orchestrator' ? board.tasks.map(t => t.held ? { ...t, result: held } : t) : board.tasks.filter(t => t.assignedTo === actor || (t.assignedTo === null && t.status !== 'done'));
@@ -560,7 +596,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
           if (patch.archived && info.worktree && await removeWorktree(ctx.cfg.dataDir, info.worktree.path)) ctx.teams.setTeam(nodeId, team, { worktree: undefined });
         }
         ctx.teams.update(nodeId, b, team);
-        if (actor === 'user' && !isBrain && ['autoSpawn', 'maxAgents', 'worktrees', 'delivery', 'memory'].some(k => b[k] !== undefined)) ctx.teams.saveSquad(nodeId, detail.path, detail.name, sessions, team);
+        if (actor === 'user' && !isBrain && ['autoSpawn', 'maxAgents', 'worktrees', 'delivery', 'memory'].some(k => b[k] !== undefined)) ctx.teams.saveSquad(nodeId, node.path, node.name, sessions, team);
         return send(res, 200, visible(ctx.teams.get(nodeId, team)));
       }
       if (action === 'state' && method === 'POST') {
@@ -633,7 +669,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         if (!member || member.info.role !== 'orchestrator' || !board.policy.autoSpawn) throw new HttpError(403, 'Avvio automatico non abilitato per questo orchestratore');
         if (!['operator', 'reviewer'].includes(String(b.role))) throw new HttpError(400, 'Un delegato deve essere operatore o revisore');
         boundedText(b.task, 1000, true);
-        const launched = await startSession(ctx, detail, { ...b, id: nodeId, mode: 'embedded', parentId: actor, teamId: team } as unknown as LaunchRequest);
+        const launched = await startSession(ctx, nodeDetail(ctx, nodeId), { ...b, id: nodeId, mode: 'embedded', parentId: actor, teamId: team } as unknown as LaunchRequest);
         return send(res, 201, launched);
       }
       if (action === 'wake' && method === 'POST') {
@@ -724,8 +760,8 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       if (req.headers.authorization) throw new HttpError(403, 'Allega i file dalla finestra di avvio');
       const name = req.headers['x-file-name'];
       if (typeof name !== 'string' || !name) throw new HttpError(400, 'Nome del file mancante');
-      const detail = nodeDetail(ctx, Number(url.searchParams.get('node')));
-      return send(res, 201, await saveAttachment(ctx.cfg.dataDir, detail.id, name, req));
+      const node = requireNode(ctx, Number(url.searchParams.get('node')));
+      return send(res, 201, await saveAttachment(ctx.cfg.dataDir, node.id, name, req));
     }
 
     if (path === '/api/launch-squad' && method === 'POST') {

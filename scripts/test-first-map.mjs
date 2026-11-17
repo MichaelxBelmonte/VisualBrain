@@ -2,11 +2,14 @@
 // later passes do not send it. Uso: node scripts/test-first-map.mjs [--files N]
 // Server, profilo, cartelle e porta sono temporanei; l'app installata e i dati reali non vengono toccati.
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { once } from 'node:events';
+import { pathToFileURL } from 'node:url';
+import { api } from '../src/ui/api.ts';
 import WebSocket from 'ws';
 import { DEFAULTS } from '../src/server/config.ts';
 import { Db } from '../src/server/db.ts';
@@ -103,4 +106,124 @@ try {
 } finally {
   child.kill('SIGKILL');
   rmSync(tmp, { recursive: true, force: true });
+}
+
+// Hold hydration in the test child so each race can be exercised even with just two indexed nodes.
+const savedDir = mkdtempSync(join(tmpdir(), 'vb-saved-map-'));
+const savedRoot = join(savedDir, 'root');
+const savedProfile = join(savedDir, 'profile');
+mkdirSync(savedRoot); mkdirSync(savedProfile);
+const savedFile = join(savedProfile, 'startup-map.json');
+const dbFile = join(savedProfile, 'brain.db');
+writeFileSync(join(savedProfile, 'settings.json'), JSON.stringify({ roots: [savedRoot], setupComplete: true }));
+const seed = new Db(dbFile);
+seed.run("INSERT INTO nodes (id,path,name,kind) VALUES (1,?,'root','dir')", savedRoot);
+seed.run("INSERT INTO nodes (id,parent_id,path,name,kind) VALUES (2,1,?,'old','file')", join(savedRoot, 'old'));
+seed.close();
+const gate = join(savedDir, 'gate.mjs');
+writeFileSync(gate, `
+  import { GraphCache } from ${JSON.stringify(pathToFileURL(join(app, 'src/server/cache.ts')).href)};
+  const load = GraphCache.prototype.loadAsync;
+  const resume = new Promise(resolve => process.once('message', resolve));
+  GraphCache.prototype.loadAsync = async function(...args) { await resume; return load.apply(this, args); };
+`);
+const key = '/api/graph?view=projects&detail=map&min=0.25';
+let testServer;
+const sockets = new Set();
+async function boot() {
+  testServer = spawn(process.execPath, ['--import', gate, 'src/cli.ts', 'serve', '--no-watch', '--port', String(port)], {
+    cwd: app, env: { ...process.env, VISUAL_BRAIN_DATA_DIR: savedProfile }, stdio: ['ignore','pipe','pipe','ipc'],
+  });
+  let output = '';
+  for (const stream of [testServer.stdout,testServer.stderr]) stream.on('data', chunk => { output = (output + chunk).slice(-2000); });
+  await waitFor('saved-map test server', () => {
+    if (testServer.exitCode !== null) throw Error(output);
+    return output.includes('Visual Brain: ' + base);
+  }, 20000);
+}
+async function stop() {
+  for (const ws of sockets) ws.terminate();
+  sockets.clear();
+  if (testServer && testServer.exitCode === null && !testServer.signalCode) {
+    const ended = once(testServer, 'exit'); testServer.kill('SIGTERM'); await ended;
+  }
+}
+async function observe(query = '') {
+  const ws = new WebSocket(base.replace('http:', 'ws:') + '/ws/events' + query);
+  sockets.add(ws);
+  const messages = [];
+  ws.on('message', frame => messages.push(JSON.parse(frame)));
+  await once(ws, 'open');
+  return messages;
+}
+const fetchLocal = path => fetch(base + path);
+async function pending(request) {
+  assert.equal(await Promise.race([request.then(() => 'answered'), sleep(40).then(() => 'waiting')]), 'waiting');
+}
+async function cold() {
+  await boot();
+  const response = fetchLocal(key);
+  await pending(response);
+  testServer.send('load');
+  const r = await response;
+  assert.equal(r.status, 200); assert.equal(r.headers.get('x-vb-map-preview'), null);
+  const json = await r.text();
+  await stop();
+  return json;
+}
+try {
+  const first = await cold();
+  const saved = readFileSync(savedFile, 'utf8');
+  for (const broken of ['{', JSON.stringify({ ...JSON.parse(saved), version: -1 }), JSON.stringify({ ...JSON.parse(saved), json: '{}' })]) {
+    writeFileSync(savedFile, broken);
+    assert.equal(await cold(), first);
+  }
+  await boot();
+  const stableEvents = await observe();
+  const restored = await fetchLocal('/api/graph?min=0.25&detail=map&view=projects');
+  const id = restored.headers.get('x-vb-map-preview');
+  assert.ok(id); assert.equal(await restored.text(), first);
+  const status = await fetchLocal('/api/status');
+  assert.deepEqual((await status.json()).stats, JSON.parse(first).stats);
+  assert.equal(status.headers.get('x-vb-map-preview'), id);
+  const detailRequests = ['/api/node/2','/api/search?q=old','/api/work/2',key+'&expanded=2'].map(fetchLocal);
+  await Promise.all(detailRequests.map(pending));
+  testServer.send('load');
+  for (const r of await Promise.all(detailRequests)) { assert.equal(r.status, 200); assert.equal(r.headers.get('x-vb-map-preview'), null); }
+  assert.equal(JSON.parse(readFileSync(savedFile, 'utf8')).query, JSON.parse(saved).query, 'a temporary expanded view does not replace the initial view');
+  assert.equal(await (await fetchLocal(key)).text(), first);
+  assert.equal(stableEvents.length, 0);
+  await stop();
+
+  const changed = new Db(dbFile);
+  changed.run("UPDATE nodes SET name='new',path=? WHERE id=2", join(savedRoot, 'new')); changed.close();
+  await boot();
+  const active = await observe();
+  assert.equal(await (await fetchLocal(key)).text(), first);
+  // The UI fetches relative URLs. Exercise its real fetch client on this disposable server.
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (url, options) => originalFetch(new URL(url, base), options);
+    const args = { expanded: [], kinds: null, min: .25, symlinks: false, externals: false, extra: [] };
+    assert.equal((await api.graph(args)).nodes[0].name, 'old');
+    const reconnect = api.graphEventQuery();
+    assert.equal(new URLSearchParams(reconnect).get('preview'), id);
+    testServer.send('load');
+    await waitFor('preview correction', () => active.some(event => event.type === 'index:map'), 5000);
+    const late = await observe(reconnect);
+    await waitFor('correction replay', () => late.some(event => event.type === 'index:map'), 5000);
+    assert.equal((await api.graph(args)).nodes[0].name, 'new');
+    assert.equal(api.graphEventQuery(), '');
+    const upToDate = await observe(api.graphEventQuery());
+    await sleep(50); assert.equal(upToDate.length, 0);
+  } finally { globalThis.fetch = originalFetch; }
+  await stop();
+  await boot();
+  const replaced = await fetchLocal(key);
+  assert.ok(replaced.headers.get('x-vb-map-preview')); assert.equal((await replaced.json()).nodes[0].name, 'new');
+  testServer.send('load');
+  console.log('PASS persisted first map: miss, match, corrupt/version, parameter mismatch, gated details, offline edit, live/late correction and clean reconnect');
+} finally {
+  await stop();
+  rmSync(savedDir, { recursive: true, force: true });
 }
