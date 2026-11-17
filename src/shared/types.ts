@@ -330,6 +330,7 @@ export interface LaunchRequest extends LaunchOptions {
 
 /** Messages on /ws/events */
 export type EventMessage =
+  | { type: 'stats:changed' }
   | { type: 'index:progress'; phase: string; done: number; total?: number; message?: string }
   | { type: 'index:map'; stats: Stats }
   | { type: 'index:done'; stats: Stats; ms: number }

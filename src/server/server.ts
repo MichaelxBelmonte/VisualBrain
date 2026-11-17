@@ -15,6 +15,7 @@ import { folderAccess } from './access.ts';
 import { startTeamWatch } from './team-watch.ts';
 import { stopHarnessInstalls } from './harness-installer.ts';
 import { graphJson, handleApi, sendJsonText, type ApiCtx } from './api.ts';
+import { MegaStats } from './mega-stats.ts';
 import { mapQuery, StartupMap } from './startup-map.ts';
 import { dbFileOf, runIndexOffThread } from './index-runner.ts';
 import { coalesceSubtrees } from './scan.ts';
@@ -202,11 +203,14 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   const updater = new Updater({ dataDir: cfg.dataDir, version, liveSessions: () => terms.list().filter(t => t.alive).length, persistentTerminals: true });
   // A folder macOS refused is mapped again as soon as the user allows it in System Settings.
   const access = folderAccess(() => cfg.setupComplete ? cfg.roots : [], () => { startIndex(); });
+  const stats = new MegaStats(join(cfg.dataDir, 'work-stats.sqlite'), () => events.send({type:'stats:changed'}));
   const ctx: ApiCtx = {
-    db, cfg, cache, startupMap, terms, teams, updater, access, state, startIndex, startAnalyze, configure,
+    db, cfg, cache, startupMap, terms, teams, updater, access, state, startIndex, startAnalyze, configure, stats,
     previewAnalyze: (consent) => buildPayload(db, cfg, cache, consent),
     changed: (reason) => events.send({ type: 'graph:changed', reason }),
   };
+  stats.heartbeat(ctx);
+  const statsTimer = setInterval(() => stats.heartbeat(ctx), 15_000);
 
   const uiDir = join(PROJECT_ROOT, 'dist', 'ui');
   const serveStatic = (req: IncomingMessage, res: ServerResponse): void => {
@@ -257,6 +261,7 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   let stopping = false;
   const server = createServer((req, res) => {
     if (!trustedRequest(req)) { res.writeHead(403); res.end('Local access only'); return; }
+    stats.watch(req, res, ctx);
     // Attachments are raw bytes; octet-stream, like JSON, is not a type a cross-site form can send without a preflight.
     const upload = req.method === 'POST' && (req.url ?? '').startsWith('/api/attachments?') && req.headers['content-type'] === 'application/octet-stream';
     if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE' && !upload && !req.headers['content-type']?.startsWith('application/json')) { res.writeHead(415); res.end('JSON required'); return; }
@@ -432,6 +437,7 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     if (stopping) return;
     stopping = true;
     updater.stop();
+    clearInterval(statsTimer); stats.close();
     stopTeamWatch();
     stopHarnessInstalls();
     server.close();

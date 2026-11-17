@@ -1,4 +1,5 @@
 import { t as tr, ui } from './i18n.ts';
+import { mountMegaStats } from './mega-stats.ts';
 // Bootstrap: store, canvas, layout, panel, search, terminals, toolbar, live events, keyboard.
 import { translateStaticUI, getLanguage, setLanguage } from './i18n.ts';
 import { openSettings, setSettingsHooks } from './settings.ts';
@@ -88,6 +89,30 @@ const panel = new Panel(document.getElementById('panel')!, store, {
   refreshGraph: () => void loadGraph(),
 });
 const search = new Search(document.getElementById('overlay')!, (id) => void reveal(id));
+
+const statsButton = document.getElementById('btn-mega-stats')!;
+const statsPage = document.getElementById('mega-stats-view')!;
+let closeStats: (() => void) | null = null;
+statsButton.addEventListener('click', () => {
+  if (closeStats) return;
+  terminals.show(false);
+  const map = document.getElementById('btn-brain')!;
+  map.classList.remove('active'); map.setAttribute('aria-pressed','false');
+  statsButton.classList.add('active'); statsButton.setAttribute('aria-pressed','true');
+  document.getElementById('app')!.classList.add('stats-open');
+  statsPage.classList.remove('hidden');
+  closeStats = mountMegaStats(statsPage);
+});
+window.addEventListener('vb:leave-stats', () => {
+  closeStats?.(); closeStats = null;
+  statsPage.classList.add('hidden');
+  document.getElementById('app')!.classList.remove('stats-open');
+  statsButton.classList.remove('active'); statsButton.setAttribute('aria-pressed','false');
+});
+window.addEventListener('vb:stats-board', e => {
+  const {nodeId,teamId} = (e as CustomEvent).detail;
+  if (closeStats && Number.isSafeInteger(nodeId) && typeof teamId === 'string') void terminals.showStatsBoard(nodeId,teamId);
+});
 
 function relayout(): void {
   graph.setLayout(computeLayout(store, graph.measure, graph.fonts(), graph.aspect()));
@@ -216,6 +241,9 @@ function connectEvents(): void {
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data) as EventMessage;
     switch (m.type) {
+      case 'stats:changed':
+        window.dispatchEvent(new Event('vb:stats-changed'));
+        break;
       case 'index:progress':
         indexing = true; indexNote = ui`${tr('Indicizzazione')} · ${m.done.toLocaleString(tr('it-IT'))}${m.total ? '/' + m.total.toLocaleString(tr('it-IT')) : ''}`; syncLoader();
         indexDot(indexNote);
@@ -267,6 +295,7 @@ function openSearch(): void {
 document.getElementById('btn-search')!.addEventListener('click', openSearch);
 
 document.addEventListener('keydown', (e) => {
+  if (closeStats) return;
   // Keep global shortcuts from replacing onboarding or a settings draft.
   if (document.getElementById('overlay')!.dataset.mode === 'settings') return;
   const target = e.target instanceof HTMLElement ? e.target : null;

@@ -225,6 +225,7 @@ export class Terminals {
   }
 
   show(open: boolean): void {
+    if (document.getElementById('app')?.classList.contains('stats-open')) window.dispatchEvent(new Event('vb:leave-stats'));
     if (!open) this.dismissQuickMenu?.();
     this.root.classList.toggle('hidden', !open);
     document.getElementById('app')!.classList.toggle('operative', open);
@@ -1314,6 +1315,11 @@ export class Terminals {
   }
 
   /** The squads' board of the selected node (a squad, or the Main Brain with "brain"). */
+  async showStatsBoard(nodeId: number, team: string): Promise<void> {
+    if (!await this.loadNode(nodeId)) { this.message(tr('Nodo non disponibile.')); return; }
+    this.selectedNode = nodeId; this.show(true); this.openBoard(team);
+  }
+
   private openBoard(team?: string): void {
     this.sideOpen = true; this.boardOpen = true; this.gitOpen = false;
     this.selectedNode ??= this.tabs.get(this.active || '')?.info.nodeId ?? [...this.nodes.keys()][0] ?? null;

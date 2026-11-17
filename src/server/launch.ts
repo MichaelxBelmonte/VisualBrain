@@ -150,7 +150,14 @@ function embeddedCommand(agent: AgentName, command: { file: string; args: string
     if (agent === 'codex') {
       // Overrides go after the subcommand, so `codex resume` reads them too.
       const at = args[0] === 'resume' ? 1 : 0;
+      // Session-scoped hooks are additive to user/project hooks. Codex enforces its normal hook trust.
+      const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
+      const reporter = quote(process.execPath) + ' ' + quote(fileURLToPath(new URL('./turn-hook.mjs', import.meta.url)));
+      const turnHooks = role ? ['SessionStart','UserPromptSubmit','Stop','Interrupt'].flatMap(event => [
+        '-c', `hooks.${event}=[{hooks=[{type="command",command=${JSON.stringify(reporter)},timeout=3}]}]`,
+      ]) : [];
       args = [...args.slice(0, at),
+        ...turnHooks,
         '-c', `mcp_servers.visual_brain.command=${JSON.stringify(process.execPath)}`,
         '-c', `mcp_servers.visual_brain.args=${JSON.stringify([bridge])}`,
         '-c', `mcp_servers.visual_brain.env_vars=${JSON.stringify(variables)}`,

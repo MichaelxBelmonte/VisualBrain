@@ -12,7 +12,7 @@
 <div id="app">
   <header id="top" data-tauri-drag-region="deep">
     <div class="hidden" aria-hidden="true"><span id="brain-label"></span><span id="root"></span></div>
-    <nav class="view-switch" aria-label="Vista"><button id="btn-brain" class="btn active" aria-pressed="true">Mappa</button><button id="btn-workspace" class="btn" aria-pressed="false">Operativa <span id="session-count">0</span></button></nav>
+    <nav class="view-switch" aria-label="Vista"><button id="btn-brain" class="btn active" aria-pressed="true">Mappa</button><button id="btn-workspace" class="btn" aria-pressed="false">Operativa <span id="session-count">0</span></button><button id="btn-mega-stats" class="btn" aria-pressed="false">Stats</button></nav>
       <div id="work-toolbar" class="work-toolbar show-tasks">
         <div class="work-location">
           <div class="work-context"><button id="work-toggle-rail" class="btn ghost icon-btn" aria-expanded="true" aria-controls="work-node-rail" title="Mostra o nascondi elenco" aria-label="Mostra o nascondi elenco"><span data-icon="panelCollapse"></span></button></div>
@@ -44,6 +44,7 @@
     <div id="legend" class="legend"></div>
   </main>
   <aside id="panel" class="panel hidden"></aside>
+  <section id="mega-stats-view" class="hidden" aria-label="Mega Brain Stats"></section>
   <section id="terminals" class="terminals show-tasks hidden">
     <aside id="work-node-rail" class="work-rail" aria-label="Nodi e sessioni">
       <div class="work-rail-head"><label class="rail-search"><span data-icon="search"></span><input id="work-filter" type="search" placeholder="Cerca nodi e sessioni" aria-label="Filtra nodi e sessioni" autocomplete="off" spellcheck="false"></label><button id="work-quick-menu" type="button" class="btn ghost icon-btn" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="Control+Shift+Space" aria-label="Menu rapido terminali" title="Menu rapido terminali (Ctrl+Maiusc+Spazio)"><span data-icon="terminal"></span></button><button id="work-add" class="btn ghost icon-btn" title="Aggiungi nodo" aria-label="Aggiungi nodo"><span data-icon="plus"></span></button><button id="work-rail-dismiss" class="btn ghost icon-btn" title="Chiudi elenco" aria-label="Chiudi elenco"><span data-icon="close"></span></button></div>

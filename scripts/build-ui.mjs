@@ -25,7 +25,7 @@ function copyStatic() {
   copyFileSync(join(root, 'src/ui/index.html'), join(out, 'index.html'));
   const css = readFileSync(join(root, 'src/ui/style.css'), 'utf8');
   const xterm = readFileSync(join(root, 'node_modules/@xterm/xterm/css/xterm.css'), 'utf8');
-  const styles = xterm + '\n' + css;
+  const styles = xterm + '\n' + css + '\n' + readFileSync(join(root, 'src/ui/mega-stats.css'), 'utf8');
   writeFileSync(join(out, 'style.css'), watch ? styles : transformSync(styles, { loader: 'css', minifyWhitespace: true }).code);
 }
 

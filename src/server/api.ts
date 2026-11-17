@@ -34,8 +34,10 @@ import { SEARCH_SQL, isSearchFilter, type SearchFilter } from '../shared/search-
 import { connectGithub, githubRepositories } from './github-connect.ts';
 import { gitEnv } from './git.ts';
 import { mapQuery, type StartupMap } from './startup-map.ts';
+import type { MegaStats } from './mega-stats.ts';
 
 export interface ApiCtx {
+  stats?: MegaStats;
   db: Db;
   startupMap?: StartupMap;
   cfg: Config;
@@ -259,6 +261,24 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     sendJson(response, status, body);
   };
   try {
+    if (path === '/api/mega-stats' || path === '/api/mega-stats/preferences') {
+      if (req.headers.authorization || req.headers['sec-fetch-site'] !== 'same-origin') throw new HttpError(403, 'Solo dalla pagina Stats');
+      if (!ctx.stats) throw new HttpError(503, 'Telemetria non disponibile');
+      if (path === '/api/mega-stats' && method === 'GET') {
+        const hours = Number(url.searchParams.get('hours') ?? 24);
+        if (![1,24,168].includes(hours)) throw new HttpError(400, 'Intervallo non valido');
+        return send(res,200,ctx.stats.report(ctx,hours,{project:url.searchParams.get('project'),team:url.searchParams.get('team'),session:url.searchParams.get('session')}));
+      }
+      if (path.endsWith('/preferences') && method === 'PUT') {
+        const b = await readJson(req);
+        if (typeof b.nodeId !== 'number' || !Number.isSafeInteger(b.nodeId) || !isTeamId(b.teamId) ||
+          typeof b.cadenceMinutes !== 'number' || !Number.isInteger(b.cadenceMinutes) || b.cadenceMinutes < 1 || b.cadenceMinutes > 1440 ||
+          (b.mode !== 'suggest' && b.mode !== 'assign') || (b.provider !== 'balanced' && b.provider !== 'codex' && b.provider !== 'claude')) throw new HttpError(400, 'Preferenze non valide');
+        try { return send(res,200,ctx.stats.setRequest(ctx,b.nodeId,b.teamId,{cadenceMinutes:b.cadenceMinutes,mode:b.mode,provider:b.provider})); }
+        catch (err) { if (err instanceof RangeError) throw new HttpError(404,err.message); throw err; }
+      }
+      throw new HttpError(405, 'Metodo non consentito');
+    }
     if (preview) {
       res.setHeader('x-vb-map-preview', preview.id);
       return sendJsonText(res, 200, path === '/api/status' ? JSON.stringify(status(ctx, preview.stats)) : preview.json);
@@ -528,6 +548,18 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       ctx.teams.unlink(m[1]); return send(res, 200, { ok: true });
     }
 
+    m = /^\/api\/work\/(\d+)\/turn$/.exec(path);
+    if (m && method === 'POST') {
+      const b = await readJson(req);
+      const t = typeof b.from === 'string' ? ctx.terms.get(b.from) : undefined;
+      if (!t?.info.alive || !t.info.role || t.info.agent !== 'codex' || t.info.nodeId !== Number(m[1]) || !t.teamToken || req.headers.authorization !== 'Bearer '+t.teamToken)
+        throw new HttpError(403,'Sessione non autorizzata');
+      if (b.phase !== 'ready' && ((b.phase !== 'start' && b.phase !== 'stop' && b.phase !== 'interrupted') || typeof b.turnId !== 'string' || !/^[\w-]{1,100}$/.test(b.turnId)))
+        throw new HttpError(400,'Evento turno non valido');
+      ctx.stats?.bind(req,t.info.nodeId,ctx.teams.teamOf(t.info.nodeId,t.info),t.info.id);
+      ctx.stats?.turn(t.info,b.phase,typeof b.turnId === 'string' ? b.turnId : undefined);
+      return sendJson(res,200,{ok:true});
+    }
     m = /^\/api\/work\/(\d+)(?:\/(messages|tasks|state|spawn|wake|inbox|forward|proposals)(?:\/([a-z0-9-]+))?)?$/.exec(path);
     if (m) {
       const nodeId = Number(m[1]);
@@ -542,6 +574,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const requested = method === 'GET' ? url.searchParams.get('team') ?? undefined : b.team;
       if (requested !== undefined && !isTeamId(requested)) throw new HttpError(400, 'Squadra non valida');
       const team = member ? ctx.teams.teamOf(nodeId, member.info) : (requested as string | undefined) ?? DEFAULT_TEAM;
+      ctx.stats?.bind(req,nodeId,team,member?.info.id ?? null);
       const isBrain = team === BRAIN_TEAM;
       if (!isBrain && !ctx.teams.team(nodeId, team)) throw new HttpError(404, 'Squadra non trovata');
       const all = ctx.teams.withCodes(ctx.terms.list().filter(s => s.nodeId === nodeId && s.agent !== 'shell'));
@@ -605,11 +638,14 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         if (!member || (!hasState && !hasAttention) || (hasState && !['working', 'idle', 'blocked'].includes(String(b.state)))
           || (hasAttention && b.attention !== null && b.attention !== 'permission' && b.attention !== 'input')
           || (b.source !== undefined && b.source !== 'agent' && b.source !== 'hook')) throw new HttpError(400, 'Stato o sessione non validi');
+        if (b.source === 'hook' && member.info.agent === 'claude' && (b.state === 'working' || b.state === 'idle'))
+          ctx.stats?.turn(member.info,b.state === 'working' ? 'start' : 'stop');
         if (hasState) {
           setWorkState(member.info, b.state as 'working' | 'idle' | 'blocked', b.source === 'hook' ? 'hook' : 'agent');
           if (b.state !== 'blocked') setAttention(member.activity, member.info, null); // a turn started or ended: the prompt was answered
         }
         if (hasAttention) setAttention(member.activity, member.info, b.attention as 'permission' | 'input' | null);
+        ctx.stats?.snapshot(ctx);
         if (hasState) wake(actor);
         return send(res, 200, { state: member.info.workState, attention: member.info.attention ?? null });
       }
@@ -650,6 +686,8 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         const finishing = b.status === 'done' || b.status === 'blocked';
         const manual = finishing && board.policy.delivery === 'manual' && (member?.info.role === 'operator' || member?.info.role === 'reviewer');
         const task = ctx.teams.changeTask(nodeId, taskId, actor, member?.info.role, { status: b.status, result: b.result, ...(b.assignedTo !== undefined ? { assignedTo: recipient(b.assignedTo) } : {}), ...(manual ? { held: true } : {}) }, team);
+        if (task.status === 'done' && board.tasks.find(t => t.id === task.id)?.status !== 'done')
+          ctx.stats?.done(nodeId,team,task.assignedTo,task.id);
         if (manual) ctx.teams.hold(nodeId, team, { kind: task.status === 'done' ? 'result' : 'blocked', from: actor, text: task.result || task.title, taskId: task.id, taskTitle: task.title });
         const target = sessions.find(s => s.alive && s.role === 'orchestrator' && s.id !== actor);
         if (target && (task.status === 'done' || task.status === 'blocked')) {
