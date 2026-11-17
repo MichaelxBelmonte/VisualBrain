@@ -41,6 +41,7 @@ jobs:
           node scripts/test-launch.mjs
           node scripts/test-terminal-service.mjs
           node scripts/test-terminal-runtime.mjs
+          node scripts/test-routing-runtime.mjs
           npm run test:harnesses
       - name: Native indexer (arm64 + x64)
         run: node scripts/build-indexer.mjs

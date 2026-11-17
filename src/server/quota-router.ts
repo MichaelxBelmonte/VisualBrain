@@ -31,14 +31,28 @@ export class QuotaRouter {
   private state:State;
   private inFlight?:Promise<void>;
   private lastProbe=0;
+  private loadFailed=false;
   constructor(dir:string) {
     this.file=join(dir,'quota-routing.json');
-    this.state=existsSync(this.file)?JSON.parse(readFileSync(this.file,'utf8')):{rules:{},signals:{}};
+    this.state={rules:{},signals:{}};
+    if(existsSync(this.file)) {
+      try {
+        const saved=JSON.parse(readFileSync(this.file,'utf8'));
+        if(!saved?.rules || !saved?.signals)throw Error('Missing quota storage fields');
+        for(const rule of Object.values(saved.rules))validRule(rule as Record<string,unknown>);
+        this.state=saved;
+      } catch {
+        this.loadFailed=true;
+        console.warn('[quota] Archivio del routing illeggibile; nuove assegnazioni sospese.');
+      }
+    }
   }
+  private checkStorage(){if(this.loadFailed)throw new TeamError(503,'Archivio routing non disponibile');}
   private save(next:State) {
+    this.checkStorage();
     writeFileSync(this.file+'.tmp',JSON.stringify(next),{mode:0o600});renameSync(this.file+'.tmp',this.file);this.state=next;
   }
-  rule(node:number,team:string):RoutingRule{return this.state.rules[node+':'+team]??defaults();}
+  rule(node:number,team:string):RoutingRule{this.checkStorage();return this.state.rules[node+':'+team]??defaults();}
   permitsProvider(node:number,team:string,provider:AgentName,now=Date.now()){
     const rule=this.rule(node,team);
     if(!rule.enabled)return true;
@@ -78,7 +92,7 @@ export class QuotaRouter {
     const fresh=all.filter(s=>s.observedAt+FRESH_MS>now && remaining(s,now).length).sort((a,b)=>minimum(a)-minimum(b));
     const sample=active[0]??low[0]??fresh[0]??latest;
     const status:QuotaGroup['status']=active.length?'limited':low.length?(remaining(low[0],now).some(w=>w.remainingPct===0)?'limited':'margin')
-      :fresh.length?'available':latest?'stale':'unknown';
+      :fresh.length?'available':latest?.windows.length?'stale':'unknown';
     const deadline=active.some(s=>s.blockedUntil===null)?null:active.length?Math.max(...active.map(s=>s.blockedUntil!)):null;
     return {provider,group,account:sample?.account??null,source:sample?.source??null,observedAt:sample?.observedAt??null,
       freshUntil:sample?sample.observedAt+FRESH_MS:null,limited:status==='limited',blockedUntil:deadline,
@@ -113,6 +127,7 @@ export class QuotaRouter {
     this.observe(this.rule(node,team).groups[provider],provider,{account:null,observedAt:now,windows,limited:b.limited,blockedUntil:b.limited?until:null,source});
   }
   view(ctx:ApiCtx,node:number|null,team:string,now=Date.now()):RoutingView{
+    this.checkStorage();
     const rule=node===null?defaults():this.rule(node,team);
     const tasks=node===null?[]:ctx.teams.get(node,team).tasks;
     const codes=node===null?{}:ctx.teams.get(node).codes?.ids??{};

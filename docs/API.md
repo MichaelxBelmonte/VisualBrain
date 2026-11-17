@@ -38,6 +38,12 @@ Base: `http://127.0.0.1:4747`. Tutte le risposte sono JSON. I tipi sono in `src/
 | POST | `/api/reminders` | `{nodeId, title, status?: 'pending' \| 'working' \| 'done', notes?}` | `NodeReminder`; nodo richiesto, titolo massimo 1000, appunti massimo 10000 caratteri |
 | PATCH | `/api/reminders/:id` | `{nodeId?, title?, status?, notes?}` | `NodeReminder`; aggiorna, riassegna, completa o riapre |
 | GET | `/api/terminals` | – | `TerminalInfo[]` |
+| GET | `/api/mega-stats?hours=24` | filtri opzionali `project` (nodo progetto), `team` (nodo:squadra), `session` | Stats dei progetti collegati da canali di Operativa; finestre 1, 24 o 168 ore. |
+| GET / PUT | `/api/mega-stats/routing?node=N&team=T` | PUT della regola completa | Regola effettiva per squadra, quote e motivi delle assegnazioni. Senza parametri GET mostra il profilo. |
+| POST | `/api/mega-stats/routing/refresh` | `{}` | Lettura della quota del profilo locale Codex tramite `account/rateLimits/read`. |
+| PUT | `/api/mega-stats/preferences` | `{nodeId,teamId,cadenceMinutes,mode,provider}` | Richiesta persistita con stato `pending` per il futuro coordinatore tra progetti. |
+| POST | `/api/work/:node/quota` | `{from,limited,windows,retryAfter?}` | Segnalazione autenticata per il proprio provider; Retry-After in secondi o data HTTP. |
+| POST | `/api/work/:node/handoff/:task` | `{from,handoffId,verified,next,safeToResume:true}` | Checkpoint confermato dal proprietario o dalla persona. Il proprietario resta unico durante l’attesa. |
 | GET | `/api/terminals/:id/preview` | – | `{ text }` con al massimo sei righe di output recente. Disponibile alla UI sulla stessa origine. La lettura lascia intatti focus, dimensioni e input del terminale. |
 | DELETE | `/api/terminals/:id` | – | `{ ok: true }` |
 | POST | `/api/terminals/:id/resume` | `{cols?, rows?}` | `{ termId, info }` |
