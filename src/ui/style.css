@@ -1363,3 +1363,61 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 #work-node-rail .tone-flag { font-style: normal; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; color: var(--tone, var(--g5)); background: color-mix(in srgb, var(--tone, var(--g4)) 14%, transparent); white-space: nowrap; }
 #work-node-rail .work-list-empty { padding: 16px 10px; font-size: 12px; color: var(--g4); }
 #work-node-rail .work-rail-links { margin: 0 8px 8px; border-radius: 8px; }
+
+/* Launch window (src/ui/work-launcher.ts): objective first, one agent line for everyone, the rest folded. One background
+   level, wide radii, grey labels, a hairline at most between member lines. Tokens only: holds in light and dark. */
+.work-launch-dialog { width: min(720px, 94vw); border-radius: 14px; overflow: hidden; }
+.work-launch-dialog form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.work-launch-dialog .dhead { padding: 14px 20px; border-bottom: 0; }
+.work-launch-dialog .dbody { display: flex; flex-direction: column; gap: 16px; padding: 4px 20px 16px; }
+.work-launch-dialog .work-launch-error:empty { display: none; }
+.work-launch-dialog .dfoot { padding: 0 20px 18px; border-top: 0; }
+.work-launch-dialog .dfoot .btn { min-width: 150px; min-height: 34px; border-radius: 9px; font-weight: 500; }
+.launch-objective textarea { display: block; width: 100%; min-height: 112px; max-height: 50vh; padding: 12px 14px; border: 1px solid var(--g2); border-radius: 11px; background: var(--g1); color: var(--fg); font: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical; }
+.launch-objective textarea:focus { outline: none; border-color: var(--g4); background: var(--bg); }
+.work-launch-dialog .launch-attach { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 12px; }
+.work-launch-dialog .launch-files { flex: 1 1 auto; min-width: 0; }
+.launch-files li { border-color: var(--g2); border-radius: 999px; background: var(--g1); }
+.launch-attach-btn { margin-left: auto; padding: 3px 8px; border: 0; border-radius: 7px; background: none; color: var(--g4); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.launch-attach-btn:hover { color: var(--fg); background: var(--g1); }
+.launch-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.launch-mode .segmented { border-radius: 10px; }
+.launch-mode .segmented > button { padding: 5px 14px; border-radius: 8px; font-size: 12.5px; }
+.launch-mode .segmented > button:disabled { opacity: .4; cursor: not-allowed; }
+.work-launch-dialog .launch-count { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: var(--g4); }
+.launch-stepper { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--g2); border-radius: 999px; background: var(--g1); }
+.launch-stepper button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: none; color: var(--fg); font-size: 15px; line-height: 1; cursor: pointer; }
+.launch-stepper button:hover:not(:disabled) { background: var(--g2); }
+.launch-stepper button:disabled { color: var(--g3); cursor: default; }
+.launch-stepper output { min-width: 18px; text-align: center; font-size: 13px; font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
+.launch-mode-hint { font-size: 11.5px; }
+.work-launch-dialog .launch-roster { display: flex; flex-direction: column; margin: 0; border: 0; }
+.launch-agent-row { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(150px, 1.4fr) 116px; gap: 10px; align-items: end; }
+.launch-agent-row:has(> .launch-role:not(.hidden)), .launch-roster.custom .launch-agent-row { grid-template-columns: 136px minmax(120px, 1fr) minmax(140px, 1.3fr) 108px; }
+.launch-roster.custom .launch-agent-row { align-items: center; padding: 7px 0; border-top: 1px solid var(--g2); }
+.launch-roster.custom .launch-agent-row:first-child { border-top: 0; padding-top: 0; align-items: end; }
+.launch-roster.custom .launch-agent-row:not(:first-child) .launch-field > span { display: none; }
+.launch-roster.custom .role-tag { min-width: 0; overflow-wrap: anywhere; padding: 0; font-size: 12px; }
+.launch-roster.custom .launch-agent-row:first-child .role-tag { padding-bottom: 8px; }
+.launch-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 11px; color: var(--g4); }
+.launch-field select, .launch-field input { width: 100%; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--g2); border-radius: 8px; background: var(--g1); color: var(--fg); font: inherit; font-size: 12.5px; }
+.launch-field select:focus-visible, .launch-field input:focus-visible { outline: none; border-color: var(--g4); background: var(--bg); }
+.launch-field :disabled { opacity: .5; }
+.launch-link { align-self: flex-start; margin-top: -6px; padding: 0; border: 0; background: none; color: var(--g4); font: inherit; font-size: 12px; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+.launch-link:hover { color: var(--fg); }
+.work-launch-dialog .launch-capacity { margin: 0; padding: 8px 12px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--role-attention) 12%, transparent); }
+.launch-more { font-size: 12px; }
+.launch-more > summary { width: fit-content; max-width: 100%; overflow-wrap: anywhere; color: var(--g4); cursor: pointer; }
+.launch-more > summary:hover, .launch-more[open] > summary { color: var(--fg); }
+.launch-more-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 0 0; }
+.work-launch-dialog .launch-team { margin: 0; }
+.work-launch-dialog .launch-team label { min-width: 0; max-width: 100%; }
+.work-launch-dialog .launch-saved { margin: 0; padding: 0; border: 0; }
+.work-launch-dialog .launch-team select, .work-launch-dialog .launch-team input, .work-launch-dialog .launch-saved select { height: 32px; padding: 0 10px; border: 1px solid var(--g2); border-radius: 8px; background: var(--g1); color: var(--fg); }
+.work-launch-dialog .launch-saved p { margin: 6px 0 0; font-size: 11.5px; }
+.work-launch-dialog .launch-cli-hint { margin: 0; }
+@media (max-width: 760px) {
+  .launch-agent-row, .launch-agent-row:has(> .launch-role:not(.hidden)), .launch-roster.custom .launch-agent-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .launch-roster.custom .launch-agent-row:not(:first-child) .launch-field > span { display: inline; }
+  .work-launch-dialog .dbody { padding: 4px 14px 14px; }
+}

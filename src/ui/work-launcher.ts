@@ -1,15 +1,28 @@
+// Launch window of Operativa: the objective first, then Squadra | Un agente, then one agent line valid for everyone
+// ("Personalizza per agente" opens one line per member). Destination squad, new squad name and saved squads sit in
+// "Altre opzioni". The launch payload is the same as before: nothing changes on the server.
 import { t as tr, ui } from './i18n.ts';
 import { ROLE_WORDS } from './work-roles.ts';
 import { api } from './api.ts';
-import { openSettings } from './settings.ts';
 import { effortChoices } from '../shared/agent-effort.ts';
 import { parseFileDrop } from './work-input.ts';
 import type { AgentName, AgentRole, ModelChoice, NodeDetail, SavedSquad, SwarmProposal, TeamSummary, TerminalInfo } from '../shared/types.ts';
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-const marks: Record<string, string> = { codex: 'Cx', claude: 'Cl', hermes: 'He', agy: 'Ag', shell: '>_' };
 const labels = { codex: 'Codex', claude: 'Claude Code', hermes: 'Hermes', agy: 'Antigravity', shell: tr('Terminale') };
 const roles = ROLE_WORDS;
-type Choice = { agent: TerminalInfo['agent']; model: string; effort: string; role?: AgentRole; name?: string };
+export type Choice = { agent: TerminalInfo['agent']; model: string; effort: string; role?: AgentRole; name?: string };
+
+/** Whether the first `count` members already run the same agent, model and effort. Pure. */
+export function allSame(choices: Choice[], count: number): boolean {
+  const [first, ...rest] = choices.slice(0, count);
+  return !first || rest.every(c => c.agent === first.agent && c.model === first.model && c.effort === first.effort);
+}
+
+/** "Uguale per tutti": every member takes the first member's agent, model and effort; roles and names stay. Pure. */
+export function sameForAll(choices: Choice[], count: number): Choice[] {
+  const first = choices[0];
+  return choices.map((c, i) => i > 0 && i < count ? { ...c, agent: first.agent, model: first.model, effort: first.effort } : c);
+}
 
 export function openWorkLauncher(options: {
   node: NodeDetail; agents: Record<AgentName, boolean>; sessions: TerminalInfo[];
@@ -35,13 +48,13 @@ export function openWorkLauncher(options: {
   let alive = members().length;
   const HARD_MAX = 8;
   let maxAgents = 4;
-  let extra = options.proposal ? Math.max(1, options.proposal.members.length - 1) : 3;
+  let extra = options.proposal ? options.proposal.members.length - 1 : 3;
   let restored: SavedSquad | null = null;
   let savedSquads: SavedSquad[] = [];
-  let catalog: Record<AgentName, ModelChoice[]> = { claude: [], codex: [], hermes: [], agy: [] };
+  let catalog: Record<AgentName, ModelChoice[]> | undefined;
   const defaultAgent = options.initialAgent ?? (['codex', 'claude', 'hermes', 'agy'] as const).find(a => options.agents[a]) ?? 'shell';
   if (defaultAgent === 'shell') squad = false;
-  const choices: Choice[] = Array.from({ length: HARD_MAX }, () => ({ agent: defaultAgent, model: '', effort: '' }));
+  let choices: Choice[] = Array.from({ length: HARD_MAX }, () => ({ agent: defaultAgent, model: '', effort: '' }));
   for (let i = 0; i < choices.length; i++) {
     try {
       const saved = JSON.parse(localStorage.getItem(ui`vb:roster:${i}`) || 'null') as Choice | null;
@@ -50,17 +63,26 @@ export function openWorkLauncher(options: {
     } catch { /* keep defaults */ }
   }
   if (options.proposal) options.proposal.members.forEach((m, i) => { if (i < choices.length) choices[i] = { agent: m.agent, model: m.model ?? '', effort: m.effort ?? '', role: m.role }; });
+  const total = () => squad && restored ? restored.members.length : squad ? Math.min(HARD_MAX, extra + (addOnly ? 0 : 1)) : 1;
+  // One agent line for everyone unless the saved roster, a proposal or a saved squad already differ per member.
+  let customize = squad && !allSame(choices, total());
   overlay.dataset.mode = 'work-launch';
-  overlay.innerHTML = ui`<div class="dialog work-launch-dialog" role="dialog" aria-modal="true" aria-labelledby="work-launch-title"><div class="dhead"><span id="work-launch-title">Avvia · ${esc(options.node.name)}</span><button class="plain-icon" type="button" data-cancel aria-label="Chiudi">×</button></div><form><div class="dbody"><div class="launch-saved"><label>Squadre salvate<select data-saved><option value="">Nuova configurazione</option></select></label><p class="muted" data-saved-hint>Ogni avvio salva la configurazione nel profilo di Visual Brain.</p></div><div class="launch-preset"><label>Avvio<select name="preset"><option value="squad" ${options.mode === 'external' || defaultAgent === 'shell' ? 'disabled' : ''}>${orchestrator ? tr('Squadra · aggiungi operatori') : tr('Squadra · orchestratore + operatori')}</option><option value="single">Singolo agente</option></select></label><span class="muted" data-preset-hint></span></div><div class="launch-team" data-team-box><label>Squadra<select data-team></select></label><input data-team-name class="hidden" maxlength="40" placeholder="Nome della nuova squadra (facoltativo)" aria-label="Nome della nuova squadra"><span class="muted" data-team-hint></span></div><div class="launch-count hidden" data-count-box><span id="launch-count-label">Operatori</span><div class="chips" role="radiogroup" aria-labelledby="launch-count-label" data-count></div></div><div class="launch-capacity hidden" role="status"><span data-capacity></span><button type="button" class="btn small" data-raise></button></div><div class="launch-roster"></div><div class="launch-objective" data-objective><label class="work-field">Obiettivo <textarea name="prompt" maxlength="4000" rows="7" placeholder="Facoltativo, anche solo con file allegati. Invio avvia, Maiusc+Invio va a capo. Puoi dare le istruzioni anche dal terminale.">${esc(options.prompt)}</textarea></label><div class="launch-attach"><button type="button" class="btn small" data-attach>Allega file</button><input type="file" multiple hidden data-attach-input><span class="muted" data-attach-hint>oppure trascinali sulla finestra. Gli agenti ricevono il percorso.</span><ul class="launch-files" data-files aria-label="File allegati"></ul></div></div><p class="launch-cli-hint hidden" data-cli-hint></p><div class="work-launch-error" role="alert"></div></div><div class="dfoot"><span class="muted launch-default-hint">Auto usa la configurazione del CLI.</span><button type="submit" class="btn active">Avvia squadra</button></div></form></div>`;
+  overlay.innerHTML = ui`<div class="dialog work-launch-dialog" role="dialog" aria-modal="true" aria-labelledby="work-launch-title"><div class="dhead"><span id="work-launch-title">Avvia · ${esc(options.node.name)}</span><button class="plain-icon" type="button" data-cancel aria-label="Chiudi">×</button></div><form><div class="dbody">`
+    + ui`<div class="launch-objective" data-objective><textarea name="prompt" maxlength="4000" rows="4" aria-label="Obiettivo" placeholder="Obiettivo: cosa devono fare? Facoltativo. Invio avvia, Maiusc+Invio va a capo.">${esc(options.prompt)}</textarea><div class="launch-attach"><ul class="launch-files" data-files aria-label="File allegati"></ul><span class="muted" data-attach-hint></span><button type="button" class="launch-attach-btn" data-attach title="Allega file, oppure trascinali sulla finestra: gli agenti ricevono il percorso.">＋ Allega</button><input type="file" multiple hidden data-attach-input></div></div>`
+    + ui`<div class="launch-mode"><div class="segmented" role="group" aria-label="Avvio"><button type="button" data-preset-choice="squad" ${options.mode === 'external' || defaultAgent === 'shell' ? 'disabled' : ''}>Squadra</button><button type="button" data-preset-choice="single">Un agente</button></div><div class="launch-count" data-count-box><span id="launch-count-label">Operatori</span><div class="launch-stepper" role="group" aria-labelledby="launch-count-label"><button type="button" data-count-step="-1" aria-label="Un operatore in meno">−</button><output data-count aria-live="polite"></output><button type="button" data-count-step="1" aria-label="Un operatore in più">+</button></div></div><span class="muted launch-mode-hint" data-preset-hint></span></div>`
+    + ui`<div class="launch-roster"></div><button type="button" class="launch-link" data-customize></button>`
+    + ui`<div class="launch-capacity hidden" role="status"><span data-capacity></span><button type="button" class="btn small" data-raise></button></div>`
+    + ui`<details class="launch-more" data-more><summary data-more-summary>Altre opzioni</summary><div class="launch-more-body"><div class="launch-team" data-team-box><label>Squadra<select data-team></select></label><input data-team-name class="hidden" maxlength="40" placeholder="Nome della nuova squadra (facoltativo)" aria-label="Nome della nuova squadra"><span class="muted" data-team-hint></span></div><div class="launch-saved" data-saved-box><label>Squadre salvate<select data-saved><option value="">Nuova configurazione</option></select></label><p class="muted" data-saved-hint>Ogni avvio salva la configurazione nel profilo di Visual Brain.</p></div></div></details>`
+    + ui`<p class="launch-cli-hint hidden" data-cli-hint></p><div class="work-launch-error" role="alert"></div></div><div class="dfoot"><button type="submit" class="btn primary" title="Auto usa la configurazione del CLI.">Avvia</button></div></form></div>`;
   overlay.classList.remove('hidden');
   const form = overlay.querySelector<HTMLFormElement>('form')!;
-  const preset = form.querySelector<HTMLSelectElement>('[name=preset]')!;
-  preset.value = squad ? 'squad' : 'single';
   const prompt = form.querySelector<HTMLTextAreaElement>('[name=prompt]')!;
   const submit = form.querySelector<HTMLButtonElement>('[type=submit]')!;
   const roster = form.querySelector<HTMLElement>('.launch-roster')!;
+  const customizeButton = form.querySelector<HTMLButtonElement>('[data-customize]')!;
   const error = form.querySelector('.work-launch-error')!;
   const dialog = overlay.querySelector<HTMLElement>('.work-launch-dialog')!;
+  const more = form.querySelector<HTMLDetailsElement>('[data-more]')!;
   const filesEl = form.querySelector<HTMLElement>('[data-files]')!;
   const attachInput = form.querySelector<HTMLInputElement>('[data-attach-input]')!;
   const attachHint = form.querySelector<HTMLElement>('[data-attach-hint]')!;
@@ -70,7 +92,7 @@ export function openWorkLauncher(options: {
   const renderFiles = () => {
     filesEl.innerHTML = attached.map((f, i) => ui`<li><span title="${esc(f.path)}">${esc(f.name)}</span><button type="button" class="plain-icon" data-unattach="${i}" aria-label="Rimuovi ${esc(f.name)}">×</button></li>`).join('');
     filesEl.querySelectorAll<HTMLElement>('[data-unattach]').forEach(b => b.onclick = () => { attached.splice(Number(b.dataset.unattach), 1); renderFiles(); });
-    attachHint.textContent = uploading ? tr('Caricamento allegati…') : attached.length ? tr('{n} allegati: gli agenti ricevono il percorso.').replace('{n}', String(attached.length)) : tr('oppure trascinali sulla finestra. Gli agenti ricevono il percorso.');
+    attachHint.textContent = uploading ? tr('Caricamento allegati…') : '';
     refreshCapacity();
   };
   const room = () => { if (attached.length < MAX_FILES) return true; error.textContent = tr('Al massimo 20 allegati'); return false; };
@@ -106,7 +128,17 @@ export function openWorkLauncher(options: {
   const teamBox = form.querySelector<HTMLElement>('[data-team-box]')!;
   const teamSelect = form.querySelector<HTMLSelectElement>('[data-team]')!;
   const teamNameInput = form.querySelector<HTMLInputElement>('[data-team-name]')!;
+  const savedBox = form.querySelector<HTMLElement>('[data-saved-box]')!;
   if (options.proposal) teamNameInput.value = options.proposal.name;
+  /** "Altre opzioni" says where the agents go without being opened; it hides when nothing inside applies. */
+  const renderMore = () => {
+    const teamShown = !teamBox.classList.contains('hidden'), savedShown = squad && options.mode === 'embedded';
+    savedBox.classList.toggle('hidden', !savedShown);
+    more.classList.toggle('hidden', !teamShown && !savedShown);
+    const target = teamId === 'new' ? (teamNameInput.value.trim() || tr('nuova squadra')) : teams.find(t => t.id === teamId)?.name ?? '';
+    const parts = [teamShown && target ? target : '', restored ? restored.name : '', !restored && savedShown && savedSquads.length ? ui`${savedSquads.length} salvate` : ''].filter(Boolean);
+    form.querySelector('[data-more-summary]')!.textContent = tr('Altre opzioni') + (parts.length ? ' · ' + parts.join(' · ') : '');
+  };
   const renderTeams = () => {
     const list = teams.filter(t => !t.archived || t.id === teamId);
     if (!list.some(t => t.id === teamId) && teamId !== 'new') list.push({ id: teamId, name: ui`Squadra ${teamId}` } as TeamSummary);
@@ -119,7 +151,9 @@ export function openWorkLauncher(options: {
       ? (others.length ? tr('Lavora in un worktree Git separato dalle altre squadre al lavoro.') : tr('Lavora nella cartella del progetto.'))
       : orchestrator ? ui`Si unisce a ${orchestrator.code || tr('l’orchestratore')}` : '';
     teamBox.classList.toggle('hidden', options.mode === 'external' || (!squad && (singleRole === 'brain' || choices[0].agent === 'shell')));
+    renderMore();
   };
+  teamNameInput.addEventListener('input', renderMore);
   /** Another squad chosen: its orchestrator, its members and its limit decide what the form offers. */
   const retarget = () => {
     orchestrator = members().find(s => s.role === 'orchestrator');
@@ -129,22 +163,20 @@ export function openWorkLauncher(options: {
     if (singleRole === 'orchestrator' && orchestrator) singleRole = 'operator';
     savedSelect.disabled = options.mode !== 'embedded' || alive > 0 || !!options.proposal;
     form.querySelector('[data-saved-hint]')!.textContent = alive > 0 ? tr('Le configurazioni si recuperano in una squadra senza agenti attivi.') : tr('Ogni avvio salva la configurazione nel profilo di Visual Brain.');
-    const squadOption = preset.querySelector<HTMLOptionElement>('option[value=squad]')!;
-    squadOption.textContent = orchestrator ? tr('Squadra · aggiungi operatori') : tr('Squadra · orchestratore + operatori');
     renderTeams(); renderRows();
   };
   teamSelect.onchange = () => { teamId = teamSelect.value; restored = null; savedSelect.value = ''; choices.forEach(c => { delete c.role; delete c.name; }); retarget(); };
-  const maxExtra = () => Math.max(1, HARD_MAX - alive - (addOnly ? 0 : 1));
-  const total = () => squad && restored ? restored.members.length : squad ? Math.min(HARD_MAX, extra + (addOnly ? 0 : 1)) : 1;
+  const minExtra = () => options.proposal && !addOnly ? 0 : 1;
+  const maxExtra = () => Math.max(minExtra(), HARD_MAX - alive - (addOnly ? 0 : 1));
   const countBox = form.querySelector<HTMLElement>('[data-count-box]')!;
   const capacity = form.querySelector<HTMLElement>('.launch-capacity')!;
   const raise = capacity.querySelector<HTMLButtonElement>('[data-raise]')!;
   /** Free slots in the node: the team limit is the user's; here it is only shown, and raised on request. */
   const refreshCapacity = () => {
-    extra = Math.min(extra, maxExtra());
     countBox.classList.toggle('hidden', !squad || !!restored);
-    countBox.querySelector('[data-count]')!.innerHTML = Array.from({ length: maxExtra() }, (_, i) => ui`<button type="button" role="radio" class="chip" data-count-choice="${i + 1}" aria-checked="${i + 1 === extra}">${i + 1}</button>`).join('');
-    countBox.querySelectorAll<HTMLElement>('[data-count-choice]').forEach(b => b.onclick = () => { extra = Number(b.dataset.countChoice); renderRows(); });
+    countBox.querySelector('[data-count]')!.textContent = String(extra);
+    countBox.querySelector<HTMLButtonElement>('[data-count-step="-1"]')!.disabled = extra <= minExtra();
+    countBox.querySelector<HTMLButtonElement>('[data-count-step="1"]')!.disabled = extra >= maxExtra();
     const needed = alive + total();
     const limit = restored ? Math.max(restored.policy.maxAgents, restored.members.length) : maxAgents;
     const over = squad && (needed > limit || (!!restored && alive > 0));
@@ -156,6 +188,7 @@ export function openWorkLauncher(options: {
     }
     submit.disabled = busy || over || uploading > 0;
   };
+  countBox.querySelectorAll<HTMLButtonElement>('[data-count-step]').forEach(b => b.onclick = () => { extra += Number(b.dataset.countStep); renderRows(); });
   raise.onclick = async () => {
     raise.disabled = true; error.textContent = '';
     try { if (teamId !== 'new') await api.updateTeam(options.node.id, { maxAgents: HARD_MAX }, teamId); maxAgents = HARD_MAX; refreshCapacity(); }
@@ -163,16 +196,17 @@ export function openWorkLauncher(options: {
     finally { raise.disabled = false; }
   };
   const savedSelect = form.querySelector<HTMLSelectElement>('[data-saved]')!;
-  savedSelect.disabled = options.mode !== 'embedded' || alive > 0;
+  savedSelect.disabled = options.mode !== 'embedded' || alive > 0 || !!options.proposal;
   if (alive > 0) form.querySelector('[data-saved-hint]')!.textContent = tr('Le configurazioni si recuperano quando non ci sono agenti attivi nel nodo.');
   savedSelect.onchange = () => {
     restored = savedSquads.find(s => s.id === savedSelect.value) ?? null;
     if (restored) {
-      squad = true; preset.value = 'squad';
+      squad = true;
       restored.members.forEach((m, i) => { choices[i] = { ...m, model: m.model ?? '', effort: m.effort ?? '' }; });
+      customize = !allSame(choices, total());
       form.querySelector('[data-saved-hint]')!.textContent = tr('Ruoli, modelli e impostazioni recuperati. Avvia crea nuove sessioni; il riepilogo della bacheca resta disponibile.');
     } else { choices.forEach(c => { delete c.role; delete c.name; }); }
-    renderRows();
+    renderRows(); renderMore();
   };
   void api.team(options.node.id).then(team => {
     if (!form.isConnected) return;
@@ -182,60 +216,74 @@ export function openWorkLauncher(options: {
     savedSelect.innerHTML += savedSquads.map(s => `<option value="${esc(s.id)}">${esc(s.name)} · ${s.members.length} · ${esc(new Date(s.savedAt).toLocaleString())}</option>`).join('');
     renderTeams(); refreshCapacity();
   }).catch(() => { if (form.isConnected) form.querySelector('[data-saved-hint]')!.textContent = tr('Configurazioni salvate non disponibili. Riapri per riprovare.'); });
-  const effortChips = (choice: Choice, available: string[]) => ['', ...available].map(e => ui`<button type="button" role="radio" class="chip" data-effort-choice="${esc(e)}" aria-checked="${choice.effort === e}" ${choice.agent === 'shell' ? 'disabled' : ''}>${e ? esc(e) : tr('Auto')}</button>`).join('');
+
+  // One agent line: agent menu, model (Auto by default) and effort menu. Shared line, per-member line or single agent.
+  const agentOptions = (selected: Choice['agent'], withShell: boolean) => Object.entries(labels).filter(([a]) => withShell || a !== 'shell')
+    .map(([a, label]) => ui`<option value="${a}" ${a === selected ? 'selected' : ''} ${a !== 'shell' && !options.agents[a as AgentName] ? 'disabled' : ''}>${label}</option>`).join('');
   const updateEffort = (row: HTMLElement, choice: Choice) => {
-    const available = effortChoices(choice.agent, choice.model, choice.agent === 'shell' ? [] : catalog[choice.agent]);
-    if (!available.includes(choice.effort)) choice.effort = '';
-    const box = row.querySelector<HTMLElement>('[data-effort]')!;
-    box.innerHTML = effortChips(choice, available);
-    box.querySelectorAll<HTMLElement>('[data-effort-choice]').forEach(b => b.onclick = () => { choice.effort = b.dataset.effortChoice!; updateEffort(row, choice); });
+    let available = effortChoices(choice.agent, choice.model, choice.agent === 'shell' ? [] : catalog?.[choice.agent]);
+    if (choice.effort && !available.includes(choice.effort)) {
+      // A saved model can have levels that only its catalogue entry supplies.
+      if (!catalog && choice.agent !== 'shell' && choice.agent !== 'claude') available = [...available, choice.effort];
+      else choice.effort = '';
+    }
+    const select = row.querySelector<HTMLSelectElement>('[data-effort]')!;
+    select.innerHTML = ['', ...available].map(e => ui`<option value="${esc(e)}" ${choice.effort === e ? 'selected' : ''}>${e ? esc(e) : tr('Auto')}</option>`).join('');
+    select.disabled = choice.agent === 'shell';
   };
   const updateModels = (row: HTMLElement, choice: Choice) => {
-    row.querySelector('datalist')!.innerHTML = choice.agent === 'shell' ? '' : catalog[choice.agent].map(m => m.label.toLowerCase() === m.id.toLowerCase() ? ui`<option value="${esc(m.id)}"></option>` : ui`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');
+    const models = choice.agent === 'shell' ? [] : catalog?.[choice.agent] ?? [];
+    row.querySelector('datalist')!.innerHTML = models.map(m => m.label.toLowerCase() === m.id.toLowerCase() ? ui`<option value="${esc(m.id)}"></option>` : ui`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');
     row.querySelector<HTMLInputElement>('[data-model]')!.disabled = choice.agent === 'shell';
     updateEffort(row, choice);
+  };
+  const refreshObjective = () => {
     prompt.disabled = squad ? addOnly : choices[0].agent === 'shell';
     form.querySelector('[data-objective]')!.classList.toggle('hidden', prompt.disabled);
   };
   const toneOf = (role: AgentRole) => role === 'orchestrator' ? 'orchestrator' : 'active';
   const renderRows = () => {
+    extra = Math.max(minExtra(), Math.min(extra, maxExtra()));
     const count = total();
-    const member = (choice: Choice, i: number) => {
-      const role = squad ? (choice.role ?? (i === 0 && !addOnly ? 'orchestrator' : 'operator')) : singleRole;
-      const roleBox = squad
-        ? ui`<span class="role-tag" data-tone="${toneOf(role)}"><i></i>${roles[role]}${choice.name ? ' · ' + esc(choice.name) : ''}</span>`
-        : ui`<div class="chips" role="radiogroup" aria-label="Ruolo" data-role>${Object.entries(roles).map(([r, label]) => ui`<button type="button" role="radio" class="chip" data-role-choice="${r}" aria-checked="${r === singleRole}" ${(r === 'orchestrator' && orchestrator) || (r === 'brain' && brainAlive) ? 'disabled' : ''} title="${r === 'brain' ? (brainAlive ? tr('Il nodo ha già un Main Brain attivo') : tr('Coordina gli orchestratori delle squadre del nodo e propone nuove squadre')) : ''}">${label}</button>`).join('')}</div>`;
-      const agentBox = Object.entries(labels).filter(([a]) => !squad || a !== 'shell').map(([a, label]) => ui`<button type="button" role="radio" class="chip agent-chip" data-agent-choice="${a}" aria-checked="${a === choice.agent}" ${a !== 'shell' && !options.agents[a as AgentName] ? 'disabled' : ''}><span class="agent-mark" aria-hidden="true">${marks[a] ?? ''}</span>${label}</button>`).join('');
-      return ui`<div class="launch-member"><div class="member-role">${roleBox}</div><div class="chips" role="radiogroup" aria-label="Agent ${i + 1}">${agentBox}</div><label class="member-field">Modello<input data-model list="roster-models-${i}" aria-label="Modello ${i + 1}" placeholder="Auto" maxlength="160" autocomplete="off" value="${esc(choice.model)}"><datalist id="roster-models-${i}"></datalist></label><div class="member-field">Effort<div class="chips" role="radiogroup" data-effort aria-label="Effort ${i + 1}"></div></div></div>`;
-    };
-    roster.innerHTML = choices.slice(0, count).map(member).join('');
-    roster.querySelectorAll<HTMLElement>('.launch-member').forEach((row, i) => {
+    // The shared line drives every member: keep them aligned before showing or launching.
+    if (squad && !customize) choices = sameForAll(choices, count);
+    const lines = !squad ? [0] : customize ? choices.slice(0, count).map((_, i) => i) : [0];
+    const member = (i: number) => {
       const choice = choices[i];
+      const role = squad ? (choice.role ?? (i === 0 && !addOnly ? 'orchestrator' : 'operator')) : singleRole;
+      const lead = !squad
+        ? ui`<label class="launch-field launch-role" data-role-box><span>Ruolo</span><select data-role>${Object.entries(roles).map(([r, label]) => ui`<option value="${r}" ${r === singleRole ? 'selected' : ''} ${(r === 'orchestrator' && orchestrator) || (r === 'brain' && brainAlive) ? 'disabled' : ''}>${label}</option>`).join('')}</select></label>`
+        : customize ? ui`<span class="role-tag" data-tone="${toneOf(role)}"><i></i>${roles[role]}${choice.name ? ' · ' + esc(choice.name) : ''}</span>` : '';
+      return ui`<div class="launch-agent-row" data-row="${i}">${lead}<label class="launch-field"><span>${squad && !customize ? tr('Agente per tutti') : tr('Agente')}</span><select data-agent aria-label="Agente ${i + 1}">${agentOptions(choice.agent, !squad)}</select></label><label class="launch-field launch-model"><span>Modello</span><input data-model list="roster-models-${i}" aria-label="Modello ${i + 1}" placeholder="Auto" title="Auto usa la configurazione del CLI." maxlength="160" autocomplete="off" value="${esc(choice.model)}"><datalist id="roster-models-${i}"></datalist></label><label class="launch-field launch-effort"><span>Effort</span><select data-effort aria-label="Effort ${i + 1}"></select></label></div>`;
+    };
+    roster.innerHTML = lines.map(member).join('');
+    roster.classList.toggle('custom', squad && customize);
+    roster.querySelectorAll<HTMLElement>('.launch-agent-row').forEach(row => {
+      const i = Number(row.dataset.row), choice = choices[i];
       const model = row.querySelector<HTMLInputElement>('[data-model]')!;
-      row.querySelectorAll<HTMLElement>('[data-agent-choice]').forEach(b => b.onclick = () => {
-        if (b.hasAttribute('disabled')) return;
-        choice.agent = b.dataset.agentChoice as Choice['agent']; choice.effort = '';
+      const shared = () => { if (squad && !customize) choices = sameForAll(choices, total()); };
+      row.querySelector<HTMLSelectElement>('[data-agent]')!.onchange = e => {
+        choice.agent = (e.target as HTMLSelectElement).value as Choice['agent']; choice.effort = '';
         try { choice.model = localStorage.getItem(ui`vb:model:${choice.agent}`) || ''; } catch { choice.model = ''; }
-        row.querySelectorAll<HTMLElement>('[data-agent-choice]').forEach(o => o.setAttribute('aria-checked', String(o === b)));
-        model.value = choice.model; updateModels(row, choice);
-        row.querySelector('[data-role]')?.classList.toggle('hidden', choice.agent === 'shell' || options.mode === 'external');
-        renderTeams();
-      });
-      row.querySelectorAll<HTMLElement>('[data-role-choice]').forEach(b => b.onclick = () => {
-        if (b.hasAttribute('disabled')) return;
-        singleRole = b.dataset.roleChoice as AgentRole;
-        row.querySelectorAll<HTMLElement>('[data-role-choice]').forEach(o => o.setAttribute('aria-checked', String(o === b)));
-        renderTeams();
-      });
-      model.oninput = () => { choice.model = model.value.trim(); updateEffort(row, choice); };
-      row.querySelector('[data-role]')?.classList.toggle('hidden', choice.agent === 'shell' || options.mode === 'external');
+        model.value = choice.model; updateModels(row, choice); shared();
+        row.querySelector('[data-role-box]')?.classList.toggle('hidden', choice.agent === 'shell' || options.mode === 'external');
+        refreshObjective(); renderTeams();
+      };
+      row.querySelector<HTMLSelectElement>('[data-role]')?.addEventListener('change', e => { singleRole = (e.target as HTMLSelectElement).value as AgentRole; renderTeams(); });
+      model.oninput = () => { choice.model = model.value.trim(); updateEffort(row, choice); shared(); };
+      row.querySelector<HTMLSelectElement>('[data-effort]')!.onchange = e => { choice.effort = (e.target as HTMLSelectElement).value; shared(); };
+      row.querySelector('[data-role-box]')?.classList.toggle('hidden', choice.agent === 'shell' || options.mode === 'external');
       updateModels(row, choice);
     });
+    customizeButton.classList.toggle('hidden', !squad);
+    customizeButton.textContent = customize ? tr('Uguale per tutti') : tr('Personalizza per agente');
+    form.querySelectorAll<HTMLElement>('[data-preset-choice]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.presetChoice === 'squad') === squad)));
     submit.textContent = squad ? tr('Avvia {n} agenti').replace('{n}', String(count)) : tr('Avvia');
-    refreshCapacity();
-    form.querySelector('[data-preset-hint]')!.textContent = squad ? (addOnly ? tr('Collegati all’orchestratore') : tr('Già collegati tra loro')) : options.mode === 'external' ? tr('In Terminal.app') : '';
+    refreshObjective(); refreshCapacity();
+    form.querySelector('[data-preset-hint]')!.textContent = squad ? (addOnly ? tr('Collegati all’orchestratore') : tr('Orchestratore + operatori, già collegati tra loro')) : options.mode === 'external' ? tr('In Terminal.app') : '';
   };
-  // Missing or signed-out CLIs: say which, and where to fix it, instead of a silent disabled chip.
+  customizeButton.onclick = () => { customize = !customize; renderRows(); };
+  // Missing or signed-out CLIs: say which, and where to fix it, instead of a silent disabled option.
   void api.agents().then(({ clis }) => {
     const hint = form.querySelector<HTMLElement>('[data-cli-hint]');
     if (!hint?.isConnected) return;
@@ -243,14 +291,26 @@ export function openWorkLauncher(options: {
     if (!missing.length && !signedOut.length) return;
     hint.innerHTML = [missing.length ? ui`Non installati: ${esc(missing.join(', '))}.` : '', signedOut.length ? ui`Senza accesso: ${esc(signedOut.join(', '))}.` : ''].filter(Boolean).join(' ') + ui` <button type="button" class="link" data-open-agents>Impostazioni → Agenti</button>`;
     hint.classList.remove('hidden');
-    hint.querySelector('[data-open-agents]')!.addEventListener('click', () => { overlay.classList.add('hidden'); overlay.innerHTML = ''; delete overlay.dataset.mode; void openSettings(false, 'agents'); });
+    hint.querySelector('[data-open-agents]')!.addEventListener('click', () => { overlay.classList.add('hidden'); overlay.innerHTML = ''; delete overlay.dataset.mode; void import('./settings.ts').then(m => m.openSettings(false, 'agents')); });
   }).catch(() => {});
-  preset.onchange = () => { restored = null; savedSelect.value = ''; choices.forEach(c => { delete c.role; delete c.name; }); squad = preset.value === 'squad'; if (squad && choices[0].agent === 'shell') choices[0].agent = (['codex', 'claude', 'hermes', 'agy'] as const).find(a => options.agents[a])!; renderRows(); };
+  form.querySelectorAll<HTMLButtonElement>('[data-preset-choice]').forEach(b => b.onclick = () => {
+    if (b.disabled || (b.dataset.presetChoice === 'squad') === squad) return;
+    restored = null; savedSelect.value = ''; choices.forEach(c => { delete c.role; delete c.name; });
+    squad = b.dataset.presetChoice === 'squad';
+    if (squad && choices[0].agent === 'shell') choices[0].agent = (['codex', 'claude', 'hermes', 'agy'] as const).find(a => options.agents[a])!;
+    if (squad) customize = !allSame(choices, total());
+    renderRows(); renderTeams();
+  });
+  // A Main Brain proposal fills team, name and members: show where it goes.
+  more.open = !!options.proposal;
   renderRows(); renderTeams();
-  void api.models().then(models => { if (!form.isConnected) return; catalog = models; roster.querySelectorAll<HTMLElement>('.launch-member').forEach((row, i) => updateModels(row, choices[i])); }).catch(() => { if (form.isConnected) error.textContent = tr('Catalogo non disponibile. Usa Auto o inserisci l’ID del modello.'); });
+  void api.models().then(models => { if (!form.isConnected) return; catalog = models; roster.querySelectorAll<HTMLElement>('.launch-agent-row').forEach(row => updateModels(row, choices[Number(row.dataset.row)])); }).catch(() => { if (form.isConnected) error.textContent = tr('Catalogo non disponibile. Usa Auto o inserisci l’ID del modello.'); });
   prompt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
+  if (prompt.disabled) form.querySelector<HTMLSelectElement>('[data-agent]')?.focus();
+  else prompt.focus();
   form.onsubmit = async e => {
     e.preventDefault(); if (busy || submit.disabled) return;
+    if (squad && !customize) choices = sameForAll(choices, total());
     if (squad && choices.slice(0, total()).some(c => c.agent === 'shell' || !options.agents[c.agent])) { error.textContent = tr('Installa gli agenti mancanti o cambia la configurazione.'); return; }
     busy = true; error.textContent = ''; submit.disabled = true; submit.textContent = tr('Avvio…');
     try {
