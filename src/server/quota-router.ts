@@ -87,13 +87,14 @@ export class QuotaRouter {
     };
     const all=shared(this.state.signals),latest=all.toSorted((a,b)=>b.observedAt-a.observedAt)[0];
     const active=shared(this.state.holds??{}).filter(s=>s.blockedUntil===null||s.blockedUntil>now);
-    const low=all.filter(s=>remaining(s,now).some(w=>w.remainingPct===0 || (w.remainingPct<rule.marginPct && (w.resetsAt!==null || s.observedAt+FRESH_MS>now))));
     const minimum=(s:QuotaSample)=>Math.min(...remaining(s,now).map(w=>w.remainingPct));
+    const low=all.filter(s=>remaining(s,now).some(w=>w.remainingPct===0 || (w.remainingPct<=rule.marginPct && (w.resetsAt!==null || s.observedAt+FRESH_MS>now)))).sort((a,b)=>minimum(a)-minimum(b));
     const fresh=all.filter(s=>s.observedAt+FRESH_MS>now && remaining(s,now).length).sort((a,b)=>minimum(a)-minimum(b));
     const sample=active[0]??low[0]??fresh[0]??latest;
     const status:QuotaGroup['status']=active.length?'limited':low.length?(remaining(low[0],now).some(w=>w.remainingPct===0)?'limited':'margin')
       :fresh.length?'available':latest?.windows.length?'stale':'unknown';
-    const deadline=active.some(s=>s.blockedUntil===null)?null:active.length?Math.max(...active.map(s=>s.blockedUntil!)):null;
+    const deadlines = [...active.map(s=>s.blockedUntil), ...low.flatMap(s=>remaining(s,now).filter(w=>w.remainingPct===0).map(w=>w.resetsAt))];
+    const deadline = deadlines.length && deadlines.every((n): n is number => n!==null) ? Math.max(...deadlines) : null;
     return {provider,group,account:sample?.account??null,source:sample?.source??null,observedAt:sample?.observedAt??null,
       freshUntil:sample?sample.observedAt+FRESH_MS:null,limited:status==='limited',blockedUntil:deadline,
       windows:(sample?.windows??[]).map(w=>({...w})),status};

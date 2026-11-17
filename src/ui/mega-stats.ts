@@ -333,9 +333,10 @@ export function mountMegaStats(root: HTMLElement): () => void {
     listedTeams = r.teams;
     const teams = r.teams.filter(t => !projectId || String(t.projectId) === projectId);
     options(project.select, [allProjects, ...projects], projectId);
-    options(team.select, [allTeams, ...teams.map(t => ({ value: t.key, label: t.name }))], teamKey);
+    const projectName = (id: number) => r.projects.find(p => p.id === id)?.name ?? String(id);
+    options(team.select, [allTeams, ...teams.map(t => ({ value: t.key, label: [!projectId && projectName(t.projectId), t.nodeId !== t.projectId && '#'+t.nodeId, t.name].filter(Boolean).join(' · ') }))], teamKey);
     if (!sessionId) choices = r.sessions;
-    options(session.select, [allSessions, ...choices.map(s => ({ value: s.id, label: s.label }))], sessionId);
+    options(session.select, [allSessions, ...choices.map(s => ({ value: s.id, label: [!projectId && projectName(s.projectId), s.nodeId !== s.projectId && '#'+s.nodeId, s.label].filter(Boolean).join(' · ') }))], sessionId);
     meta.replaceChildren(t('Ultimo aggiornamento'), ' · ', timestamp(r.updatedAt), '   ·   ', t('Copertura del server'), ' ', duration(r.observedMs));
     const metrics = summary(r.totals);
     const observations = el('section', undefined, 'mega-stats-section');
