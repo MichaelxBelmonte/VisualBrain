@@ -1,0 +1,1748 @@
+{
+ "label": "baseline-20k",
+ "date": "2026-10-14T14:18:47.562Z",
+ "machine": {
+  "cpu": "Apple M5 Pro",
+  "cores": 15,
+  "memGb": 24,
+  "node": "v24.21.0",
+  "arch": "arm64"
+ },
+ "cases": [
+  {
+   "name": "sintetico-20000",
+   "roots": [
+    "<sintetico>"
+   ],
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 1349,
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 94.8,
+       "heapMb": 10.7,
+       "peakRssMb": 94.8,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "scan",
+       "ms": 323.3,
+       "rssMb": 243.4,
+       "heapMb": 99.4,
+       "peakRssMb": 243.4,
+       "stallMs": 7,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 21.4,
+       "rssMb": 252.7,
+       "heapMb": 108.8,
+       "peakRssMb": 252.7,
+       "stallMs": 21.4,
+       "counts": {
+        "projects": 30
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 638.8,
+       "rssMb": 369.8,
+       "heapMb": 146.1,
+       "peakRssMb": 369.8,
+       "stallMs": 64.9,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 521,
+        "hashMs": 24,
+        "extractMs": 296,
+        "writeMs": 96
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 72.4,
+       "rssMb": 383.2,
+       "heapMb": 152.7,
+       "peakRssMb": 383.8,
+       "stallMs": 72.4
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.9,
+       "rssMb": 383.3,
+       "heapMb": 152.7,
+       "peakRssMb": 383.8,
+       "stallMs": 2.9
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.2,
+       "rssMb": 383.3,
+       "heapMb": 152.7,
+       "peakRssMb": 383.8,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 133.6,
+       "rssMb": 414.8,
+       "heapMb": 180.5,
+       "peakRssMb": 414.8,
+       "stallMs": 133.6
+      },
+      {
+       "phase": "edges",
+       "ms": 209.2,
+       "rssMb": 414.8,
+       "heapMb": 180.5,
+       "peakRssMb": 414.8,
+       "stallMs": 209.2,
+       "counts": {
+        "edges": 6781
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 414.8,
+       "heapMb": 180.5,
+       "peakRssMb": 414.8,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 414.8,
+       "heapMb": 180.5,
+       "peakRssMb": 414.8,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "rank",
+       "ms": 129,
+       "rssMb": 435.5,
+       "heapMb": 158.1,
+       "peakRssMb": 444.2,
+       "stallMs": 129
+      },
+      {
+       "phase": "fts",
+       "ms": 25.9,
+       "rssMb": 442.5,
+       "heapMb": 158.1,
+       "peakRssMb": 444.2,
+       "stallMs": 25.9
+      }
+     ],
+     "peakRssMb": 444,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "c14bcd5d2aeca40e",
+      "links": "306760c74ac5e1ed",
+      "refpath": "1c3b5080622ff55f",
+      "mention": "5e5286d247607f12",
+      "symlink": "74bb6999f3beac5b",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "c0592881dee1ece4"
+     },
+     "dbMb": 17.9
+    },
+    {
+     "mode": "warm",
+     "wallMs": 722,
+     "summary": {
+      "seen": 21038,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.6,
+       "rssMb": 100.7,
+       "heapMb": 10.7,
+       "peakRssMb": 100.8,
+       "stallMs": 2.6
+      },
+      {
+       "phase": "scan",
+       "ms": 312,
+       "rssMb": 260.9,
+       "heapMb": 113.3,
+       "peakRssMb": 260.9,
+       "stallMs": 4.1,
+       "counts": {
+        "seen": 21038,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 17.6,
+       "rssMb": 266.4,
+       "heapMb": 76.4,
+       "peakRssMb": 266.4,
+       "stallMs": 17.6,
+       "counts": {
+        "projects": 30
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 4,
+       "rssMb": 270,
+       "heapMb": 76.8,
+       "peakRssMb": 270,
+       "stallMs": 0,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 75.5,
+       "rssMb": 319,
+       "heapMb": 102,
+       "peakRssMb": 322.3,
+       "stallMs": 75.5
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.8,
+       "rssMb": 319.4,
+       "heapMb": 102,
+       "peakRssMb": 322.3,
+       "stallMs": 2.8
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 319.4,
+       "heapMb": 102,
+       "peakRssMb": 322.3,
+       "stallMs": 0.3
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 124.3,
+       "rssMb": 346.5,
+       "heapMb": 160.4,
+       "peakRssMb": 346.5,
+       "stallMs": 124.3
+      },
+      {
+       "phase": "edges",
+       "ms": 203,
+       "rssMb": 346.5,
+       "heapMb": 160.4,
+       "peakRssMb": 346.5,
+       "stallMs": 203,
+       "counts": {
+        "edges": 6781
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 346.5,
+       "heapMb": 160.4,
+       "peakRssMb": 346.5,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "externals",
+       "ms": 0,
+       "rssMb": 346.5,
+       "heapMb": 160.4,
+       "peakRssMb": 346.5,
+       "stallMs": 0
+      },
+      {
+       "phase": "rank",
+       "ms": 111.6,
+       "rssMb": 363.9,
+       "heapMb": 137.3,
+       "peakRssMb": 363.9,
+       "stallMs": 111.6
+      },
+      {
+       "phase": "fts",
+       "ms": 70.1,
+       "rssMb": 372.3,
+       "heapMb": 137.4,
+       "peakRssMb": 372.3,
+       "stallMs": 70.1
+      }
+     ],
+     "peakRssMb": 373,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "c14bcd5d2aeca40e",
+      "links": "306760c74ac5e1ed",
+      "refpath": "1c3b5080622ff55f",
+      "mention": "5e5286d247607f12",
+      "symlink": "74bb6999f3beac5b",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "c0592881dee1ece4"
+     },
+     "dbMb": 19.3
+    },
+    {
+     "mode": "incremental",
+     "wallMs": 809,
+     "summary": {
+      "seen": 21071,
+      "added": 60,
+      "changed": 113,
+      "removed": 27,
+      "extracted": 173,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.8,
+       "rssMb": 102.1,
+       "heapMb": 10.6,
+       "peakRssMb": 102.1,
+       "stallMs": 2.8
+      },
+      {
+       "phase": "scan",
+       "ms": 327.9,
+       "rssMb": 261,
+       "heapMb": 113.3,
+       "peakRssMb": 261,
+       "stallMs": 5.9,
+       "counts": {
+        "seen": 21071,
+        "added": 60,
+        "changed": 113,
+        "removed": 27
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 18.3,
+       "rssMb": 269.7,
+       "heapMb": 76.3,
+       "peakRssMb": 269.7,
+       "stallMs": 18.3,
+       "counts": {
+        "projects": 30
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 22.5,
+       "rssMb": 279.9,
+       "heapMb": 83.8,
+       "peakRssMb": 279.9,
+       "stallMs": 2.4,
+       "counts": {
+        "files": 173,
+        "texts": 91,
+        "bytes": 517611,
+        "refs": 101,
+        "identifiers": 0,
+        "readMs": 14,
+        "hashMs": 0,
+        "extractMs": 11,
+        "writeMs": 3
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 80.3,
+       "rssMb": 322.5,
+       "heapMb": 109.6,
+       "peakRssMb": 325.7,
+       "stallMs": 80.3
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.8,
+       "rssMb": 322.6,
+       "heapMb": 109.6,
+       "peakRssMb": 325.7,
+       "stallMs": 2.8
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 322.6,
+       "heapMb": 109.6,
+       "peakRssMb": 325.7,
+       "stallMs": 0.3
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 168.1,
+       "rssMb": 354.1,
+       "heapMb": 146.5,
+       "peakRssMb": 354.1,
+       "stallMs": 168.1
+      },
+      {
+       "phase": "edges",
+       "ms": 251.5,
+       "rssMb": 354.1,
+       "heapMb": 146.5,
+       "peakRssMb": 354.1,
+       "stallMs": 251.5,
+       "counts": {
+        "edges": 7026
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 354.1,
+       "heapMb": 146.5,
+       "peakRssMb": 354.1,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 354.1,
+       "heapMb": 146.6,
+       "peakRssMb": 354.1,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "rank",
+       "ms": 129.6,
+       "rssMb": 369.9,
+       "heapMb": 183,
+       "peakRssMb": 369.9,
+       "stallMs": 129.6
+      },
+      {
+       "phase": "fts",
+       "ms": 55.4,
+       "rssMb": 378,
+       "heapMb": 183,
+       "peakRssMb": 378,
+       "stallMs": 55.4
+      }
+     ],
+     "peakRssMb": 389,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "8d7aaeee7eccea92",
+      "links": "4210f67743faaf3f",
+      "refpath": "1c3b5080622ff55f",
+      "mention": "db4b4cfd708ad0b4",
+      "symlink": "74bb6999f3beac5b",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "ed1fcee08da5be5a"
+     },
+     "dbMb": 19.6
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 1299,
+     "summary": {
+      "seen": 21071,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20202,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 30.6,
+       "rssMb": 115.6,
+       "heapMb": 10.7,
+       "peakRssMb": 115.6,
+       "stallMs": 30.6
+      },
+      {
+       "phase": "scan",
+       "ms": 293.6,
+       "rssMb": 266.6,
+       "heapMb": 112.2,
+       "peakRssMb": 266.6,
+       "stallMs": 6.4,
+       "counts": {
+        "seen": 21071,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 18.8,
+       "rssMb": 275.3,
+       "heapMb": 75.2,
+       "peakRssMb": 275.3,
+       "stallMs": 18.8,
+       "counts": {
+        "projects": 30
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 564.5,
+       "rssMb": 389.6,
+       "heapMb": 140.2,
+       "peakRssMb": 389.6,
+       "stallMs": 58.9,
+       "counts": {
+        "files": 20202,
+        "texts": 3782,
+        "bytes": 62510884,
+        "refs": 4894,
+        "identifiers": 0,
+        "readMs": 458,
+        "hashMs": 24,
+        "extractMs": 292,
+        "writeMs": 89
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 73.2,
+       "rssMb": 396.3,
+       "heapMb": 150.5,
+       "peakRssMb": 397.8,
+       "stallMs": 73.2
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 3,
+       "rssMb": 396.3,
+       "heapMb": 150.5,
+       "peakRssMb": 397.8,
+       "stallMs": 3
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 396.3,
+       "heapMb": 150.5,
+       "peakRssMb": 397.8,
+       "stallMs": 0.3
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 143.6,
+       "rssMb": 432,
+       "heapMb": 210.8,
+       "peakRssMb": 432,
+       "stallMs": 143.6
+      },
+      {
+       "phase": "edges",
+       "ms": 220.1,
+       "rssMb": 432,
+       "heapMb": 210.8,
+       "peakRssMb": 432,
+       "stallMs": 220.1,
+       "counts": {
+        "edges": 7026
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 432,
+       "heapMb": 210.8,
+       "peakRssMb": 432,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 432,
+       "heapMb": 210.8,
+       "peakRssMb": 432,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "rank",
+       "ms": 114.9,
+       "rssMb": 447,
+       "heapMb": 185.5,
+       "peakRssMb": 447,
+       "stallMs": 114.9
+      },
+      {
+       "phase": "fts",
+       "ms": 55.7,
+       "rssMb": 455.2,
+       "heapMb": 185.5,
+       "peakRssMb": 455.2,
+       "stallMs": 55.7
+      }
+     ],
+     "peakRssMb": 456,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "8d7aaeee7eccea92",
+      "links": "4210f67743faaf3f",
+      "refpath": "1c3b5080622ff55f",
+      "mention": "db4b4cfd708ad0b4",
+      "symlink": "74bb6999f3beac5b",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "ed1fcee08da5be5a"
+     },
+     "dbMb": 20.7
+    }
+   ],
+   "corpus": {
+    "files": 20200,
+    "dirs": 680,
+    "bytes": 358238566,
+    "vendorFiles": 3600,
+    "symlinks": 20,
+    "secrets": 31,
+    "duplicates": 89,
+    "projects": 30,
+    "generateMs": 1704
+   },
+   "mutation": {
+    "edited": 115,
+    "added": 60,
+    "deleted": 27
+   }
+  },
+  {
+   "name": "repo",
+   "roots": [
+    "/Users/me/Desktop/JetHR/strumenti/visual-brain"
+   ],
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 198,
+     "summary": {
+      "seen": 97,
+      "added": 97,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 76,
+      "projects": 2,
+      "edges": 341
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 98.2,
+       "heapMb": 10.7,
+       "peakRssMb": 98.3,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "scan",
+       "ms": 99.3,
+       "rssMb": 148.7,
+       "heapMb": 38.1,
+       "peakRssMb": 148.7,
+       "stallMs": 0.9,
+       "counts": {
+        "seen": 97,
+        "added": 97,
+        "changed": 0,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 148.9,
+       "heapMb": 38.3,
+       "peakRssMb": 148.9,
+       "stallMs": 0.9,
+       "counts": {
+        "projects": 2
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 80.8,
+       "rssMb": 177.4,
+       "heapMb": 39.3,
+       "peakRssMb": 177.4,
+       "stallMs": 39.9,
+       "counts": {
+        "files": 76,
+        "texts": 74,
+        "bytes": 1628252,
+        "refs": 576,
+        "identifiers": 16,
+        "readMs": 77,
+        "hashMs": 1,
+        "extractMs": 70,
+        "writeMs": 3
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 7.5,
+       "rssMb": 181,
+       "heapMb": 42.5,
+       "peakRssMb": 181,
+       "stallMs": 7.5
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 181,
+       "heapMb": 42.5,
+       "peakRssMb": 181,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.1,
+       "rssMb": 181,
+       "heapMb": 42.5,
+       "peakRssMb": 181,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 5.1,
+       "rssMb": 188.4,
+       "heapMb": 51.1,
+       "peakRssMb": 188.4,
+       "stallMs": 5.1
+      },
+      {
+       "phase": "edges",
+       "ms": 12.9,
+       "rssMb": 188.4,
+       "heapMb": 51.1,
+       "peakRssMb": 188.4,
+       "stallMs": 12.9,
+       "counts": {
+        "edges": 341
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 188.4,
+       "heapMb": 51.1,
+       "peakRssMb": 188.4,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 188.4,
+       "heapMb": 51.1,
+       "peakRssMb": 188.4,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "rank",
+       "ms": 3.3,
+       "rssMb": 191.4,
+       "heapMb": 54.3,
+       "peakRssMb": 191.4,
+       "stallMs": 3.3
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 191.5,
+       "heapMb": 54.3,
+       "peakRssMb": 191.5,
+       "stallMs": 0.3
+      }
+     ],
+     "peakRssMb": 192,
+     "nodes": {
+      "dir": 21,
+      "external": 51,
+      "file": 76
+     },
+     "edgesByKind": {
+      "external": 46,
+      "imports": 150,
+      "links": 4,
+      "mention": 56,
+      "refpath": 49,
+      "shared_id": 1,
+      "similar": 35
+     },
+     "fingerprint": {
+      "imports": "32da120549ee5568",
+      "links": "9f6c835c1e988227",
+      "refpath": "08f3846084d451cf",
+      "mention": "1108a6b357d653d1",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "5fd50be5fbb12fcb",
+      "shared_id": "8eaa749037cfacb6",
+      "similar": "3c8ec0071c243b93"
+     },
+     "dbMb": 0.4
+    },
+    {
+     "mode": "warm",
+     "wallMs": 113,
+     "summary": {
+      "seen": 97,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 2,
+      "edges": 340
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.3,
+       "rssMb": 97.3,
+       "heapMb": 10.7,
+       "peakRssMb": 97.3,
+       "stallMs": 0.3
+      },
+      {
+       "phase": "scan",
+       "ms": 97.2,
+       "rssMb": 143.9,
+       "heapMb": 37.4,
+       "peakRssMb": 143.9,
+       "stallMs": 1.6,
+       "counts": {
+        "seen": 97,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 144.1,
+       "heapMb": 38,
+       "peakRssMb": 144.1,
+       "stallMs": 0.8,
+       "counts": {
+        "projects": 2
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 0.2,
+       "rssMb": 144.2,
+       "heapMb": 37.6,
+       "peakRssMb": 144.2,
+       "stallMs": 0,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 4.6,
+       "rssMb": 147.5,
+       "heapMb": 40.9,
+       "peakRssMb": 147.5,
+       "stallMs": 4.6
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 147.6,
+       "heapMb": 40.9,
+       "peakRssMb": 147.6,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.1,
+       "rssMb": 147.6,
+       "heapMb": 40.9,
+       "peakRssMb": 147.6,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 4.9,
+       "rssMb": 155.4,
+       "heapMb": 49.6,
+       "peakRssMb": 155.4,
+       "stallMs": 4.9
+      },
+      {
+       "phase": "edges",
+       "ms": 9.9,
+       "rssMb": 155.4,
+       "heapMb": 49.6,
+       "peakRssMb": 155.4,
+       "stallMs": 9.9,
+       "counts": {
+        "edges": 340
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 155.4,
+       "heapMb": 49.6,
+       "peakRssMb": 155.4,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 155.5,
+       "heapMb": 49.6,
+       "peakRssMb": 155.5,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "rank",
+       "ms": 3.2,
+       "rssMb": 158.5,
+       "heapMb": 52.7,
+       "peakRssMb": 158.5,
+       "stallMs": 3.2
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 158.8,
+       "heapMb": 52.7,
+       "peakRssMb": 158.8,
+       "stallMs": 0.5
+      }
+     ],
+     "peakRssMb": 160,
+     "nodes": {
+      "dir": 21,
+      "external": 51,
+      "file": 76
+     },
+     "edgesByKind": {
+      "external": 20,
+      "imports": 150,
+      "links": 4,
+      "mention": 56,
+      "refpath": 74,
+      "shared_id": 1,
+      "similar": 35
+     },
+     "fingerprint": {
+      "imports": "32da120549ee5568",
+      "links": "9f6c835c1e988227",
+      "refpath": "e862b3593b8bee21",
+      "mention": "1108a6b357d653d1",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "904dd53c540a473b",
+      "shared_id": "8eaa749037cfacb6",
+      "similar": "3c8ec0071c243b93"
+     },
+     "dbMb": 0.5
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 170,
+     "summary": {
+      "seen": 97,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 76,
+      "projects": 2,
+      "edges": 340
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.6,
+       "rssMb": 94.4,
+       "heapMb": 10.6,
+       "peakRssMb": 94.5,
+       "stallMs": 0.6
+      },
+      {
+       "phase": "scan",
+       "ms": 83,
+       "rssMb": 150.1,
+       "heapMb": 45.2,
+       "peakRssMb": 150.1,
+       "stallMs": 0.9,
+       "counts": {
+        "seen": 97,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 150.4,
+       "heapMb": 45.7,
+       "peakRssMb": 150.4,
+       "stallMs": 0.8,
+       "counts": {
+        "projects": 2
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 71.7,
+       "rssMb": 169,
+       "heapMb": 48.7,
+       "peakRssMb": 169,
+       "stallMs": 10.7,
+       "counts": {
+        "files": 76,
+        "texts": 74,
+        "bytes": 1628252,
+        "refs": 576,
+        "identifiers": 16,
+        "readMs": 68,
+        "hashMs": 1,
+        "extractMs": 65,
+        "writeMs": 3
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 4.4,
+       "rssMb": 172.2,
+       "heapMb": 52,
+       "peakRssMb": 172.2,
+       "stallMs": 4.4
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 172.2,
+       "heapMb": 52,
+       "peakRssMb": 172.2,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.1,
+       "rssMb": 172.2,
+       "heapMb": 52,
+       "peakRssMb": 172.2,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 5.1,
+       "rssMb": 177.8,
+       "heapMb": 30.8,
+       "peakRssMb": 177.8,
+       "stallMs": 5.1
+      },
+      {
+       "phase": "edges",
+       "ms": 9.8,
+       "rssMb": 177.8,
+       "heapMb": 30.8,
+       "peakRssMb": 177.8,
+       "stallMs": 9.8,
+       "counts": {
+        "edges": 340
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 177.8,
+       "heapMb": 30.8,
+       "peakRssMb": 177.8,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 177.8,
+       "heapMb": 30.8,
+       "peakRssMb": 177.8,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "rank",
+       "ms": 2.7,
+       "rssMb": 178,
+       "heapMb": 34,
+       "peakRssMb": 178,
+       "stallMs": 2.7
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 178.2,
+       "heapMb": 34,
+       "peakRssMb": 178.2,
+       "stallMs": 0.5
+      }
+     ],
+     "peakRssMb": 178,
+     "nodes": {
+      "dir": 21,
+      "external": 51,
+      "file": 76
+     },
+     "edgesByKind": {
+      "external": 20,
+      "imports": 150,
+      "links": 4,
+      "mention": 56,
+      "refpath": 74,
+      "shared_id": 1,
+      "similar": 35
+     },
+     "fingerprint": {
+      "imports": "32da120549ee5568",
+      "links": "9f6c835c1e988227",
+      "refpath": "e862b3593b8bee21",
+      "mention": "1108a6b357d653d1",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "904dd53c540a473b",
+      "shared_id": "8eaa749037cfacb6",
+      "similar": "3c8ec0071c243b93"
+     },
+     "dbMb": 0.5
+    }
+   ]
+  },
+  {
+   "name": "reale-Desktop",
+   "roots": [
+    "/Users/me/Desktop"
+   ],
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 38640,
+     "summary": {
+      "seen": 105012,
+      "added": 105012,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90588,
+      "projects": 108,
+      "edges": 56626
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 95.6,
+       "heapMb": 10.7,
+       "peakRssMb": 95.6,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "scan",
+       "ms": 8995.1,
+       "rssMb": 861,
+       "heapMb": 629.2,
+       "peakRssMb": 861,
+       "stallMs": 32.7,
+       "counts": {
+        "seen": 105012,
+        "added": 105012,
+        "changed": 0,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 86.4,
+       "rssMb": 886.9,
+       "heapMb": 606.6,
+       "peakRssMb": 886.9,
+       "stallMs": 86.4,
+       "counts": {
+        "projects": 108
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 24778.3,
+       "rssMb": 951.2,
+       "heapMb": 135.5,
+       "peakRssMb": 967.5,
+       "stallMs": 3058.6,
+       "counts": {
+        "files": 90588,
+        "texts": 23476,
+        "bytes": 425883853,
+        "refs": 78242,
+        "identifiers": 9953,
+        "readMs": 23885,
+        "hashMs": 91,
+        "extractMs": 22763,
+        "writeMs": 807
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1386.8,
+       "rssMb": 968.3,
+       "heapMb": 137.2,
+       "peakRssMb": 981.7,
+       "stallMs": 1386.8
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 29,
+       "rssMb": 968.4,
+       "heapMb": 140,
+       "peakRssMb": 981.7,
+       "stallMs": 29
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 8.5,
+       "rssMb": 968.4,
+       "heapMb": 143.8,
+       "peakRssMb": 981.7,
+       "stallMs": 8.5
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2416.1,
+       "rssMb": 970.1,
+       "heapMb": 256.6,
+       "peakRssMb": 981.7,
+       "stallMs": 2416.1
+      },
+      {
+       "phase": "edges",
+       "ms": 3840.5,
+       "rssMb": 970.1,
+       "heapMb": 256.6,
+       "peakRssMb": 981.7,
+       "stallMs": 3840.5,
+       "counts": {
+        "edges": 56626
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 970.1,
+       "heapMb": 256.7,
+       "peakRssMb": 981.7,
+       "stallMs": 0.2
+      },
+      {
+       "phase": "externals",
+       "ms": 7.3,
+       "rssMb": 970.3,
+       "heapMb": 256.7,
+       "peakRssMb": 981.7,
+       "stallMs": 7.3
+      },
+      {
+       "phase": "rank",
+       "ms": 804.4,
+       "rssMb": 1021.5,
+       "heapMb": 384.2,
+       "peakRssMb": 1057.6,
+       "stallMs": 804.4
+      },
+      {
+       "phase": "fts",
+       "ms": 123.8,
+       "rssMb": 1023.2,
+       "heapMb": 384.2,
+       "peakRssMb": 1057.6,
+       "stallMs": 123.8
+      }
+     ],
+     "peakRssMb": 1058,
+     "nodes": {
+      "dir": 14385,
+      "external": 692,
+      "file": 90602,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1909,
+      "external": 1651,
+      "imports": 6334,
+      "links": 1082,
+      "mention": 5116,
+      "refpath": 9970,
+      "shared_id": 1383,
+      "similar": 29156,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "bd89b777e63d3b4b",
+      "links": "e6b6803fc9f09743",
+      "refpath": "b7da6d837a8867c0",
+      "mention": "dacfaa764a95cedc",
+      "symlink": "7cd76002418d02cd",
+      "duplicate": "0ac02d65f4be4194",
+      "external": "3e06921e0930d197",
+      "shared_id": "460b51399d63110b",
+      "similar": "e7f7a7f9d629e22c"
+     },
+     "dbMb": 115.1
+    },
+    {
+     "mode": "warm",
+     "wallMs": 13724,
+     "summary": {
+      "seen": 104968,
+      "added": 1,
+      "changed": 3,
+      "removed": 45,
+      "extracted": 4,
+      "projects": 106,
+      "edges": 56473
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 20.4,
+       "rssMb": 129.8,
+       "heapMb": 10.7,
+       "peakRssMb": 129.9,
+       "stallMs": 20.4
+      },
+      {
+       "phase": "scan",
+       "ms": 8453.5,
+       "rssMb": 859.9,
+       "heapMb": 201,
+       "peakRssMb": 859.9,
+       "stallMs": 24.5,
+       "counts": {
+        "seen": 104968,
+        "added": 1,
+        "changed": 3,
+        "removed": 45
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 78.5,
+       "rssMb": 869,
+       "heapMb": 222.2,
+       "peakRssMb": 869,
+       "stallMs": 78.5,
+       "counts": {
+        "projects": 106
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 47.6,
+       "rssMb": 877.3,
+       "heapMb": 229.5,
+       "peakRssMb": 877.3,
+       "stallMs": 23.8,
+       "counts": {
+        "files": 4,
+        "texts": 3,
+        "bytes": 488905,
+        "refs": 37,
+        "identifiers": 0,
+        "readMs": 13,
+        "hashMs": 0,
+        "extractMs": 12,
+        "writeMs": 1
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1384.4,
+       "rssMb": 897.8,
+       "heapMb": 378.2,
+       "peakRssMb": 897.8,
+       "stallMs": 1384.4
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 9.3,
+       "rssMb": 897.9,
+       "heapMb": 382.3,
+       "peakRssMb": 897.9,
+       "stallMs": 9.3
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 7,
+       "rssMb": 898,
+       "heapMb": 387.2,
+       "peakRssMb": 898,
+       "stallMs": 7
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2672.4,
+       "rssMb": 883.6,
+       "heapMb": 221.8,
+       "peakRssMb": 903.3,
+       "stallMs": 2672.4
+      },
+      {
+       "phase": "edges",
+       "ms": 4073.3,
+       "rssMb": 883.6,
+       "heapMb": 221.8,
+       "peakRssMb": 903.3,
+       "stallMs": 4073.3,
+       "counts": {
+        "edges": 56473
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 883.6,
+       "heapMb": 221.8,
+       "peakRssMb": 903.3,
+       "stallMs": 0.1
+      },
+      {
+       "phase": "externals",
+       "ms": 3.5,
+       "rssMb": 883.8,
+       "heapMb": 221.8,
+       "peakRssMb": 903.3,
+       "stallMs": 3.5
+      },
+      {
+       "phase": "rank",
+       "ms": 761.4,
+       "rssMb": 921.2,
+       "heapMb": 332.7,
+       "peakRssMb": 929.1,
+       "stallMs": 761.4
+      },
+      {
+       "phase": "fts",
+       "ms": 285,
+       "rssMb": 926,
+       "heapMb": 332.7,
+       "peakRssMb": 929.1,
+       "stallMs": 285
+      }
+     ],
+     "peakRssMb": 929,
+     "nodes": {
+      "dir": 14374,
+      "external": 692,
+      "file": 90569,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1888,
+      "external": 1627,
+      "imports": 6265,
+      "links": 1082,
+      "mention": 5107,
+      "refpath": 9980,
+      "shared_id": 1383,
+      "similar": 29116,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "be32e134a4271ec3",
+      "links": "e6b6803fc9f09743",
+      "refpath": "3670530602e1d59c",
+      "mention": "e535eadfed91694c",
+      "symlink": "7cd76002418d02cd",
+      "duplicate": "6facab3ccf662842",
+      "external": "eee9542ddc8824af",
+      "shared_id": "460b51399d63110b",
+      "similar": "c0baac64dc5a2161"
+     },
+     "dbMb": 122.3
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 40482,
+     "summary": {
+      "seen": 104969,
+      "added": 1,
+      "changed": 2,
+      "removed": 0,
+      "extracted": 90556,
+      "projects": 106,
+      "edges": 56480
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 158.4,
+       "rssMb": 206.9,
+       "heapMb": 10.7,
+       "peakRssMb": 206.9,
+       "stallMs": 158.4
+      },
+      {
+       "phase": "scan",
+       "ms": 8746.5,
+       "rssMb": 834.4,
+       "heapMb": 523.7,
+       "peakRssMb": 836.8,
+       "stallMs": 24.6,
+       "counts": {
+        "seen": 104969,
+        "added": 1,
+        "changed": 2,
+        "removed": 0
+       }
+      },
+      {
+       "phase": "projects",
+       "ms": 90.4,
+       "rssMb": 884.7,
+       "heapMb": 544.8,
+       "peakRssMb": 884.7,
+       "stallMs": 90.4,
+       "counts": {
+        "projects": 106
+       }
+      },
+      {
+       "phase": "extract",
+       "ms": 26036,
+       "rssMb": 604.5,
+       "heapMb": 184.2,
+       "peakRssMb": 915,
+       "stallMs": 3180.1,
+       "counts": {
+        "files": 90556,
+        "texts": 23447,
+        "bytes": 425469102,
+        "refs": 78085,
+        "identifiers": 9951,
+        "readMs": 25199,
+        "hashMs": 97,
+        "extractMs": 24003,
+        "writeMs": 748
+       }
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1466.6,
+       "rssMb": 709.6,
+       "heapMb": 338.6,
+       "peakRssMb": 915,
+       "stallMs": 1466.6
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 9.9,
+       "rssMb": 709.9,
+       "heapMb": 342.9,
+       "peakRssMb": 915,
+       "stallMs": 9.9
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 6.7,
+       "rssMb": 710.2,
+       "heapMb": 347.8,
+       "peakRssMb": 915,
+       "stallMs": 6.7
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2766.8,
+       "rssMb": 734,
+       "heapMb": 199.5,
+       "peakRssMb": 915,
+       "stallMs": 2766.8
+      },
+      {
+       "phase": "edges",
+       "ms": 4250,
+       "rssMb": 734,
+       "heapMb": 199.5,
+       "peakRssMb": 915,
+       "stallMs": 4250,
+       "counts": {
+        "edges": 56480
+       }
+      },
+      {
+       "phase": "seed",
+       "ms": 2.7,
+       "rssMb": 734,
+       "heapMb": 199.5,
+       "peakRssMb": 915,
+       "stallMs": 2.7
+      },
+      {
+       "phase": "externals",
+       "ms": 3.9,
+       "rssMb": 734,
+       "heapMb": 199.5,
+       "peakRssMb": 915,
+       "stallMs": 3.9
+      },
+      {
+       "phase": "rank",
+       "ms": 841,
+       "rssMb": 754.3,
+       "heapMb": 305.2,
+       "peakRssMb": 915,
+       "stallMs": 841
+      },
+      {
+       "phase": "fts",
+       "ms": 352,
+       "rssMb": 758.4,
+       "heapMb": 305.2,
+       "peakRssMb": 915,
+       "stallMs": 352
+      }
+     ],
+     "peakRssMb": 915,
+     "nodes": {
+      "dir": 14374,
+      "external": 692,
+      "file": 90570,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1888,
+      "external": 1627,
+      "imports": 6269,
+      "links": 1082,
+      "mention": 5108,
+      "refpath": 9980,
+      "shared_id": 1383,
+      "similar": 29118,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "c86d0429a7758d3f",
+      "links": "e6b6803fc9f09743",
+      "refpath": "3670530602e1d59c",
+      "mention": "ed0ee72b16141a96",
+      "symlink": "7cd76002418d02cd",
+      "duplicate": "6facab3ccf662842",
+      "external": "eee9542ddc8824af",
+      "shared_id": "460b51399d63110b",
+      "similar": "a9c4759fe134714d"
+     },
+     "dbMb": 122.3
+    }
+   ]
+  }
+ ]
+}

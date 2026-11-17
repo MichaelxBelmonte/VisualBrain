@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleLocalizations</key><array><string>en</string><string>it</string></array>
+<key>NSDesktopFolderUsageDescription</key><string>Visual Brain indexes the folders you choose to build your local file map.</string>
+<key>NSDocumentsFolderUsageDescription</key><string>Visual Brain indexes selected documents to show their relationships locally.</string>
+<key>NSDownloadsFolderUsageDescription</key><string>Visual Brain can include Downloads when you select it in setup.</string>
+</dict></plist>

@@ -1,0 +1,237 @@
+// API-side mirror of a detached terminal host. No PTY is owned by this process.
+import { connect, type Socket } from 'node:net';
+import { execFileSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { constants, existsSync, readFileSync, mkdirSync, writeFileSync, rmSync, statSync } from 'node:fs';
+import { chmod, copyFile, cp, mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { Terminals, appendBuffer, type SpawnOptions, type Term, type TerminalStore } from './terminals.ts';
+import { noteInjected } from './activity.ts';
+import { TERMINAL_PROTOCOL, metadataFields, observe, readFrames, sendFrame, type HostRecord, type TermPatch, type TermSnapshot } from './terminal-wire.ts';
+
+const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const alive = (pid: number): boolean => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code !== 'ESRCH'; } };
+/** After a reboot the recorded PID can belong to an unrelated process: also require the host's own command line. */
+function hostAlive(record: HostRecord, dir: string): boolean {
+  if (!alive(record.pid)) return false;
+  try { return execFileSync('ps', ['-ww', '-p', String(record.pid), '-o', 'command='], { encoding: 'utf8' }).trim().endsWith(` src/server/terminal-host.ts ${dir}`); }
+  catch { return false; }
+}
+function recordAt(path: string): HostRecord | null {
+  try {
+    const r = JSON.parse(readFileSync(path, 'utf8'));
+    if (!Number.isInteger(r.pid) || r.pid < 2 || !Number.isInteger(r.port) || r.port < 1 || r.port > 65535 || !/^[a-f0-9]{64}$/.test(r.token)) throw new Error('Invalid terminal host record');
+    return r;
+  } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null; throw e; }
+}
+
+/** Copy only the PTY runtime, never the checkout/config/credentials. A bundle replacement cannot invalidate lazy loads. */
+async function prepareRuntime(dir: string): Promise<string> {
+  const source = dirname(fileURLToPath(import.meta.url));
+  const names = ['terminal-host.ts', 'terminal-wire.ts', 'terminals.ts', 'activity.ts'];
+  const require = createRequire(import.meta.url);
+  const addon = dirname(require.resolve('node-pty/package.json'));
+  const hash = createHash('sha256').update(process.version).update(process.arch).update(readFileSync(join(addon, 'package.json')));
+  for (const name of names) hash.update(readFileSync(join(source, name)));
+  const runtime = join(dir, `runtime-${hash.digest('hex').slice(0, 20)}`);
+  if (existsSync(join(runtime, 'complete'))) return runtime;
+  const stage = `${runtime}.new-${process.pid}`;
+  await rm(stage, { recursive: true, force: true });
+  try {
+    await mkdir(join(stage, 'src/server'), { recursive: true, mode: 0o700 });
+    await copyFile(process.execPath, join(stage, 'node'), constants.COPYFILE_FICLONE);
+    await chmod(join(stage, 'node'), 0o700);
+    for (const name of names) await copyFile(join(source, name), join(stage, 'src/server', name));
+    await writeFile(join(stage, 'package.json'), '{"private":true,"type":"module"}', { mode: 0o600 });
+    const dest = join(stage, 'node_modules/node-pty');
+    await mkdir(dest, { recursive: true, mode: 0o700 });
+    await copyFile(join(addon, 'package.json'), join(dest, 'package.json'));
+    await cp(join(addon, 'lib'), join(dest, 'lib'), { recursive: true });
+    for (const entry of [`prebuilds/${process.platform}-${process.arch}`, 'build/Release']) {
+      if (existsSync(join(addon, entry))) await cp(join(addon, entry), join(dest, entry), { recursive: true });
+    }
+    await writeFile(join(stage, 'complete'), '1', { mode: 0o600 });
+    await rename(stage, runtime);
+    return runtime;
+  } catch (error) { await rm(stage, { recursive: true, force: true }); throw error; }
+}
+
+export class TerminalService implements TerminalStore {
+  readonly persistent = true;
+  private socket!: Socket;
+  private terms = new Map<string, Term>();
+  private pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
+  private sequence = 0;
+  private applying = false;
+  private closing = false;
+  private failure: Error | null = null;
+  private onExit: (id: string, code: number) => void;
+  private envSource = new Terminals(() => {});
+  hostPid = 0;
+  connected = false;
+
+  private constructor(onExit: (id: string, code: number) => void) { this.onExit = onExit; }
+
+  static async open(dataDir: string, publicPort: number, onExit: (id: string, code: number) => void): Promise<TerminalService> {
+    const dir = join(dataDir, 'terminal-service');
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    await chmod(dir, 0o700);
+    const recordFile = join(dir, 'host.json');
+    const attach = async (record: HostRecord) => {
+      if (record.protocol !== TERMINAL_PROTOCOL) throw new Error('Il servizio terminali usa un protocollo diverso: conserva la versione corrente finché le sessioni finiscono.');
+      const service = new TerminalService(onExit);
+      await service.attach(record, publicPort);
+      return service;
+    };
+    const existing = recordAt(recordFile);
+    if (existing && hostAlive(existing, dir)) return attach(existing); // Never replace a live/unreachable/unauthorized host.
+
+    // Serialize only host startup. Another backend never gets its own duplicate PTY service for this profile.
+    const lock = join(dir, 'starting');
+    const deadline = Date.now() + 30_000;
+    for (;;) {
+      try { mkdirSync(lock, { mode: 0o700 }); writeFileSync(join(lock, 'pid'), String(process.pid), { mode: 0o600 }); break; }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        const current = recordAt(recordFile);
+        if (current && hostAlive(current, dir)) return attach(current);
+        const pid = Number(existsSync(join(lock, 'pid')) ? readFileSync(join(lock, 'pid'), 'utf8') : 0);
+        if (Date.now() - statSync(lock).mtimeMs > 30_000 && (pid === 0 || (pid > 1 && !alive(pid)))) { rmSync(lock, { recursive: true }); continue; }
+        if (Date.now() >= deadline) throw new Error('Avvio del servizio terminali già in corso; riprova.');
+        await pause(100);
+      }
+    }
+    try {
+      const current = recordAt(recordFile);
+      if (current && hostAlive(current, dir)) return await attach(current);
+      const runtime = await prepareRuntime(dir);
+      const child = spawn(join(runtime, 'node'), ['src/server/terminal-host.ts', dir], {
+        cwd: runtime, detached: true, stdio: 'ignore',
+        // Credentials from the API process are sent only as part of a terminal's explicit environment, never host identity.
+        env: Object.fromEntries(['HOME', 'PATH', 'LANG', 'SHELL', 'TMPDIR'].flatMap(k => process.env[k] === undefined ? [] : [[k, process.env[k]!]])),
+      });
+      let error: Error | null = null;
+      child.on('error', e => { error = e; }); child.unref();
+      for (let n = 0; n < 150; n++) {
+        if (error) throw error;
+        const record = recordAt(recordFile);
+        if (record && record.pid === child.pid) return await attach(record);
+        if (child.exitCode !== null) throw new Error(`Servizio terminali terminato durante l’avvio (${child.exitCode}).`);
+        await pause(100);
+      }
+      throw new Error('Timeout durante l’avvio del servizio terminali.');
+    } finally { rmSync(lock, { recursive: true, force: true }); }
+  }
+
+  private attach(record: HostRecord, publicPort: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let ready = false;
+      const socket = this.socket = connect(record.port, '127.0.0.1');
+      const timeout = setTimeout(() => { reject(new Error('Terminal service handshake timed out')); socket.destroy(); }, 5000);
+      socket.on('connect', () => sendFrame(socket, { op: 'hello', token: record.token, protocol: TERMINAL_PROTOCOL, publicPort }));
+      socket.on('error', error => { this.failure = error; if (!ready) reject(error); });
+      socket.on('close', () => {
+        clearTimeout(timeout); this.connected = false;
+        const error = this.failure ?? new Error('Terminal service disconnected');
+        if (!ready) reject(error);
+        for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(error); } this.pending.clear();
+      });
+      readFrames(socket, m => {
+        if (m.error && !m.request) { this.failure = new Error(m.error); if (!ready) reject(this.failure); socket.destroy(); return; }
+        if (m.event === 'ready') { ready = true; this.connected = true; this.hostPid = m.pid; clearTimeout(timeout); resolve(); return; }
+        if (m.event === 'term') { this.add(m.term); return; }
+        if (m.event === 'output') {
+          const t = this.terms.get(m.id); if (!t) return;
+          appendBuffer(t, m.data); for (const listener of t.listeners) listener(m.data);
+        } else if (m.event === 'patch') {
+          const t = this.terms.get(m.id); if (!t) return;
+          this.applying = true;
+          try {
+            const target = t[m.patch.section as 'info' | 'activity'] as unknown as Record<string, unknown>;
+            if (m.patch.value === undefined) delete target[m.patch.key]; else target[m.patch.key] = m.patch.value;
+          } finally { this.applying = false; }
+        } else if (m.event === 'exit') {
+          const t = this.terms.get(m.id); if (t) { t.info.alive = false; t.exitCode = m.code; this.onExit(m.id, m.code); }
+        } else if (m.event === 'remove') this.terms.delete(m.id);
+        else if (m.request) {
+          const p = this.pending.get(m.request); if (!p) return;
+          this.pending.delete(m.request); clearTimeout(p.timer);
+          if (m.error) p.reject(new Error(m.error)); else p.resolve(m.result);
+        }
+      });
+    });
+  }
+
+  private add(s: TermSnapshot): void {
+    const id = s.info.id;
+    const changed = (section: TermPatch['section']) => (key: string, value: unknown) => {
+      if (!this.applying) this.command({ op: 'patch', id, patch: { section, key, value } });
+    };
+    const t: Term = {
+      info: observe(s.info, changed('info'), metadataFields.info),
+      activity: observe({ ...s.activity, timer: null }, changed('activity'), metadataFields.activity),
+      proc: { pid: s.pid, write: data => this.command({ op: 'write', id, data }), resize: (cols, rows) => this.resize(id, cols, rows), kill: () => this.kill(id) },
+      buffer: s.buffer, bufferBytes: s.buffer.reduce((n, b) => n + b.length, 0), listeners: new Set(), exitCode: s.exitCode,
+      teamToken: s.teamToken, seenMessage: s.seenMessage, injectedMessage: s.injectedMessage,
+    };
+    this.terms.set(id, observe(t, changed('term'), metadataFields.term));
+  }
+  private command(message: object): void {
+    if (!this.connected || this.closing) throw this.failure ?? new Error('Terminal service disconnected');
+    sendFrame(this.socket, message);
+  }
+  private request(message: object): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const request = ++this.sequence;
+      const timer = setTimeout(() => {
+        this.pending.delete(request); reject(new Error('Terminal service request timed out'));
+        // Do not retry a spawn/input whose acknowledgement was lost: the operation might already have happened.
+        this.socket.destroy();
+      }, 10_000);
+      this.pending.set(request, { resolve, reject, timer });
+      try { this.command({ ...message, request }); } catch (e) { clearTimeout(timer); this.pending.delete(request); reject(e); }
+    });
+  }
+  list() { return [...this.terms.values()].map(t => t.info); }
+  get(id: string) { return this.terms.get(id); }
+  env(vars: Record<string, string> = {}) { return this.envSource.env(vars); }
+  async spawn(opts: SpawnOptions): Promise<Term> {
+    const id = await this.request({ op: 'spawn', opts: { ...opts, env: this.env(opts.env) } });
+    const term = this.terms.get(id)!;
+    // A host started by an older version drops unknown spawn fields: keep them for this server's lifetime.
+    if (opts.resumeId && !term.info.resumeId) term.info.resumeId = opts.resumeId;
+    if (opts.branch && !term.info.branch) term.info.branch = opts.branch;
+    return term;
+  }
+  rename(id: string, name: string) {
+    const t = this.terms.get(id); if (!t) return;
+    const clean = name.replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (clean) t.info.name = clean; else delete t.info.name;
+    return t.info;
+  }
+  write(id: string, data: string) { this.command({ op: 'write', id, data, input: true }); }
+  resize(id: string, cols: number, rows: number) { this.command({ op: 'resize', id, cols, rows }); }
+  kill(id: string) { this.command({ op: 'kill', id }); this.terms.delete(id); }
+  killAll() { for (const id of this.terms.keys()) this.kill(id); }
+  deliver(id: string, notice: string, cursor: number, now: number): boolean {
+    const t = this.get(id); if (!t?.info.alive) return false;
+    // One frame owns both the cursor and the complete paste. A backend crash cannot leave "announced" text unsent.
+    this.command({ op: 'deliver', id, notice, cursor, now });
+    this.applying = true;
+    try {
+      t.injectedMessage = Math.max(t.injectedMessage, cursor);
+      t.info.workState = 'working'; t.info.stateSource = 'server'; t.info.stateAt = now; delete t.info.idleSince;
+      noteInjected(t.activity, now);
+    } finally { this.applying = false; }
+    return true;
+  }
+  async flush() { await this.request({ op: 'flush' }); }
+  async detach() {
+    if (!this.connected) return;
+    const detached = this.request({ op: 'detach' });
+    this.closing = true;
+    try { await detached; } finally { this.socket.destroy(); }
+  }
+}

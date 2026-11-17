@@ -1,0 +1,48 @@
+VISUAL BRAIN 0.2.48 — MAC
+
+1. Unzip the package and drag Visual Brain.app into Applications BEFORE opening it.
+   Opened from Downloads or the unzipped folder, macOS runs it from a read-only
+   copy and updates cannot be installed there. The app now tries to move itself
+   to Applications, but it is better to do it first.
+2. Open it, choose Italiano or English, then select folders to map.
+3. Click “Create my map” and wait for indexing.
+
+Node is bundled. No npm, Rust or developer tools are needed.
+In a node panel, “Node harness → Install” downloads DeepSeek Harness or Harness²
+to your profile. npm and uv are bundled too; each user connects their own
+account/provider. Installing does not make model calls.
+Requires macOS 13.5 or later. The universal package includes Intel and Apple Silicon.
+
+This build uses a stable self-signed identity, without an Apple certificate. It is
+not notarized: macOS may require first-launch approval in System Settings →
+Privacy & Security. The signature keeps the same identity across versions; it
+does not grant folder access. Do not disable Gatekeeper or other system protections.
+
+The map works without AI. To start agents, separately install and sign in to
+Claude Code, Codex or Hermes with your own account.
+Your index and team boards stay in ~/Library/Application Support/Visual Brain/.
+Logs are in the logs subfolder. Scans read only your selected folders and do not
+modify original files. Launched AI agents may modify files according to your
+instructions and the permissions of their CLI.
+
+Use More → Settings to change language and folders. File names and file contents
+are never translated. macOS may restrict access to some folders; authorize only
+the folders you want to index.
+
+Local indexing sends no data to external providers. Using AI agents or semantic
+analysis may send context to the providers you configure.
+
+Terminals started in 0.2.17 keep running when you quit, update and reopen the app.
+Graph and team APIs are unavailable while the app is closed.
+When upgrading from 0.2.16 or earlier for the first time, finish work in the old
+sessions before quitting: they cannot be transferred to the new engine.
+Restarting the Mac or logging out ends sessions. Personal data stays separate.
+
+FIRST UPGRADE FROM 0.2.44 OR EARLIER
+The signing identity changes once. Before updating, finish and close all agent
+and terminal sessions. After installation, quit the app with ⌘Q, wait at least
+10 seconds, then reopen it from Applications: the old terminal service exits
+automatically when empty. Alternatively, after saving and finishing your work,
+restart your Mac. macOS may ask again for permission to access selected folders.
+Keeping terminals from the old version alive can continue triggering repeated
+prompts until this step. The update does not terminate them automatically.

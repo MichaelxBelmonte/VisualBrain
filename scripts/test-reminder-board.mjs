@@ -1,0 +1,64 @@
+// Real DB/API tests: migration, spatial folders, links, task movement and agent boundaries.
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { Db } from '../src/server/db.ts';
+import { handleApi } from '../src/server/api.ts';
+const dir=mkdtempSync(join(tmpdir(),'vb-reminder-board-'));let db=new Db(join(dir,'board.db'));
+const member={info:{id:'agent',alive:true,role:'operator',nodeId:1},teamToken:'one-token'};
+const terms={get:id=>id==='agent'?member:undefined};
+const req=async(method,path,body,token)=>{
+ const input=Readable.from(body===undefined?[]:[Buffer.from(JSON.stringify(body))]);Object.assign(input,{method,url:path,headers:token?{authorization:`Bearer ${token}`}:{}});
+ let status,data;await handleApi({db,terms},input,{writeHead:s=>status=s,end:s=>data=JSON.parse(s)});return {status,data};
+};
+try {
+ // Opening an older DB adds the new column, while all legacy content stays intact.
+ db.exec('ALTER TABLE reminders DROP COLUMN folder_id');db.close();db=new Db(join(dir,'board.db'));
+ db.run("INSERT INTO nodes(id,path,name,kind) VALUES (1,'/one','One','dir'),(2,'/two','Two','dir')");
+ db.run("INSERT INTO reminders(id,node_id,node_path,node_name,title,status,notes,created_at,updated_at) VALUES ('legacy',1,'/one','One','Old task','working','Keep my notes',10,20)");
+ let result=await req('GET','/api/reminder-board?nodeId=1');assert.equal(result.status,200);assert.equal(result.data.folders.length,0,'GET does not mutate the database');
+ result=await req('POST','/api/reminder-board',{nodeId:1});assert.equal(result.status,200);const inbox=result.data.folders[0];assert.equal(inbox.isInbox,1);
+ const old=(await req('GET','/api/reminders')).data[0];assert.equal(old.id,'legacy');assert.equal(old.folderId,inbox.id);assert.equal(old.notes,'Keep my notes');assert.equal(old.createdAt,10);assert.equal(old.updatedAt,20);
+ assert.equal((await req('POST','/api/reminder-board',{nodeId:1})).data.folders[0].id,inbox.id,'initialization is idempotent');
+ const create=await req('POST','/api/reminder-folders',{nodeId:1,name:'  Planning  ',x:350,y:80});assert.equal(create.status,201);const folder=create.data;assert.equal(folder.name,'Planning');
+ result=await req('PATCH',`/api/reminder-folders/${folder.id}`,{name:'Next',x:690,y:120});assert.equal(result.status,200);assert.equal(result.data.x,690);assert.equal(result.data.name,'Next');
+ for (const body of [{name:''},{name:'x'.repeat(121)},{x:-1},{y:null},{x:100001},{y:'20'}]) assert.equal((await req('PATCH',`/api/reminder-folders/${folder.id}`,body)).status,400);
+ const task=(await req('POST','/api/reminders',{nodeId:1,folderId:folder.id,title:'Inside folder',notes:'Progress'})).data;
+ assert.equal(task.folderId,folder.id);
+ const other=(await req('POST','/api/reminder-board',{nodeId:2})).data.folders[0];
+ assert.equal((await req('POST','/api/reminders',{nodeId:1,folderId:other.id,title:'Wrong'})).status,400);
+ assert.equal((await req('PATCH',`/api/reminders/${task.id}`,{folderId:other.id})).status,400);
+ assert.equal((await req('PATCH',`/api/reminders/${task.id}`,{folderId:inbox.id})).data.folderId,inbox.id);
+ await req('PATCH',`/api/reminders/${task.id}`,{folderId:folder.id});
+ const link=(await req('POST','/api/reminder-folder-links',{src:folder.id,dst:inbox.id})).data;
+ assert.equal((await req('POST','/api/reminder-folder-links',{src:inbox.id,dst:folder.id})).data.id,link.id,'reverse link is deduplicated');
+ assert.equal((await req('POST','/api/reminder-folder-links',{src:folder.id,dst:folder.id})).status,400);
+ assert.equal((await req('POST','/api/reminder-folder-links',{src:folder.id,dst:other.id})).status,400);
+ assert.equal((await req('GET','/api/reminder-board?nodeId=1&session=agent',undefined,'one-token')).data.folders.length,2);
+ assert.equal((await req('PATCH',`/api/reminder-folders/${folder.id}`,{from:'agent',name:'Agent update'},'one-token')).status,200);
+ assert.equal((await req('GET','/api/reminder-board?nodeId=2&session=agent',undefined,'one-token')).status,403);
+ assert.equal((await req('PATCH',`/api/reminder-folders/${other.id}`,{from:'agent',name:'Wrong'},'one-token')).status,403);
+ assert.equal((await req('POST','/api/reminder-folder-links',{from:'agent',src:folder.id,dst:other.id},'one-token')).status,403);
+ for(const token of ['wrong','expired'])assert.equal((await req('GET','/api/reminder-board?nodeId=1&session=agent',undefined,token)).status,403);
+ member.info.alive=false;assert.equal((await req('GET','/api/reminder-board?nodeId=1&session=agent',undefined,'one-token')).status,403);member.info.alive=true;
+ db.close();db=new Db(join(dir,'board.db'));
+ result=await req('GET','/api/reminder-board?nodeId=1');assert.equal(result.data.folders.find(f=>f.id===folder.id).x,690);assert.equal(result.data.links[0].id,link.id,'position and links survive reopen');
+ assert.equal((await req('DELETE',`/api/reminder-folder-links/${link.id}`)).status,200);assert.equal((await req('GET','/api/reminder-board?nodeId=1')).data.links.length,0);
+ await req('POST','/api/reminder-folder-links',{src:folder.id,dst:inbox.id});
+ assert.equal((await req('DELETE',`/api/reminder-folders/${inbox.id}`)).status,409,'the default folder is protected');
+ assert.equal((await req('PATCH',`/api/reminder-folders/${inbox.id}`,{name:'My inbox'})).status,200,'default folder is renamable');
+ assert.equal((await req('DELETE',`/api/reminder-folders/${folder.id}`)).status,200);
+ result=await req('GET','/api/reminder-board?nodeId=1');assert.equal(result.data.links.length,0);assert.equal(result.data.folders.length,1);
+ const kept=(await req('GET','/api/reminders')).data.find(r=>r.id===task.id);assert.equal(kept.folderId,inbox.id);assert.equal(kept.notes,'Progress','deleting a folder never deletes its tasks');
+ db.run('UPDATE nodes SET deleted=1 WHERE id=1');
+ assert.equal((await req('GET','/api/reminder-board?nodeId=1')).data.folders.length,1,'the person can read saved folders after a file disappears');
+ assert.equal((await req('GET','/api/reminder-board?nodeId=1&session=agent',undefined,'one-token')).status,404);
+ assert.equal((await req('PATCH',`/api/reminders/${task.id}`,{notes:'Archived notes'})).status,200);
+ db.run('UPDATE nodes SET deleted=0 WHERE id=1');
+ db.run("UPDATE nodes SET path='/replacement' WHERE id=1");
+ assert.equal((await req('GET','/api/reminder-board?nodeId=1')).data.folders.length,0,'node ID reuse cannot inherit old folders');
+ assert.equal((await req('PATCH',`/api/reminder-folders/${inbox.id}`,{name:'Wrong node'})).status,404);
+ console.log('PASS task folders: legacy migration, default list, CRUD, rename/positions, persistence, movement, links/dedup/removal, no task loss, agent scope and node ID reuse');
+} finally {db.close();rmSync(dir,{recursive:true,force:true});}

@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { setLanguage, t, ui } from '../src/ui/i18n.ts';
+import { buildContext } from '../src/server/launch.ts';
+import { teamInstructions } from '../src/server/team.ts';
+import { DEFAULTS } from '../src/server/config.ts';
+setLanguage('en');
+assert.equal(t('Operativa'), 'Workspace');
+assert.equal(ui`<button title="Aggiungi nodo">+ Nodo</button>`, '<button title="Add node">+ Node</button>');
+// Italian user content, filenames and prompts must never enter the translation catalogue.
+const content = 'Orchestratore / Appunti / Avvia squadra';
+assert.equal(ui`<h3>Nodo</h3><p>${content}</p>`, `<h3>Node</h3><p>${content}</p>`);
+assert.equal(ui`/api/node/${42}`, '/api/node/42');
+assert.equal(t('Affianca orchestratore'), 'Tile orchestrator');
+assert.equal(t('Messaggi del canale'), 'Channel messages');
+assert.equal(ui`Allineato a ${content}`, `In sync with ${content}`);
+assert.equal(ui`${5} sessioni collegate: ne entrano al massimo ${4}. Scegli quali affiancare.`, '5 connected sessions: the maximum is 4. Choose which ones to tile.');
+assert.equal(ui`<button title="Copia il percorso">Copia percorso</button>`, '<button title="Copy the path">Copy path</button>');
+setLanguage('it');
+assert.equal(ui`<button>+ Nodo</button>`, '<button>+ Nodo</button>');
+console.log('PASS IT/EN UI, attributes, API paths and preservation of user content');
+const detail = { id: 1, name: 'Appunti', path: '/tmp/Appunti', kind: 'dir', cls: 'folder', bytes: 0, files: 0, edges: [], children: [], notes: [] };
+const english = buildContext(detail, { ...DEFAULTS, language: 'en' }, content);
+assert.ok(english.includes('Request: ' + content));
+assert.ok(english.includes('Respond in English'));
+assert.ok(teamInstructions('http://127.0.0.1:4747', 'test', 'fake', 'operator', undefined, 'en').includes('No initial task:'));
+for (const lang of ['it', 'en']) assert.ok(teamInstructions('http://127.0.0.1:4747', 'test', 'fake', 'operator', undefined, lang).includes('VB_TEAM_TOKEN'), `${lang}: the protocol says where the token is kept`);
+assert.ok(buildContext(detail, { ...DEFAULTS, language: 'it' }).includes('Richiesta:'));
+console.log('PASS bilingual agent instructions without rewriting the user request');

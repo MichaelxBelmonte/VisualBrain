@@ -1,0 +1,466 @@
+{
+ "label": "dopo-ts-desktop",
+ "date": "2026-10-14T15:07:17.132Z",
+ "src": "src",
+ "engine": "ts",
+ "machine": {
+  "cpu": "Apple M5 Pro",
+  "cores": 15,
+  "memGb": 24,
+  "node": "v24.21.0",
+  "arch": "arm64"
+ },
+ "cases": [
+  {
+   "name": "reale-Desktop",
+   "roots": [
+    "/Users/me/Desktop"
+   ],
+   "repeat": 1,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 40085,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105078,
+      "added": 105078,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90646,
+      "projects": 108,
+      "edges": 55807
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.6,
+       "heapMb": 12.2,
+       "peakRssMb": 104.6,
+       "stallMs": 0.1,
+       "endAt": 1791990437202,
+       "httpMaxMs": 6.4
+      },
+      {
+       "phase": "scan",
+       "ms": 9195.6,
+       "rssMb": 753.2,
+       "heapMb": 517.5,
+       "peakRssMb": 753.2,
+       "stallMs": 376.2,
+       "endAt": 1791990446397,
+       "counts": {
+        "seen": 105078,
+        "added": 105078,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 551.6
+      },
+      {
+       "phase": "projects",
+       "ms": 90.1,
+       "rssMb": 780.4,
+       "heapMb": 496.2,
+       "peakRssMb": 780.4,
+       "stallMs": 90.1,
+       "endAt": 1791990446488,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 25265.3,
+       "rssMb": 859.1,
+       "heapMb": 143.6,
+       "peakRssMb": 1020.4,
+       "stallMs": 3558.1,
+       "endAt": 1791990471753,
+       "counts": {
+        "files": 90646,
+        "texts": 23533,
+        "bytes": 427500990,
+        "refs": 78854,
+        "identifiers": 10193,
+        "readMs": 24303,
+        "hashMs": 96,
+        "extractMs": 23191,
+        "writeMs": 878
+       },
+       "httpMaxMs": 3571.3
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1605.6,
+       "rssMb": 905,
+       "heapMb": 164.3,
+       "peakRssMb": 1020.4,
+       "stallMs": 1605.6,
+       "endAt": 1791990473359
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 28.9,
+       "rssMb": 905,
+       "heapMb": 167.3,
+       "peakRssMb": 1020.4,
+       "stallMs": 28.9,
+       "endAt": 1791990473387
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.6,
+       "rssMb": 905,
+       "heapMb": 171.5,
+       "peakRssMb": 1020.4,
+       "stallMs": 9.6,
+       "endAt": 1791990473397
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2921.3,
+       "rssMb": 915.5,
+       "heapMb": 297.5,
+       "peakRssMb": 1020.4,
+       "stallMs": 2921.3,
+       "endAt": 1791990476318
+      },
+      {
+       "phase": "edges",
+       "ms": 4565.5,
+       "rssMb": 915.5,
+       "heapMb": 297.5,
+       "peakRssMb": 1020.4,
+       "stallMs": 4565.5,
+       "endAt": 1791990476318,
+       "counts": {
+        "edges": 55807
+       },
+       "httpMaxMs": 5488.2
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 915.5,
+       "heapMb": 297.5,
+       "peakRssMb": 1020.4,
+       "stallMs": 0.2,
+       "endAt": 1791990476319,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 7.1,
+       "rssMb": 915.7,
+       "heapMb": 297.5,
+       "peakRssMb": 1020.4,
+       "stallMs": 7.1,
+       "endAt": 1791990476326,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 832.1,
+       "rssMb": 959.5,
+       "heapMb": 396.9,
+       "peakRssMb": 1020.4,
+       "stallMs": 832.1,
+       "endAt": 1791990477158,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 127.8,
+       "rssMb": 961,
+       "heapMb": 396.9,
+       "peakRssMb": 1020.4,
+       "stallMs": 127.8,
+       "endAt": 1791990477286,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 1020,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90660,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1663,
+      "imports": 6451,
+      "links": 1086,
+      "mention": 5130,
+      "refpath": 10048,
+      "shared_id": 1359,
+      "similar": 28109,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "c5019fc8036fe881",
+      "links": "1c4c43bf6513fa13",
+      "refpath": "f0774c85c2af1a85",
+      "mention": "d4e459c70fedd179",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "2926a20dceaef96e",
+      "shared_id": "80a993e8a662d52c",
+      "similar": "322526bafabb4a11"
+     },
+     "dbMb": 115.1,
+     "processMs": 40475,
+     "memory": {
+      "nodePeakMb": 1020,
+      "treePeakSampledMb": 1020,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 236,
+      "errors": 1,
+      "p50": 5.6,
+      "p95": 673,
+      "max": 5488.2
+     },
+     "rep": 1,
+     "wallMsAll": [
+      40085
+     ],
+     "processMsAll": [
+      40475
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "warm",
+     "wallMs": 14533,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105078,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 108,
+      "edges": 55806
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 30.7,
+       "rssMb": 136,
+       "heapMb": 12.2,
+       "peakRssMb": 136,
+       "stallMs": 30.7,
+       "endAt": 1791990477768,
+       "httpMaxMs": 35.4
+      },
+      {
+       "phase": "scan",
+       "ms": 8986.8,
+       "rssMb": 812.7,
+       "heapMb": 546,
+       "peakRssMb": 812.7,
+       "stallMs": 374.4,
+       "endAt": 1791990486755,
+       "counts": {
+        "seen": 105078,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 5864.1
+      },
+      {
+       "phase": "projects",
+       "ms": 81.9,
+       "rssMb": 872.1,
+       "heapMb": 574,
+       "peakRssMb": 872.1,
+       "stallMs": 81.9,
+       "endAt": 1791990486837,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 26,
+       "rssMb": 884.1,
+       "heapMb": 579.5,
+       "peakRssMb": 884.1,
+       "stallMs": 16,
+       "endAt": 1791990486863,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1465.7,
+       "rssMb": 995,
+       "heapMb": 174.6,
+       "peakRssMb": 1018.5,
+       "stallMs": 1465.7,
+       "endAt": 1791990488329
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 15.5,
+       "rssMb": 995,
+       "heapMb": 179.6,
+       "peakRssMb": 1018.5,
+       "stallMs": 15.5,
+       "endAt": 1791990488345
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 10.8,
+       "rssMb": 995.1,
+       "heapMb": 185.1,
+       "peakRssMb": 1018.5,
+       "stallMs": 10.8,
+       "endAt": 1791990488355
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2933.5,
+       "rssMb": 1017,
+       "heapMb": 275.8,
+       "peakRssMb": 1019.2,
+       "stallMs": 2933.5,
+       "endAt": 1791990491289
+      },
+      {
+       "phase": "edges",
+       "ms": 4425.6,
+       "rssMb": 1017,
+       "heapMb": 275.8,
+       "peakRssMb": 1019.2,
+       "stallMs": 4425.6,
+       "endAt": 1791990491289,
+       "counts": {
+        "edges": 55806
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 1017,
+       "heapMb": 275.8,
+       "peakRssMb": 1019.2,
+       "stallMs": 0.2,
+       "endAt": 1791990491289,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.5,
+       "rssMb": 1017.1,
+       "heapMb": 275.8,
+       "peakRssMb": 1019.2,
+       "stallMs": 3.5,
+       "endAt": 1791990491293,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 740.1,
+       "rssMb": 1043.7,
+       "heapMb": 403.2,
+       "peakRssMb": 1079.8,
+       "stallMs": 740.1,
+       "endAt": 1791990492033,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 237.5,
+       "rssMb": 1061.3,
+       "heapMb": 403.2,
+       "peakRssMb": 1079.8,
+       "stallMs": 237.5,
+       "endAt": 1791990492270,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 1080,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90660,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1648,
+      "imports": 6453,
+      "links": 1086,
+      "mention": 5130,
+      "refpath": 10060,
+      "shared_id": 1359,
+      "similar": 28109,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "1c4c43bf6513fa13",
+      "refpath": "63de3a3ecaa8562d",
+      "mention": "d4e459c70fedd179",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "66598f1d547437d0",
+      "shared_id": "80a993e8a662d52c",
+      "similar": "322526bafabb4a11"
+     },
+     "dbMb": 122.3,
+     "processMs": 14920,
+     "memory": {
+      "nodePeakMb": 1080,
+      "treePeakSampledMb": 1063,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 159,
+      "errors": 1,
+      "p50": 4.6,
+      "p95": 9.3,
+      "max": 5864.1
+     },
+     "rep": 1,
+     "wallMsAll": [
+      14533
+     ],
+     "processMsAll": [
+      14920
+     ],
+     "fingerprintsStable": true
+    }
+   ]
+  }
+ ]
+}

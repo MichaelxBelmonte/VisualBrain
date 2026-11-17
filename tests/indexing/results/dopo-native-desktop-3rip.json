@@ -1,0 +1,8634 @@
+{
+ "label": "dopo-native",
+ "date": "2026-10-14T14:57:33.844Z",
+ "src": "src",
+ "engine": "native",
+ "machine": {
+  "cpu": "Apple M5 Pro",
+  "cores": 15,
+  "memGb": 24,
+  "node": "v24.21.0",
+  "arch": "arm64"
+ },
+ "cases": [
+  {
+   "name": "sintetico-20000",
+   "roots": [
+    "<sintetico>"
+   ],
+   "repeat": 3,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 1158,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 106.6,
+       "heapMb": 12.2,
+       "peakRssMb": 106.6,
+       "stallMs": 0.1,
+       "endAt": 1791989863486,
+       "httpMaxMs": 5.1
+      },
+      {
+       "phase": "scan",
+       "ms": 203.9,
+       "rssMb": 152,
+       "heapMb": 27.6,
+       "peakRssMb": 152,
+       "stallMs": 68.3,
+       "endAt": 1791989863690,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 79.9
+      },
+      {
+       "phase": "projects",
+       "ms": 17.7,
+       "rssMb": 157,
+       "heapMb": 37.2,
+       "peakRssMb": 157,
+       "stallMs": 17.7,
+       "endAt": 1791989863708,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 565.1,
+       "rssMb": 312.2,
+       "heapMb": 59.8,
+       "peakRssMb": 312.2,
+       "stallMs": 64.3,
+       "endAt": 1791989864273,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 452,
+        "hashMs": 24,
+        "extractMs": 289,
+        "writeMs": 95
+       },
+       "httpMaxMs": 372.7
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 75.9,
+       "rssMb": 317.8,
+       "heapMb": 66.8,
+       "peakRssMb": 318.6,
+       "stallMs": 75.9,
+       "endAt": 1791989864349
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.5,
+       "rssMb": 317.8,
+       "heapMb": 66.8,
+       "peakRssMb": 318.6,
+       "stallMs": 2.5,
+       "endAt": 1791989864351
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 317.8,
+       "heapMb": 66.8,
+       "peakRssMb": 318.6,
+       "stallMs": 0.3,
+       "endAt": 1791989864352
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 139.2,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 139.2,
+       "endAt": 1791989864491
+      },
+      {
+       "phase": "edges",
+       "ms": 217.9,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 217.9,
+       "endAt": 1791989864491,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 0.2,
+       "endAt": 1791989864491,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 0.1,
+       "endAt": 1791989864491,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 126.4,
+       "rssMb": 368.6,
+       "heapMb": 129.7,
+       "peakRssMb": 368.6,
+       "stallMs": 126.4,
+       "endAt": 1791989864618,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 25.7,
+       "rssMb": 376,
+       "heapMb": 129.7,
+       "peakRssMb": 376,
+       "stallMs": 25.7,
+       "endAt": 1791989864643,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 377,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18.1,
+     "processMs": 1384,
+     "memory": {
+      "nodePeakMb": 377,
+      "treePeakSampledMb": 376,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 14,
+      "errors": 0,
+      "p50": 5.1,
+      "p95": 372.7,
+      "max": 372.7
+     },
+     "rep": 2,
+     "wallMsAll": [
+      1078,
+      1158,
+      1298
+     ],
+     "processMsAll": [
+      1288,
+      1384,
+      1535
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "warm",
+     "wallMs": 614,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.6,
+       "rssMb": 110.6,
+       "heapMb": 12.2,
+       "peakRssMb": 110.6,
+       "stallMs": 2.6,
+       "endAt": 1791989864945,
+       "httpMaxMs": 7.3
+      },
+      {
+       "phase": "scan",
+       "ms": 194.4,
+       "rssMb": 169.4,
+       "heapMb": 45.4,
+       "peakRssMb": 169.4,
+       "stallMs": 69.9,
+       "endAt": 1791989865139,
+       "counts": {
+        "seen": 21038,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 445.2
+      },
+      {
+       "phase": "projects",
+       "ms": 15.9,
+       "rssMb": 179.4,
+       "heapMb": 55.1,
+       "peakRssMb": 179.4,
+       "stallMs": 15.9,
+       "endAt": 1791989865155,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 4.7,
+       "rssMb": 183.1,
+       "heapMb": 55.4,
+       "peakRssMb": 183.1,
+       "stallMs": 0,
+       "endAt": 1791989865160,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 83.5,
+       "rssMb": 234.6,
+       "heapMb": 85,
+       "peakRssMb": 234.6,
+       "stallMs": 83.5,
+       "endAt": 1791989865244
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.9,
+       "rssMb": 235,
+       "heapMb": 85,
+       "peakRssMb": 235,
+       "stallMs": 2.9,
+       "endAt": 1791989865246
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 235.1,
+       "heapMb": 85,
+       "peakRssMb": 235.1,
+       "stallMs": 0.4,
+       "endAt": 1791989865247
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 139.3,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 139.3,
+       "endAt": 1791989865386
+      },
+      {
+       "phase": "edges",
+       "ms": 226.1,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 226.1,
+       "endAt": 1791989865386,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 0.2,
+       "endAt": 1791989865386,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 0.1,
+       "endAt": 1791989865386,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 109.4,
+       "rssMb": 317.6,
+       "heapMb": 112.9,
+       "peakRssMb": 317.6,
+       "stallMs": 109.4,
+       "endAt": 1791989865496,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 59.6,
+       "rssMb": 330.3,
+       "heapMb": 112.9,
+       "peakRssMb": 330.3,
+       "stallMs": 59.6,
+       "endAt": 1791989865555,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 331,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 19.5,
+     "processMs": 838,
+     "memory": {
+      "nodePeakMb": 331,
+      "treePeakSampledMb": 330,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 7.3,
+      "p95": 445.2,
+      "max": 445.2
+     },
+     "rep": 2,
+     "wallMsAll": [
+      613,
+      614,
+      671
+     ],
+     "processMsAll": [
+      834,
+      838,
+      889
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "incremental",
+     "wallMs": 654,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 60,
+      "changed": 113,
+      "removed": 27,
+      "extracted": 173,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.6,
+       "rssMb": 111,
+       "heapMb": 12.2,
+       "peakRssMb": 111,
+       "stallMs": 2.6,
+       "endAt": 1791989858241,
+       "httpMaxMs": 7.6
+      },
+      {
+       "phase": "scan",
+       "ms": 200.8,
+       "rssMb": 180.1,
+       "heapMb": 43.3,
+       "peakRssMb": 180.1,
+       "stallMs": 70.1,
+       "endAt": 1791989858441,
+       "counts": {
+        "seen": 21071,
+        "added": 60,
+        "changed": 113,
+        "removed": 27
+       },
+       "httpMaxMs": 60.6
+      },
+      {
+       "phase": "projects",
+       "ms": 15.1,
+       "rssMb": 184.2,
+       "heapMb": 52.9,
+       "peakRssMb": 184.2,
+       "stallMs": 15.1,
+       "endAt": 1791989858457,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 22.7,
+       "rssMb": 183.3,
+       "heapMb": 17.9,
+       "peakRssMb": 188.6,
+       "stallMs": 3,
+       "endAt": 1791989858479,
+       "counts": {
+        "files": 173,
+        "texts": 91,
+        "bytes": 517611,
+        "refs": 101,
+        "identifiers": 0,
+        "readMs": 15,
+        "hashMs": 0,
+        "extractMs": 11,
+        "writeMs": 3
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 82,
+       "rssMb": 218.2,
+       "heapMb": 38.6,
+       "peakRssMb": 218.2,
+       "stallMs": 82,
+       "endAt": 1791989858561
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 3,
+       "rssMb": 218.3,
+       "heapMb": 38.6,
+       "peakRssMb": 218.3,
+       "stallMs": 3,
+       "endAt": 1791989858564
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 218.3,
+       "heapMb": 38.6,
+       "peakRssMb": 218.3,
+       "stallMs": 0.4,
+       "endAt": 1791989858565
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 140,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 140,
+       "endAt": 1791989858705
+      },
+      {
+       "phase": "edges",
+       "ms": 225.4,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 225.4,
+       "endAt": 1791989858705,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 378.2
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 0.2,
+       "endAt": 1791989858705,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 0.1,
+       "endAt": 1791989858705,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 132.9,
+       "rssMb": 316.4,
+       "heapMb": 113.3,
+       "peakRssMb": 316.4,
+       "stallMs": 132.9,
+       "endAt": 1791989858838,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 53.3,
+       "rssMb": 327.8,
+       "heapMb": 113.3,
+       "peakRssMb": 327.8,
+       "stallMs": 53.3,
+       "endAt": 1791989858891,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 328,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 19.8,
+     "processMs": 869,
+     "memory": {
+      "nodePeakMb": 328,
+      "treePeakSampledMb": 316,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 7,
+      "errors": 0,
+      "p50": 4.4,
+      "p95": 378.2,
+      "max": 378.2
+     },
+     "rep": 1,
+     "wallMsAll": [
+      625,
+      654,
+      665
+     ],
+     "processMsAll": [
+      837,
+      869,
+      875
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 1140,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20202,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 30.8,
+       "rssMb": 125.4,
+       "heapMb": 12.2,
+       "peakRssMb": 125.4,
+       "stallMs": 30.8,
+       "endAt": 1791989866890,
+       "httpMaxMs": 35.8
+      },
+      {
+       "phase": "scan",
+       "ms": 198.2,
+       "rssMb": 179.7,
+       "heapMb": 45.5,
+       "peakRssMb": 179.7,
+       "stallMs": 59.4,
+       "endAt": 1791989867088,
+       "counts": {
+        "seen": 21071,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 78.5
+      },
+      {
+       "phase": "projects",
+       "ms": 15.2,
+       "rssMb": 189.8,
+       "heapMb": 55.2,
+       "peakRssMb": 189.8,
+       "stallMs": 15.2,
+       "endAt": 1791989867104,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 523.4,
+       "rssMb": 344.4,
+       "heapMb": 94.3,
+       "peakRssMb": 344.4,
+       "stallMs": 61.2,
+       "endAt": 1791989867627,
+       "counts": {
+        "files": 20202,
+        "texts": 3782,
+        "bytes": 62510884,
+        "refs": 4894,
+        "identifiers": 0,
+        "readMs": 411,
+        "hashMs": 24,
+        "extractMs": 276,
+        "writeMs": 91
+       },
+       "httpMaxMs": 77.9
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 79.5,
+       "rssMb": 351.3,
+       "heapMb": 106.8,
+       "peakRssMb": 352.6,
+       "stallMs": 79.5,
+       "endAt": 1791989867707
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.5,
+       "rssMb": 351.4,
+       "heapMb": 106.8,
+       "peakRssMb": 352.6,
+       "stallMs": 2.5,
+       "endAt": 1791989867709
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 351.4,
+       "heapMb": 106.8,
+       "peakRssMb": 352.6,
+       "stallMs": 0.4,
+       "endAt": 1791989867710
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 126.5,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 126.5,
+       "endAt": 1791989867836
+      },
+      {
+       "phase": "edges",
+       "ms": 208.9,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 208.9,
+       "endAt": 1791989867836,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 360.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 0.2,
+       "endAt": 1791989867836,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 0.1,
+       "endAt": 1791989867836,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 109.2,
+       "rssMb": 401.5,
+       "heapMb": 153,
+       "peakRssMb": 401.5,
+       "stallMs": 109.2,
+       "endAt": 1791989867946,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 53.5,
+       "rssMb": 409.8,
+       "heapMb": 153,
+       "peakRssMb": 409.8,
+       "stallMs": 53.5,
+       "endAt": 1791989867999,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 410,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 20.9,
+     "processMs": 1360,
+     "memory": {
+      "nodePeakMb": 410,
+      "treePeakSampledMb": 410,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 13,
+      "errors": 0,
+      "p50": 9.5,
+      "p95": 360.9,
+      "max": 360.9
+     },
+     "rep": 2,
+     "wallMsAll": [
+      1120,
+      1140,
+      1228
+     ],
+     "processMsAll": [
+      1341,
+      1360,
+      1451
+     ],
+     "fingerprintsStable": true
+    }
+   ],
+   "raw": [
+    {
+     "mode": "cold",
+     "wallMs": 1298,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 106,
+       "heapMb": 12.2,
+       "peakRssMb": 106,
+       "stallMs": 0.1,
+       "endAt": 1791989855616,
+       "httpMaxMs": 6.5
+      },
+      {
+       "phase": "scan",
+       "ms": 230.3,
+       "rssMb": 148.5,
+       "heapMb": 36.8,
+       "peakRssMb": 148.5,
+       "stallMs": 70.8,
+       "endAt": 1791989855847,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 115.8
+      },
+      {
+       "phase": "projects",
+       "ms": 24,
+       "rssMb": 155.4,
+       "heapMb": 32.4,
+       "peakRssMb": 155.4,
+       "stallMs": 24,
+       "endAt": 1791989855871,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 663.6,
+       "rssMb": 299.3,
+       "heapMb": 108.9,
+       "peakRssMb": 299.3,
+       "stallMs": 62.9,
+       "endAt": 1791989856534,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 545,
+        "hashMs": 24,
+        "extractMs": 287,
+        "writeMs": 99
+       },
+       "httpMaxMs": 381.1
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 74.8,
+       "rssMb": 332.7,
+       "heapMb": 119.1,
+       "peakRssMb": 333.2,
+       "stallMs": 74.8,
+       "endAt": 1791989856609
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.5,
+       "rssMb": 332.7,
+       "heapMb": 119.1,
+       "peakRssMb": 333.2,
+       "stallMs": 2.5,
+       "endAt": 1791989856612
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 332.7,
+       "heapMb": 119.1,
+       "peakRssMb": 333.2,
+       "stallMs": 0.3,
+       "endAt": 1791989856612
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 141.5,
+       "rssMb": 379.8,
+       "heapMb": 111,
+       "peakRssMb": 379.8,
+       "stallMs": 141.5,
+       "endAt": 1791989856754
+      },
+      {
+       "phase": "edges",
+       "ms": 219.1,
+       "rssMb": 379.8,
+       "heapMb": 111,
+       "peakRssMb": 379.8,
+       "stallMs": 219.1,
+       "endAt": 1791989856754,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 379.8,
+       "heapMb": 111,
+       "peakRssMb": 379.8,
+       "stallMs": 0.2,
+       "endAt": 1791989856754,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 379.8,
+       "heapMb": 111,
+       "peakRssMb": 379.8,
+       "stallMs": 0.1,
+       "endAt": 1791989856754,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 132.6,
+       "rssMb": 393.4,
+       "heapMb": 146.9,
+       "peakRssMb": 393.4,
+       "stallMs": 132.6,
+       "endAt": 1791989856886,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 27.2,
+       "rssMb": 400.5,
+       "heapMb": 146.9,
+       "peakRssMb": 400.5,
+       "stallMs": 27.2,
+       "endAt": 1791989856914,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 401,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18.1,
+     "processMs": 1535,
+     "memory": {
+      "nodePeakMb": 401,
+      "treePeakSampledMb": 395,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 15,
+      "errors": 0,
+      "p50": 5.5,
+      "p95": 381.1,
+      "max": 381.1
+     },
+     "rep": 1
+    },
+    {
+     "mode": "warm",
+     "wallMs": 671,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 3.1,
+       "rssMb": 111,
+       "heapMb": 12.2,
+       "peakRssMb": 111,
+       "stallMs": 3.1,
+       "endAt": 1791989857190,
+       "httpMaxMs": 8.4
+      },
+      {
+       "phase": "scan",
+       "ms": 217.2,
+       "rssMb": 177.6,
+       "heapMb": 43.1,
+       "peakRssMb": 177.6,
+       "stallMs": 66.8,
+       "endAt": 1791989857408,
+       "counts": {
+        "seen": 21038,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 507.3
+      },
+      {
+       "phase": "projects",
+       "ms": 15.9,
+       "rssMb": 181.7,
+       "heapMb": 52.9,
+       "peakRssMb": 181.7,
+       "stallMs": 15.9,
+       "endAt": 1791989857424,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 5,
+       "rssMb": 185.1,
+       "heapMb": 53.3,
+       "peakRssMb": 185.1,
+       "stallMs": 0,
+       "endAt": 1791989857429,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 87.6,
+       "rssMb": 206.3,
+       "heapMb": 41.7,
+       "peakRssMb": 211.6,
+       "stallMs": 87.6,
+       "endAt": 1791989857516
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 3.2,
+       "rssMb": 206.8,
+       "heapMb": 41.7,
+       "peakRssMb": 211.6,
+       "stallMs": 3.2,
+       "endAt": 1791989857519
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 206.8,
+       "heapMb": 41.7,
+       "peakRssMb": 211.6,
+       "stallMs": 0.4,
+       "endAt": 1791989857520
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 150.3,
+       "rssMb": 304.1,
+       "heapMb": 76.3,
+       "peakRssMb": 304.1,
+       "stallMs": 150.3,
+       "endAt": 1791989857670
+      },
+      {
+       "phase": "edges",
+       "ms": 241.6,
+       "rssMb": 304.1,
+       "heapMb": 76.3,
+       "peakRssMb": 304.1,
+       "stallMs": 241.6,
+       "endAt": 1791989857670,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 304.1,
+       "heapMb": 76.3,
+       "peakRssMb": 304.1,
+       "stallMs": 0.1,
+       "endAt": 1791989857670,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 304.1,
+       "heapMb": 76.3,
+       "peakRssMb": 304.1,
+       "stallMs": 0.1,
+       "endAt": 1791989857670,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 122.4,
+       "rssMb": 319.7,
+       "heapMb": 114.3,
+       "peakRssMb": 319.7,
+       "stallMs": 122.4,
+       "endAt": 1791989857793,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 64.4,
+       "rssMb": 332.5,
+       "heapMb": 114.3,
+       "peakRssMb": 332.5,
+       "stallMs": 64.4,
+       "endAt": 1791989857857,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 333,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 19.5,
+     "processMs": 889,
+     "memory": {
+      "nodePeakMb": 333,
+      "treePeakSampledMb": 333,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 3.6,
+      "p95": 507.3,
+      "max": 507.3
+     },
+     "rep": 1
+    },
+    {
+     "mode": "incremental",
+     "wallMs": 654,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 60,
+      "changed": 113,
+      "removed": 27,
+      "extracted": 173,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.6,
+       "rssMb": 111,
+       "heapMb": 12.2,
+       "peakRssMb": 111,
+       "stallMs": 2.6,
+       "endAt": 1791989858241,
+       "httpMaxMs": 7.6
+      },
+      {
+       "phase": "scan",
+       "ms": 200.8,
+       "rssMb": 180.1,
+       "heapMb": 43.3,
+       "peakRssMb": 180.1,
+       "stallMs": 70.1,
+       "endAt": 1791989858441,
+       "counts": {
+        "seen": 21071,
+        "added": 60,
+        "changed": 113,
+        "removed": 27
+       },
+       "httpMaxMs": 60.6
+      },
+      {
+       "phase": "projects",
+       "ms": 15.1,
+       "rssMb": 184.2,
+       "heapMb": 52.9,
+       "peakRssMb": 184.2,
+       "stallMs": 15.1,
+       "endAt": 1791989858457,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 22.7,
+       "rssMb": 183.3,
+       "heapMb": 17.9,
+       "peakRssMb": 188.6,
+       "stallMs": 3,
+       "endAt": 1791989858479,
+       "counts": {
+        "files": 173,
+        "texts": 91,
+        "bytes": 517611,
+        "refs": 101,
+        "identifiers": 0,
+        "readMs": 15,
+        "hashMs": 0,
+        "extractMs": 11,
+        "writeMs": 3
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 82,
+       "rssMb": 218.2,
+       "heapMb": 38.6,
+       "peakRssMb": 218.2,
+       "stallMs": 82,
+       "endAt": 1791989858561
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 3,
+       "rssMb": 218.3,
+       "heapMb": 38.6,
+       "peakRssMb": 218.3,
+       "stallMs": 3,
+       "endAt": 1791989858564
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 218.3,
+       "heapMb": 38.6,
+       "peakRssMb": 218.3,
+       "stallMs": 0.4,
+       "endAt": 1791989858565
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 140,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 140,
+       "endAt": 1791989858705
+      },
+      {
+       "phase": "edges",
+       "ms": 225.4,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 225.4,
+       "endAt": 1791989858705,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 378.2
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 0.2,
+       "endAt": 1791989858705,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 300.8,
+       "heapMb": 74.4,
+       "peakRssMb": 300.8,
+       "stallMs": 0.1,
+       "endAt": 1791989858705,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 132.9,
+       "rssMb": 316.4,
+       "heapMb": 113.3,
+       "peakRssMb": 316.4,
+       "stallMs": 132.9,
+       "endAt": 1791989858838,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 53.3,
+       "rssMb": 327.8,
+       "heapMb": 113.3,
+       "peakRssMb": 327.8,
+       "stallMs": 53.3,
+       "endAt": 1791989858891,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 328,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 19.8,
+     "processMs": 869,
+     "memory": {
+      "nodePeakMb": 328,
+      "treePeakSampledMb": 316,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 7,
+      "errors": 0,
+      "p50": 4.4,
+      "p95": 378.2,
+      "max": 378.2
+     },
+     "rep": 1
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 1228,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20202,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 31.7,
+       "rssMb": 129,
+       "heapMb": 12.2,
+       "peakRssMb": 129,
+       "stallMs": 31.7,
+       "endAt": 1791989859259,
+       "httpMaxMs": 36.7
+      },
+      {
+       "phase": "scan",
+       "ms": 200.4,
+       "rssMb": 184.3,
+       "heapMb": 45.2,
+       "peakRssMb": 184.3,
+       "stallMs": 56.9,
+       "endAt": 1791989859460,
+       "counts": {
+        "seen": 21071,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 74.4
+      },
+      {
+       "phase": "projects",
+       "ms": 15.5,
+       "rssMb": 194.3,
+       "heapMb": 55,
+       "peakRssMb": 194.3,
+       "stallMs": 15.5,
+       "endAt": 1791989859475,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 576.1,
+       "rssMb": 346.7,
+       "heapMb": 71.5,
+       "peakRssMb": 346.7,
+       "stallMs": 51.7,
+       "endAt": 1791989860052,
+       "counts": {
+        "files": 20202,
+        "texts": 3782,
+        "bytes": 62510884,
+        "refs": 4894,
+        "identifiers": 0,
+        "readMs": 463,
+        "hashMs": 24,
+        "extractMs": 291,
+        "writeMs": 92
+       },
+       "httpMaxMs": 42
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 85.3,
+       "rssMb": 353.6,
+       "heapMb": 82.8,
+       "peakRssMb": 355.4,
+       "stallMs": 85.3,
+       "endAt": 1791989860137
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.9,
+       "rssMb": 353.6,
+       "heapMb": 82.8,
+       "peakRssMb": 355.4,
+       "stallMs": 2.9,
+       "endAt": 1791989860140
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 353.6,
+       "heapMb": 82.8,
+       "peakRssMb": 355.4,
+       "stallMs": 0.4,
+       "endAt": 1791989860140
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 139.9,
+       "rssMb": 392.8,
+       "heapMb": 104.2,
+       "peakRssMb": 392.8,
+       "stallMs": 139.9,
+       "endAt": 1791989860280
+      },
+      {
+       "phase": "edges",
+       "ms": 228.5,
+       "rssMb": 392.8,
+       "heapMb": 104.2,
+       "peakRssMb": 392.8,
+       "stallMs": 228.5,
+       "endAt": 1791989860280,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 398.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 392.8,
+       "heapMb": 104.2,
+       "peakRssMb": 392.8,
+       "stallMs": 0.2,
+       "endAt": 1791989860280,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 392.8,
+       "heapMb": 104.2,
+       "peakRssMb": 392.8,
+       "stallMs": 0.1,
+       "endAt": 1791989860280,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 117.4,
+       "rssMb": 407.6,
+       "heapMb": 144.2,
+       "peakRssMb": 407.6,
+       "stallMs": 117.4,
+       "endAt": 1791989860398,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 57.2,
+       "rssMb": 409.4,
+       "heapMb": 144.2,
+       "peakRssMb": 414.3,
+       "stallMs": 57.2,
+       "endAt": 1791989860455,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 414,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 20.9,
+     "processMs": 1451,
+     "memory": {
+      "nodePeakMb": 414,
+      "treePeakSampledMb": 409,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 14,
+      "errors": 0,
+      "p50": 10.1,
+      "p95": 398.9,
+      "max": 398.9
+     },
+     "rep": 1
+    },
+    {
+     "mode": "cold",
+     "wallMs": 1158,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 106.6,
+       "heapMb": 12.2,
+       "peakRssMb": 106.6,
+       "stallMs": 0.1,
+       "endAt": 1791989863486,
+       "httpMaxMs": 5.1
+      },
+      {
+       "phase": "scan",
+       "ms": 203.9,
+       "rssMb": 152,
+       "heapMb": 27.6,
+       "peakRssMb": 152,
+       "stallMs": 68.3,
+       "endAt": 1791989863690,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 79.9
+      },
+      {
+       "phase": "projects",
+       "ms": 17.7,
+       "rssMb": 157,
+       "heapMb": 37.2,
+       "peakRssMb": 157,
+       "stallMs": 17.7,
+       "endAt": 1791989863708,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 565.1,
+       "rssMb": 312.2,
+       "heapMb": 59.8,
+       "peakRssMb": 312.2,
+       "stallMs": 64.3,
+       "endAt": 1791989864273,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 452,
+        "hashMs": 24,
+        "extractMs": 289,
+        "writeMs": 95
+       },
+       "httpMaxMs": 372.7
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 75.9,
+       "rssMb": 317.8,
+       "heapMb": 66.8,
+       "peakRssMb": 318.6,
+       "stallMs": 75.9,
+       "endAt": 1791989864349
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.5,
+       "rssMb": 317.8,
+       "heapMb": 66.8,
+       "peakRssMb": 318.6,
+       "stallMs": 2.5,
+       "endAt": 1791989864351
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 317.8,
+       "heapMb": 66.8,
+       "peakRssMb": 318.6,
+       "stallMs": 0.3,
+       "endAt": 1791989864352
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 139.2,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 139.2,
+       "endAt": 1791989864491
+      },
+      {
+       "phase": "edges",
+       "ms": 217.9,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 217.9,
+       "endAt": 1791989864491,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 0.2,
+       "endAt": 1791989864491,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 352.2,
+       "heapMb": 92.5,
+       "peakRssMb": 352.2,
+       "stallMs": 0.1,
+       "endAt": 1791989864491,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 126.4,
+       "rssMb": 368.6,
+       "heapMb": 129.7,
+       "peakRssMb": 368.6,
+       "stallMs": 126.4,
+       "endAt": 1791989864618,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 25.7,
+       "rssMb": 376,
+       "heapMb": 129.7,
+       "peakRssMb": 376,
+       "stallMs": 25.7,
+       "endAt": 1791989864643,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 377,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18.1,
+     "processMs": 1384,
+     "memory": {
+      "nodePeakMb": 377,
+      "treePeakSampledMb": 376,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 14,
+      "errors": 0,
+      "p50": 5.1,
+      "p95": 372.7,
+      "max": 372.7
+     },
+     "rep": 2
+    },
+    {
+     "mode": "warm",
+     "wallMs": 614,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.6,
+       "rssMb": 110.6,
+       "heapMb": 12.2,
+       "peakRssMb": 110.6,
+       "stallMs": 2.6,
+       "endAt": 1791989864945,
+       "httpMaxMs": 7.3
+      },
+      {
+       "phase": "scan",
+       "ms": 194.4,
+       "rssMb": 169.4,
+       "heapMb": 45.4,
+       "peakRssMb": 169.4,
+       "stallMs": 69.9,
+       "endAt": 1791989865139,
+       "counts": {
+        "seen": 21038,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 445.2
+      },
+      {
+       "phase": "projects",
+       "ms": 15.9,
+       "rssMb": 179.4,
+       "heapMb": 55.1,
+       "peakRssMb": 179.4,
+       "stallMs": 15.9,
+       "endAt": 1791989865155,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 4.7,
+       "rssMb": 183.1,
+       "heapMb": 55.4,
+       "peakRssMb": 183.1,
+       "stallMs": 0,
+       "endAt": 1791989865160,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 83.5,
+       "rssMb": 234.6,
+       "heapMb": 85,
+       "peakRssMb": 234.6,
+       "stallMs": 83.5,
+       "endAt": 1791989865244
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.9,
+       "rssMb": 235,
+       "heapMb": 85,
+       "peakRssMb": 235,
+       "stallMs": 2.9,
+       "endAt": 1791989865246
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 235.1,
+       "heapMb": 85,
+       "peakRssMb": 235.1,
+       "stallMs": 0.4,
+       "endAt": 1791989865247
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 139.3,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 139.3,
+       "endAt": 1791989865386
+      },
+      {
+       "phase": "edges",
+       "ms": 226.1,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 226.1,
+       "endAt": 1791989865386,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 0.2,
+       "endAt": 1791989865386,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 304.2,
+       "heapMb": 75.2,
+       "peakRssMb": 304.2,
+       "stallMs": 0.1,
+       "endAt": 1791989865386,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 109.4,
+       "rssMb": 317.6,
+       "heapMb": 112.9,
+       "peakRssMb": 317.6,
+       "stallMs": 109.4,
+       "endAt": 1791989865496,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 59.6,
+       "rssMb": 330.3,
+       "heapMb": 112.9,
+       "peakRssMb": 330.3,
+       "stallMs": 59.6,
+       "endAt": 1791989865555,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 331,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 19.5,
+     "processMs": 838,
+     "memory": {
+      "nodePeakMb": 331,
+      "treePeakSampledMb": 330,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 7.3,
+      "p95": 445.2,
+      "max": 445.2
+     },
+     "rep": 2
+    },
+    {
+     "mode": "incremental",
+     "wallMs": 665,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 60,
+      "changed": 113,
+      "removed": 27,
+      "extracted": 173,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.5,
+       "rssMb": 110.1,
+       "heapMb": 12.2,
+       "peakRssMb": 110.2,
+       "stallMs": 2.5,
+       "endAt": 1791989865878,
+       "httpMaxMs": 7.6
+      },
+      {
+       "phase": "scan",
+       "ms": 203.6,
+       "rssMb": 169.9,
+       "heapMb": 44.6,
+       "peakRssMb": 169.9,
+       "stallMs": 71.3,
+       "endAt": 1791989866082,
+       "counts": {
+        "seen": 21071,
+        "added": 60,
+        "changed": 113,
+        "removed": 27
+       },
+       "httpMaxMs": 62.3
+      },
+      {
+       "phase": "projects",
+       "ms": 15.5,
+       "rssMb": 179.9,
+       "heapMb": 54.3,
+       "peakRssMb": 179.9,
+       "stallMs": 15.5,
+       "endAt": 1791989866097,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 22.7,
+       "rssMb": 201.1,
+       "heapMb": 45.1,
+       "peakRssMb": 203.7,
+       "stallMs": 4.7,
+       "endAt": 1791989866120,
+       "counts": {
+        "files": 173,
+        "texts": 91,
+        "bytes": 517611,
+        "refs": 101,
+        "identifiers": 0,
+        "readMs": 15,
+        "hashMs": 0,
+        "extractMs": 10,
+        "writeMs": 3
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 84.3,
+       "rssMb": 243,
+       "heapMb": 67.1,
+       "peakRssMb": 243,
+       "stallMs": 84.3,
+       "endAt": 1791989866204
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 3.2,
+       "rssMb": 243.1,
+       "heapMb": 67.1,
+       "peakRssMb": 243.1,
+       "stallMs": 3.2,
+       "endAt": 1791989866207
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 243.1,
+       "heapMb": 67.1,
+       "peakRssMb": 243.1,
+       "stallMs": 0.4,
+       "endAt": 1791989866208
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 147.3,
+       "rssMb": 316,
+       "heapMb": 81.4,
+       "peakRssMb": 316,
+       "stallMs": 147.3,
+       "endAt": 1791989866355
+      },
+      {
+       "phase": "edges",
+       "ms": 235.3,
+       "rssMb": 316,
+       "heapMb": 81.5,
+       "peakRssMb": 316,
+       "stallMs": 235.3,
+       "endAt": 1791989866355,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 388.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 316,
+       "heapMb": 81.5,
+       "peakRssMb": 316,
+       "stallMs": 0.2,
+       "endAt": 1791989866355,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 316,
+       "heapMb": 81.5,
+       "peakRssMb": 316,
+       "stallMs": 0.1,
+       "endAt": 1791989866355,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 131.3,
+       "rssMb": 329.5,
+       "heapMb": 119.8,
+       "peakRssMb": 329.5,
+       "stallMs": 131.3,
+       "endAt": 1791989866487,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 53,
+       "rssMb": 340.8,
+       "heapMb": 119.8,
+       "peakRssMb": 340.8,
+       "stallMs": 53,
+       "endAt": 1791989866540,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 341,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 19.8,
+     "processMs": 875,
+     "memory": {
+      "nodePeakMb": 341,
+      "treePeakSampledMb": 332,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 7,
+      "errors": 0,
+      "p50": 4.9,
+      "p95": 388.9,
+      "max": 388.9
+     },
+     "rep": 2
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 1140,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20202,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 30.8,
+       "rssMb": 125.4,
+       "heapMb": 12.2,
+       "peakRssMb": 125.4,
+       "stallMs": 30.8,
+       "endAt": 1791989866890,
+       "httpMaxMs": 35.8
+      },
+      {
+       "phase": "scan",
+       "ms": 198.2,
+       "rssMb": 179.7,
+       "heapMb": 45.5,
+       "peakRssMb": 179.7,
+       "stallMs": 59.4,
+       "endAt": 1791989867088,
+       "counts": {
+        "seen": 21071,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 78.5
+      },
+      {
+       "phase": "projects",
+       "ms": 15.2,
+       "rssMb": 189.8,
+       "heapMb": 55.2,
+       "peakRssMb": 189.8,
+       "stallMs": 15.2,
+       "endAt": 1791989867104,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 523.4,
+       "rssMb": 344.4,
+       "heapMb": 94.3,
+       "peakRssMb": 344.4,
+       "stallMs": 61.2,
+       "endAt": 1791989867627,
+       "counts": {
+        "files": 20202,
+        "texts": 3782,
+        "bytes": 62510884,
+        "refs": 4894,
+        "identifiers": 0,
+        "readMs": 411,
+        "hashMs": 24,
+        "extractMs": 276,
+        "writeMs": 91
+       },
+       "httpMaxMs": 77.9
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 79.5,
+       "rssMb": 351.3,
+       "heapMb": 106.8,
+       "peakRssMb": 352.6,
+       "stallMs": 79.5,
+       "endAt": 1791989867707
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.5,
+       "rssMb": 351.4,
+       "heapMb": 106.8,
+       "peakRssMb": 352.6,
+       "stallMs": 2.5,
+       "endAt": 1791989867709
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 351.4,
+       "heapMb": 106.8,
+       "peakRssMb": 352.6,
+       "stallMs": 0.4,
+       "endAt": 1791989867710
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 126.5,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 126.5,
+       "endAt": 1791989867836
+      },
+      {
+       "phase": "edges",
+       "ms": 208.9,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 208.9,
+       "endAt": 1791989867836,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 360.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 0.2,
+       "endAt": 1791989867836,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 385.9,
+       "heapMb": 114.6,
+       "peakRssMb": 385.9,
+       "stallMs": 0.1,
+       "endAt": 1791989867836,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 109.2,
+       "rssMb": 401.5,
+       "heapMb": 153,
+       "peakRssMb": 401.5,
+       "stallMs": 109.2,
+       "endAt": 1791989867946,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 53.5,
+       "rssMb": 409.8,
+       "heapMb": 153,
+       "peakRssMb": 409.8,
+       "stallMs": 53.5,
+       "endAt": 1791989867999,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 410,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 20.9,
+     "processMs": 1360,
+     "memory": {
+      "nodePeakMb": 410,
+      "treePeakSampledMb": 410,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 13,
+      "errors": 0,
+      "p50": 9.5,
+      "p95": 360.9,
+      "max": 360.9
+     },
+     "rep": 2
+    },
+    {
+     "mode": "cold",
+     "wallMs": 1078,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 105.6,
+       "heapMb": 12.2,
+       "peakRssMb": 105.6,
+       "stallMs": 0.1,
+       "endAt": 1791989870770,
+       "httpMaxMs": 4.9
+      },
+      {
+       "phase": "scan",
+       "ms": 191.2,
+       "rssMb": 151.6,
+       "heapMb": 31.6,
+       "peakRssMb": 151.6,
+       "stallMs": 66,
+       "endAt": 1791989870961,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 65.7
+      },
+      {
+       "phase": "projects",
+       "ms": 17.3,
+       "rssMb": 162.3,
+       "heapMb": 41.4,
+       "peakRssMb": 162.3,
+       "stallMs": 17.3,
+       "endAt": 1791989870978,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 512.3,
+       "rssMb": 324.6,
+       "heapMb": 68,
+       "peakRssMb": 324.6,
+       "stallMs": 59.9,
+       "endAt": 1791989871491,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 404,
+        "hashMs": 23,
+        "extractMs": 276,
+        "writeMs": 88
+       },
+       "httpMaxMs": 70.1
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 68.5,
+       "rssMb": 333.1,
+       "heapMb": 129.7,
+       "peakRssMb": 333.1,
+       "stallMs": 68.5,
+       "endAt": 1791989871559
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.6,
+       "rssMb": 333.2,
+       "heapMb": 129.7,
+       "peakRssMb": 333.2,
+       "stallMs": 2.6,
+       "endAt": 1791989871562
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.2,
+       "rssMb": 333.2,
+       "heapMb": 129.7,
+       "peakRssMb": 333.2,
+       "stallMs": 0.2,
+       "endAt": 1791989871562
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 135.2,
+       "rssMb": 370.5,
+       "heapMb": 104.7,
+       "peakRssMb": 370.5,
+       "stallMs": 135.2,
+       "endAt": 1791989871697
+      },
+      {
+       "phase": "edges",
+       "ms": 206.6,
+       "rssMb": 370.5,
+       "heapMb": 104.7,
+       "peakRssMb": 370.5,
+       "stallMs": 206.6,
+       "endAt": 1791989871697,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": 350.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 370.5,
+       "heapMb": 104.7,
+       "peakRssMb": 370.5,
+       "stallMs": 0.2,
+       "endAt": 1791989871698,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 370.5,
+       "heapMb": 104.7,
+       "peakRssMb": 370.5,
+       "stallMs": 0.1,
+       "endAt": 1791989871698,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 125,
+       "rssMb": 386.9,
+       "heapMb": 143,
+       "peakRssMb": 386.9,
+       "stallMs": 125,
+       "endAt": 1791989871823,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 24.7,
+       "rssMb": 393.9,
+       "heapMb": 143,
+       "peakRssMb": 393.9,
+       "stallMs": 24.7,
+       "endAt": 1791989871847,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 394,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18.1,
+     "processMs": 1288,
+     "memory": {
+      "nodePeakMb": 394,
+      "treePeakSampledMb": 387,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 13,
+      "errors": 0,
+      "p50": 5.5,
+      "p95": 350.9,
+      "max": 350.9
+     },
+     "rep": 3
+    },
+    {
+     "mode": "warm",
+     "wallMs": 613,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.4,
+       "rssMb": 111.5,
+       "heapMb": 12.2,
+       "peakRssMb": 111.5,
+       "stallMs": 2.4,
+       "endAt": 1791989872102,
+       "httpMaxMs": 7.8
+      },
+      {
+       "phase": "scan",
+       "ms": 200,
+       "rssMb": 171.1,
+       "heapMb": 46.1,
+       "peakRssMb": 171.1,
+       "stallMs": 64.7,
+       "endAt": 1791989872302,
+       "counts": {
+        "seen": 21038,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 450.3
+      },
+      {
+       "phase": "projects",
+       "ms": 15.9,
+       "rssMb": 181.3,
+       "heapMb": 55.9,
+       "peakRssMb": 181.3,
+       "stallMs": 15.9,
+       "endAt": 1791989872318,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 4.8,
+       "rssMb": 185,
+       "heapMb": 56.2,
+       "peakRssMb": 185,
+       "stallMs": 0,
+       "endAt": 1791989872323,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 84.9,
+       "rssMb": 239.4,
+       "heapMb": 89.6,
+       "peakRssMb": 239.4,
+       "stallMs": 84.9,
+       "endAt": 1791989872408
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.8,
+       "rssMb": 239.9,
+       "heapMb": 89.6,
+       "peakRssMb": 239.9,
+       "stallMs": 2.8,
+       "endAt": 1791989872411
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 239.9,
+       "heapMb": 89.6,
+       "peakRssMb": 239.9,
+       "stallMs": 0.3,
+       "endAt": 1791989872411
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 132.4,
+       "rssMb": 303.3,
+       "heapMb": 66.1,
+       "peakRssMb": 303.3,
+       "stallMs": 132.4,
+       "endAt": 1791989872544
+      },
+      {
+       "phase": "edges",
+       "ms": 220.5,
+       "rssMb": 303.3,
+       "heapMb": 66.1,
+       "peakRssMb": 303.3,
+       "stallMs": 220.5,
+       "endAt": 1791989872544,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 303.3,
+       "heapMb": 66.1,
+       "peakRssMb": 303.3,
+       "stallMs": 0.1,
+       "endAt": 1791989872544,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 303.3,
+       "heapMb": 66.1,
+       "peakRssMb": 303.3,
+       "stallMs": 0.1,
+       "endAt": 1791989872544,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 109.8,
+       "rssMb": 318.5,
+       "heapMb": 103.3,
+       "peakRssMb": 318.5,
+       "stallMs": 109.8,
+       "endAt": 1791989872654,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 59,
+       "rssMb": 331.4,
+       "heapMb": 103.3,
+       "peakRssMb": 331.4,
+       "stallMs": 59,
+       "endAt": 1791989872713,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 332,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 19.5,
+     "processMs": 834,
+     "memory": {
+      "nodePeakMb": 332,
+      "treePeakSampledMb": 331,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 3.7,
+      "p95": 450.3,
+      "max": 450.3
+     },
+     "rep": 3
+    },
+    {
+     "mode": "incremental",
+     "wallMs": 625,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 60,
+      "changed": 113,
+      "removed": 27,
+      "extracted": 173,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 2.4,
+       "rssMb": 111.1,
+       "heapMb": 12.2,
+       "peakRssMb": 111.1,
+       "stallMs": 2.4,
+       "endAt": 1791989873033,
+       "httpMaxMs": 7.3
+      },
+      {
+       "phase": "scan",
+       "ms": 193.1,
+       "rssMb": 178.9,
+       "heapMb": 43.4,
+       "peakRssMb": 178.9,
+       "stallMs": 70.8,
+       "endAt": 1791989873226,
+       "counts": {
+        "seen": 21071,
+        "added": 60,
+        "changed": 113,
+        "removed": 27
+       },
+       "httpMaxMs": 53
+      },
+      {
+       "phase": "projects",
+       "ms": 14.8,
+       "rssMb": 183,
+       "heapMb": 53,
+       "peakRssMb": 183,
+       "stallMs": 14.8,
+       "endAt": 1791989873241,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 20.4,
+       "rssMb": 181.7,
+       "heapMb": 19,
+       "peakRssMb": 186.4,
+       "stallMs": 2.9,
+       "endAt": 1791989873261,
+       "counts": {
+        "files": 173,
+        "texts": 91,
+        "bytes": 517611,
+        "refs": 101,
+        "identifiers": 0,
+        "readMs": 14,
+        "hashMs": 0,
+        "extractMs": 10,
+        "writeMs": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 81,
+       "rssMb": 216.2,
+       "heapMb": 40.2,
+       "peakRssMb": 216.2,
+       "stallMs": 81,
+       "endAt": 1791989873343
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.8,
+       "rssMb": 216.4,
+       "heapMb": 40.2,
+       "peakRssMb": 216.4,
+       "stallMs": 2.8,
+       "endAt": 1791989873345
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 216.4,
+       "heapMb": 40.3,
+       "peakRssMb": 216.4,
+       "stallMs": 0.4,
+       "endAt": 1791989873346
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 133.1,
+       "rssMb": 299.2,
+       "heapMb": 58.8,
+       "peakRssMb": 299.2,
+       "stallMs": 133.1,
+       "endAt": 1791989873479
+      },
+      {
+       "phase": "edges",
+       "ms": 217.3,
+       "rssMb": 299.2,
+       "heapMb": 58.8,
+       "peakRssMb": 299.2,
+       "stallMs": 217.3,
+       "endAt": 1791989873479,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 358.6
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 299.2,
+       "heapMb": 58.8,
+       "peakRssMb": 299.2,
+       "stallMs": 0.1,
+       "endAt": 1791989873479,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0,
+       "rssMb": 299.2,
+       "heapMb": 58.8,
+       "peakRssMb": 299.2,
+       "stallMs": 0,
+       "endAt": 1791989873479,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 125.8,
+       "rssMb": 314.9,
+       "heapMb": 98.2,
+       "peakRssMb": 314.9,
+       "stallMs": 125.8,
+       "endAt": 1791989873605,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 50.2,
+       "rssMb": 326.5,
+       "heapMb": 98.2,
+       "peakRssMb": 326.5,
+       "stallMs": 50.2,
+       "endAt": 1791989873655,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 327,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 19.8,
+     "processMs": 837,
+     "memory": {
+      "nodePeakMb": 327,
+      "treePeakSampledMb": 315,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 7,
+      "errors": 0,
+      "p50": 4.1,
+      "p95": 358.6,
+      "max": 358.6
+     },
+     "rep": 3
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 1120,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21071,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20202,
+      "projects": 30,
+      "edges": 7026
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 30.6,
+       "rssMb": 124.9,
+       "heapMb": 12.2,
+       "peakRssMb": 124.9,
+       "stallMs": 30.6,
+       "endAt": 1791989873931,
+       "httpMaxMs": 35.2
+      },
+      {
+       "phase": "scan",
+       "ms": 184.1,
+       "rssMb": 186.3,
+       "heapMb": 43.5,
+       "peakRssMb": 186.3,
+       "stallMs": 57.2,
+       "endAt": 1791989874116,
+       "counts": {
+        "seen": 21071,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 60.2
+      },
+      {
+       "phase": "projects",
+       "ms": 14.7,
+       "rssMb": 190.4,
+       "heapMb": 53.3,
+       "peakRssMb": 190.4,
+       "stallMs": 14.7,
+       "endAt": 1791989874130,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 508.4,
+       "rssMb": 360.8,
+       "heapMb": 124.2,
+       "peakRssMb": 360.8,
+       "stallMs": 56.1,
+       "endAt": 1791989874639,
+       "counts": {
+        "files": 20202,
+        "texts": 3782,
+        "bytes": 62510884,
+        "refs": 4894,
+        "identifiers": 0,
+        "readMs": 401,
+        "hashMs": 23,
+        "extractMs": 276,
+        "writeMs": 89
+       },
+       "httpMaxMs": 77.1
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 79.6,
+       "rssMb": 370.1,
+       "heapMb": 142.9,
+       "peakRssMb": 370.1,
+       "stallMs": 79.6,
+       "endAt": 1791989874719
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.6,
+       "rssMb": 370.1,
+       "heapMb": 142.9,
+       "peakRssMb": 370.1,
+       "stallMs": 2.6,
+       "endAt": 1791989874721
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 370.1,
+       "heapMb": 142.9,
+       "peakRssMb": 370.1,
+       "stallMs": 0.3,
+       "endAt": 1791989874721
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 134.3,
+       "rssMb": 415.5,
+       "heapMb": 128.5,
+       "peakRssMb": 415.5,
+       "stallMs": 134.3,
+       "endAt": 1791989874856
+      },
+      {
+       "phase": "edges",
+       "ms": 217,
+       "rssMb": 415.5,
+       "heapMb": 128.5,
+       "peakRssMb": 415.5,
+       "stallMs": 217,
+       "endAt": 1791989874856,
+       "counts": {
+        "edges": 7026
+       },
+       "httpMaxMs": 369.7
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 415.5,
+       "heapMb": 128.5,
+       "peakRssMb": 415.5,
+       "stallMs": 0.2,
+       "endAt": 1791989874856,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 415.5,
+       "heapMb": 128.5,
+       "peakRssMb": 415.5,
+       "stallMs": 0.1,
+       "endAt": 1791989874856,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 109.6,
+       "rssMb": 428.1,
+       "heapMb": 165.4,
+       "peakRssMb": 428.1,
+       "stallMs": 109.6,
+       "endAt": 1791989874966,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 54.8,
+       "rssMb": 430.4,
+       "heapMb": 165.4,
+       "peakRssMb": 435.2,
+       "stallMs": 54.8,
+       "endAt": 1791989875021,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 435,
+     "nodes": {
+      "dir": 818,
+      "file": 20233,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1841,
+      "links": 1273,
+      "mention": 675,
+      "refpath": 31,
+      "similar": 3186,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "cc028e339d9d0c32",
+      "links": "7287d8e0c9b9a022",
+      "refpath": "7037def7d104d62b",
+      "mention": "b81726794a72fb3d",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "7819ee0d90ca0f2e"
+     },
+     "dbMb": 20.9,
+     "processMs": 1341,
+     "memory": {
+      "nodePeakMb": 435,
+      "treePeakSampledMb": 431,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 13,
+      "errors": 0,
+      "p50": 3.5,
+      "p95": 369.7,
+      "max": 369.7
+     },
+     "rep": 3
+    }
+   ],
+   "corpus": {
+    "files": 20200,
+    "dirs": 680,
+    "bytes": 358238566,
+    "vendorFiles": 3600,
+    "symlinks": 20,
+    "secrets": 31,
+    "duplicates": 89,
+    "projects": 30,
+    "generateMs": 2472
+   },
+   "mutation": {
+    "edited": 115,
+    "added": 60,
+    "deleted": 27
+   }
+  },
+  {
+   "name": "repo",
+   "roots": [
+    "/Users/me/Desktop/JetHR/strumenti/visual-brain"
+   ],
+   "repeat": 3,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 176,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.5,
+       "heapMb": 12.2,
+       "peakRssMb": 104.5,
+       "stallMs": 0.1,
+       "endAt": 1791989877612,
+       "httpMaxMs": 4.8
+      },
+      {
+       "phase": "scan",
+       "ms": 45.3,
+       "rssMb": 106,
+       "heapMb": 13.1,
+       "peakRssMb": 106,
+       "stallMs": 1.7,
+       "endAt": 1791989877657,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 106.1,
+       "heapMb": 13.3,
+       "peakRssMb": 106.1,
+       "stallMs": 0.9,
+       "endAt": 1791989877658,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 105.9,
+       "rssMb": 126.8,
+       "heapMb": 21.6,
+       "peakRssMb": 126.8,
+       "stallMs": 49.6,
+       "endAt": 1791989877764,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 101,
+        "hashMs": 1,
+        "extractMs": 98,
+        "writeMs": 4
+       },
+       "httpMaxMs": 120.9
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 12.1,
+       "rssMb": 127.8,
+       "heapMb": 21.4,
+       "peakRssMb": 127.8,
+       "stallMs": 12.1,
+       "endAt": 1791989877776
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 127.8,
+       "heapMb": 21.5,
+       "peakRssMb": 127.8,
+       "stallMs": 0.2,
+       "endAt": 1791989877776
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 127.8,
+       "heapMb": 21.6,
+       "peakRssMb": 127.8,
+       "stallMs": 0.3,
+       "endAt": 1791989877777
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.5,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 6.5,
+       "endAt": 1791989877783
+      },
+      {
+       "phase": "edges",
+       "ms": 19.1,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 19.1,
+       "endAt": 1791989877783,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 0.1,
+       "endAt": 1791989877783,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 0.1,
+       "endAt": 1791989877783,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.5,
+       "rssMb": 129.8,
+       "heapMb": 25,
+       "peakRssMb": 129.8,
+       "stallMs": 3.5,
+       "endAt": 1791989877787,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 129.9,
+       "heapMb": 25,
+       "peakRssMb": 129.9,
+       "stallMs": 0.3,
+       "endAt": 1791989877787,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 130,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 378,
+     "memory": {
+      "nodePeakMb": 130,
+      "treePeakSampledMb": 130,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 4.8,
+      "p95": 120.9,
+      "max": 120.9
+     },
+     "rep": 3,
+     "wallMsAll": [
+      176,
+      176,
+      179
+     ],
+     "processMsAll": [
+      379,
+      378,
+      387
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "warm",
+     "wallMs": 64,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.3,
+       "rssMb": 104.1,
+       "heapMb": 12.2,
+       "peakRssMb": 104.1,
+       "stallMs": 0.3,
+       "endAt": 1791989875764,
+       "httpMaxMs": 4.9
+      },
+      {
+       "phase": "scan",
+       "ms": 41.1,
+       "rssMb": 105.9,
+       "heapMb": 13.2,
+       "peakRssMb": 105.9,
+       "stallMs": 1.1,
+       "endAt": 1791989875806,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 106,
+       "heapMb": 13.9,
+       "peakRssMb": 106,
+       "stallMs": 0.8,
+       "endAt": 1791989875806,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 0.2,
+       "rssMb": 106.1,
+       "heapMb": 13.4,
+       "peakRssMb": 106.1,
+       "stallMs": 0,
+       "endAt": 1791989875807,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9.7,
+       "rssMb": 111.9,
+       "heapMb": 14.7,
+       "peakRssMb": 111.9,
+       "stallMs": 9.7,
+       "endAt": 1791989875816
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 111.9,
+       "heapMb": 14.7,
+       "peakRssMb": 111.9,
+       "stallMs": 0.2,
+       "endAt": 1791989875817
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 112,
+       "heapMb": 14.9,
+       "peakRssMb": 112,
+       "stallMs": 0.3,
+       "endAt": 1791989875817
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.4,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 6.4,
+       "endAt": 1791989875823
+      },
+      {
+       "phase": "edges",
+       "ms": 16.6,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 16.6,
+       "endAt": 1791989875823,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": 9.4
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 0.1,
+       "endAt": 1791989875823,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 0.1,
+       "endAt": 1791989875823,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.9,
+       "rssMb": 114.7,
+       "heapMb": 18.6,
+       "peakRssMb": 114.7,
+       "stallMs": 3.9,
+       "endAt": 1791989875827,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 115,
+       "heapMb": 18.6,
+       "peakRssMb": 115,
+       "stallMs": 0.5,
+       "endAt": 1791989875828,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 116,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 263,
+     "memory": {
+      "nodePeakMb": 116,
+      "treePeakSampledMb": 115,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 4.9,
+      "p95": 9.4,
+      "max": 9.4
+     },
+     "rep": 1,
+     "wallMsAll": [
+      63,
+      64,
+      68
+     ],
+     "processMsAll": [
+      265,
+      263,
+      263
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 168,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.8,
+       "rssMb": 104.7,
+       "heapMb": 12.2,
+       "peakRssMb": 104.7,
+       "stallMs": 0.8,
+       "endAt": 1791989878336,
+       "httpMaxMs": 5.6
+      },
+      {
+       "phase": "scan",
+       "ms": 40.3,
+       "rssMb": 106.5,
+       "heapMb": 13.2,
+       "peakRssMb": 106.5,
+       "stallMs": 1.1,
+       "endAt": 1791989878376,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 106.5,
+       "heapMb": 14.1,
+       "peakRssMb": 106.5,
+       "stallMs": 0.8,
+       "endAt": 1791989878377,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 105.4,
+       "rssMb": 127.3,
+       "heapMb": 18.2,
+       "peakRssMb": 127.3,
+       "stallMs": 67.5,
+       "endAt": 1791989878482,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 101,
+        "hashMs": 1,
+        "extractMs": 98,
+        "writeMs": 4
+       },
+       "httpMaxMs": 112.4
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9.3,
+       "rssMb": 127.6,
+       "heapMb": 25.3,
+       "peakRssMb": 127.6,
+       "stallMs": 9.3,
+       "endAt": 1791989878492
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 127.6,
+       "heapMb": 25.3,
+       "peakRssMb": 127.6,
+       "stallMs": 0.2,
+       "endAt": 1791989878492
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 127.6,
+       "heapMb": 25.5,
+       "peakRssMb": 127.6,
+       "stallMs": 0.3,
+       "endAt": 1791989878492
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.3,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 6.3,
+       "endAt": 1791989878499
+      },
+      {
+       "phase": "edges",
+       "ms": 16.2,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 16.2,
+       "endAt": 1791989878499,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 0.1,
+       "endAt": 1791989878499,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 0.1,
+       "endAt": 1791989878499,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.5,
+       "rssMb": 129.5,
+       "heapMb": 21.2,
+       "peakRssMb": 129.5,
+       "stallMs": 3.5,
+       "endAt": 1791989878502,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 129.7,
+       "heapMb": 21.2,
+       "peakRssMb": 129.7,
+       "stallMs": 0.5,
+       "endAt": 1791989878503,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 130,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 370,
+     "memory": {
+      "nodePeakMb": 130,
+      "treePeakSampledMb": 130,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 5.6,
+      "p95": 112.4,
+      "max": 112.4
+     },
+     "rep": 3,
+     "wallMsAll": [
+      167,
+      168,
+      175
+     ],
+     "processMsAll": [
+      367,
+      370,
+      370
+     ],
+     "fingerprintsStable": true
+    }
+   ],
+   "raw": [
+    {
+     "mode": "cold",
+     "wallMs": 179,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.6,
+       "heapMb": 12.2,
+       "peakRssMb": 104.6,
+       "stallMs": 0.1,
+       "endAt": 1791989875348,
+       "httpMaxMs": 5
+      },
+      {
+       "phase": "scan",
+       "ms": 47.5,
+       "rssMb": 106.1,
+       "heapMb": 13.1,
+       "peakRssMb": 106.1,
+       "stallMs": 1.1,
+       "endAt": 1791989875395,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 1.2,
+       "rssMb": 106.2,
+       "heapMb": 13.3,
+       "peakRssMb": 106.2,
+       "stallMs": 1.2,
+       "endAt": 1791989875396,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 106.9,
+       "rssMb": 127.3,
+       "heapMb": 21.2,
+       "peakRssMb": 127.3,
+       "stallMs": 61.3,
+       "endAt": 1791989875503,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 102,
+        "hashMs": 2,
+        "extractMs": 97,
+        "writeMs": 4
+       },
+       "httpMaxMs": 123.8
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 11.4,
+       "rssMb": 128.3,
+       "heapMb": 21.1,
+       "peakRssMb": 128.3,
+       "stallMs": 11.4,
+       "endAt": 1791989875515
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 128.4,
+       "heapMb": 21.1,
+       "peakRssMb": 128.4,
+       "stallMs": 0.2,
+       "endAt": 1791989875515
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 128.4,
+       "heapMb": 21.2,
+       "peakRssMb": 128.4,
+       "stallMs": 0.3,
+       "endAt": 1791989875515
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.5,
+       "rssMb": 130.2,
+       "heapMb": 20.2,
+       "peakRssMb": 130.2,
+       "stallMs": 6.5,
+       "endAt": 1791989875522
+      },
+      {
+       "phase": "edges",
+       "ms": 18.4,
+       "rssMb": 130.2,
+       "heapMb": 20.2,
+       "peakRssMb": 130.2,
+       "stallMs": 18.4,
+       "endAt": 1791989875522,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 130.2,
+       "heapMb": 20.2,
+       "peakRssMb": 130.2,
+       "stallMs": 0.2,
+       "endAt": 1791989875522,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 130.2,
+       "heapMb": 20.2,
+       "peakRssMb": 130.2,
+       "stallMs": 0.1,
+       "endAt": 1791989875522,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.6,
+       "rssMb": 130.5,
+       "heapMb": 24.6,
+       "peakRssMb": 130.5,
+       "stallMs": 3.6,
+       "endAt": 1791989875526,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 130.6,
+       "heapMb": 24.6,
+       "peakRssMb": 130.6,
+       "stallMs": 0.3,
+       "endAt": 1791989875526,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 131,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 387,
+     "memory": {
+      "nodePeakMb": 131,
+      "treePeakSampledMb": 131,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 5,
+      "p95": 123.8,
+      "max": 123.8
+     },
+     "rep": 1
+    },
+    {
+     "mode": "warm",
+     "wallMs": 64,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.3,
+       "rssMb": 104.1,
+       "heapMb": 12.2,
+       "peakRssMb": 104.1,
+       "stallMs": 0.3,
+       "endAt": 1791989875764,
+       "httpMaxMs": 4.9
+      },
+      {
+       "phase": "scan",
+       "ms": 41.1,
+       "rssMb": 105.9,
+       "heapMb": 13.2,
+       "peakRssMb": 105.9,
+       "stallMs": 1.1,
+       "endAt": 1791989875806,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 106,
+       "heapMb": 13.9,
+       "peakRssMb": 106,
+       "stallMs": 0.8,
+       "endAt": 1791989875806,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 0.2,
+       "rssMb": 106.1,
+       "heapMb": 13.4,
+       "peakRssMb": 106.1,
+       "stallMs": 0,
+       "endAt": 1791989875807,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9.7,
+       "rssMb": 111.9,
+       "heapMb": 14.7,
+       "peakRssMb": 111.9,
+       "stallMs": 9.7,
+       "endAt": 1791989875816
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 111.9,
+       "heapMb": 14.7,
+       "peakRssMb": 111.9,
+       "stallMs": 0.2,
+       "endAt": 1791989875817
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 112,
+       "heapMb": 14.9,
+       "peakRssMb": 112,
+       "stallMs": 0.3,
+       "endAt": 1791989875817
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.4,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 6.4,
+       "endAt": 1791989875823
+      },
+      {
+       "phase": "edges",
+       "ms": 16.6,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 16.6,
+       "endAt": 1791989875823,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": 9.4
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 0.1,
+       "endAt": 1791989875823,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 113.8,
+       "heapMb": 17.9,
+       "peakRssMb": 113.8,
+       "stallMs": 0.1,
+       "endAt": 1791989875823,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.9,
+       "rssMb": 114.7,
+       "heapMb": 18.6,
+       "peakRssMb": 114.7,
+       "stallMs": 3.9,
+       "endAt": 1791989875827,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 115,
+       "heapMb": 18.6,
+       "peakRssMb": 115,
+       "stallMs": 0.5,
+       "endAt": 1791989875828,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 116,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 263,
+     "memory": {
+      "nodePeakMb": 116,
+      "treePeakSampledMb": 115,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 4.9,
+      "p95": 9.4,
+      "max": 9.4
+     },
+     "rep": 1
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 167,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.8,
+       "rssMb": 104.2,
+       "heapMb": 12.2,
+       "peakRssMb": 104.2,
+       "stallMs": 0.8,
+       "endAt": 1791989876066,
+       "httpMaxMs": 5.4
+      },
+      {
+       "phase": "scan",
+       "ms": 39.9,
+       "rssMb": 106,
+       "heapMb": 13.2,
+       "peakRssMb": 106,
+       "stallMs": 1.1,
+       "endAt": 1791989876106,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 106,
+       "heapMb": 14.1,
+       "peakRssMb": 106,
+       "stallMs": 0.8,
+       "endAt": 1791989876106,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 105.3,
+       "rssMb": 126.9,
+       "heapMb": 21.5,
+       "peakRssMb": 126.9,
+       "stallMs": 55.9,
+       "endAt": 1791989876212,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 101,
+        "hashMs": 1,
+        "extractMs": 98,
+        "writeMs": 4
+       },
+       "httpMaxMs": 113.3
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9,
+       "rssMb": 127.2,
+       "heapMb": 21.6,
+       "peakRssMb": 127.2,
+       "stallMs": 9,
+       "endAt": 1791989876221
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 127.2,
+       "heapMb": 21.6,
+       "peakRssMb": 127.2,
+       "stallMs": 0.2,
+       "endAt": 1791989876221
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 127.3,
+       "heapMb": 21.7,
+       "peakRssMb": 127.3,
+       "stallMs": 0.3,
+       "endAt": 1791989876221
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.6,
+       "rssMb": 129,
+       "heapMb": 21.1,
+       "peakRssMb": 129,
+       "stallMs": 6.6,
+       "endAt": 1791989876228
+      },
+      {
+       "phase": "edges",
+       "ms": 16.1,
+       "rssMb": 129,
+       "heapMb": 21.1,
+       "peakRssMb": 129,
+       "stallMs": 16.1,
+       "endAt": 1791989876228,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 129,
+       "heapMb": 21.1,
+       "peakRssMb": 129,
+       "stallMs": 0.1,
+       "endAt": 1791989876228,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 129,
+       "heapMb": 21.1,
+       "peakRssMb": 129,
+       "stallMs": 0.1,
+       "endAt": 1791989876228,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.5,
+       "rssMb": 129.2,
+       "heapMb": 25.5,
+       "peakRssMb": 129.2,
+       "stallMs": 3.5,
+       "endAt": 1791989876232,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 129.5,
+       "heapMb": 25.5,
+       "peakRssMb": 129.5,
+       "stallMs": 0.5,
+       "endAt": 1791989876232,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 130,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 367,
+     "memory": {
+      "nodePeakMb": 130,
+      "treePeakSampledMb": 130,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 5.4,
+      "p95": 113.3,
+      "max": 113.3
+     },
+     "rep": 1
+    },
+    {
+     "mode": "cold",
+     "wallMs": 176,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.2,
+       "heapMb": 12.2,
+       "peakRssMb": 104.2,
+       "stallMs": 0.1,
+       "endAt": 1791989876485,
+       "httpMaxMs": 5.1
+      },
+      {
+       "phase": "scan",
+       "ms": 46.4,
+       "rssMb": 105.8,
+       "heapMb": 13.1,
+       "peakRssMb": 105.8,
+       "stallMs": 1.1,
+       "endAt": 1791989876531,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 105.8,
+       "heapMb": 13.3,
+       "peakRssMb": 105.8,
+       "stallMs": 0.9,
+       "endAt": 1791989876532,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 105.4,
+       "rssMb": 126.5,
+       "heapMb": 17.9,
+       "peakRssMb": 126.5,
+       "stallMs": 52.6,
+       "endAt": 1791989876638,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 101,
+        "hashMs": 1,
+        "extractMs": 98,
+        "writeMs": 4
+       },
+       "httpMaxMs": 122.3
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 11.5,
+       "rssMb": 127.7,
+       "heapMb": 24.7,
+       "peakRssMb": 127.7,
+       "stallMs": 11.5,
+       "endAt": 1791989876649
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 127.8,
+       "heapMb": 24.7,
+       "peakRssMb": 127.8,
+       "stallMs": 0.2,
+       "endAt": 1791989876649
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 127.8,
+       "heapMb": 24.8,
+       "peakRssMb": 127.8,
+       "stallMs": 0.3,
+       "endAt": 1791989876650
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.6,
+       "rssMb": 129,
+       "heapMb": 23.5,
+       "peakRssMb": 129,
+       "stallMs": 6.6,
+       "endAt": 1791989876656
+      },
+      {
+       "phase": "edges",
+       "ms": 18.6,
+       "rssMb": 129,
+       "heapMb": 23.5,
+       "peakRssMb": 129,
+       "stallMs": 18.6,
+       "endAt": 1791989876656,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 129,
+       "heapMb": 23.5,
+       "peakRssMb": 129,
+       "stallMs": 0.1,
+       "endAt": 1791989876657,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 129.1,
+       "heapMb": 23.5,
+       "peakRssMb": 129.1,
+       "stallMs": 0.1,
+       "endAt": 1791989876657,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.7,
+       "rssMb": 129.3,
+       "heapMb": 20.2,
+       "peakRssMb": 129.3,
+       "stallMs": 3.7,
+       "endAt": 1791989876660,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 129.4,
+       "heapMb": 20.2,
+       "peakRssMb": 129.4,
+       "stallMs": 0.3,
+       "endAt": 1791989876661,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 130,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 379,
+     "memory": {
+      "nodePeakMb": 130,
+      "treePeakSampledMb": 130,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 5.1,
+      "p95": 122.3,
+      "max": 122.3
+     },
+     "rep": 2
+    },
+    {
+     "mode": "warm",
+     "wallMs": 68,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.3,
+       "rssMb": 104.5,
+       "heapMb": 12.3,
+       "peakRssMb": 104.5,
+       "stallMs": 0.3,
+       "endAt": 1791989876898,
+       "httpMaxMs": 4.9
+      },
+      {
+       "phase": "scan",
+       "ms": 44.1,
+       "rssMb": 106.2,
+       "heapMb": 13.3,
+       "peakRssMb": 106.2,
+       "stallMs": 1.1,
+       "endAt": 1791989876942,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 106.3,
+       "heapMb": 14,
+       "peakRssMb": 106.3,
+       "stallMs": 0.8,
+       "endAt": 1791989876943,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 0.2,
+       "rssMb": 106.3,
+       "heapMb": 13.5,
+       "peakRssMb": 106.3,
+       "stallMs": 0,
+       "endAt": 1791989876943,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9.9,
+       "rssMb": 112,
+       "heapMb": 14.8,
+       "peakRssMb": 112,
+       "stallMs": 9.9,
+       "endAt": 1791989876953
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 112,
+       "heapMb": 14.8,
+       "peakRssMb": 112,
+       "stallMs": 0.2,
+       "endAt": 1791989876954
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 112,
+       "heapMb": 14.9,
+       "peakRssMb": 112,
+       "stallMs": 0.4,
+       "endAt": 1791989876954
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.6,
+       "rssMb": 113.9,
+       "heapMb": 17.9,
+       "peakRssMb": 113.9,
+       "stallMs": 6.6,
+       "endAt": 1791989876961
+      },
+      {
+       "phase": "edges",
+       "ms": 17.2,
+       "rssMb": 113.9,
+       "heapMb": 17.9,
+       "peakRssMb": 113.9,
+       "stallMs": 17.2,
+       "endAt": 1791989876961,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": 13.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 113.9,
+       "heapMb": 17.9,
+       "peakRssMb": 113.9,
+       "stallMs": 0.1,
+       "endAt": 1791989876961,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 113.9,
+       "heapMb": 17.9,
+       "peakRssMb": 113.9,
+       "stallMs": 0.1,
+       "endAt": 1791989876961,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 4.5,
+       "rssMb": 115.1,
+       "heapMb": 18.6,
+       "peakRssMb": 115.1,
+       "stallMs": 4.5,
+       "endAt": 1791989876965,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 115.4,
+       "heapMb": 18.6,
+       "peakRssMb": 115.4,
+       "stallMs": 0.5,
+       "endAt": 1791989876966,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 116,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 263,
+     "memory": {
+      "nodePeakMb": 116,
+      "treePeakSampledMb": 116,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 4.9,
+      "p95": 13.9,
+      "max": 13.9
+     },
+     "rep": 2
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 175,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 1,
+       "rssMb": 105.5,
+       "heapMb": 12.2,
+       "peakRssMb": 105.5,
+       "stallMs": 1,
+       "endAt": 1791989877195,
+       "httpMaxMs": 5.8
+      },
+      {
+       "phase": "scan",
+       "ms": 43.6,
+       "rssMb": 107.3,
+       "heapMb": 13.2,
+       "peakRssMb": 107.3,
+       "stallMs": 1.2,
+       "endAt": 1791989877239,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 107.4,
+       "heapMb": 14.1,
+       "peakRssMb": 107.4,
+       "stallMs": 0.9,
+       "endAt": 1791989877240,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 107.8,
+       "rssMb": 128.1,
+       "heapMb": 21.6,
+       "peakRssMb": 128.1,
+       "stallMs": 68.7,
+       "endAt": 1791989877347,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 103,
+        "hashMs": 1,
+        "extractMs": 100,
+        "writeMs": 4
+       },
+       "httpMaxMs": 118.7
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9.5,
+       "rssMb": 128.5,
+       "heapMb": 21.7,
+       "peakRssMb": 128.5,
+       "stallMs": 9.5,
+       "endAt": 1791989877357
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 128.5,
+       "heapMb": 21.7,
+       "peakRssMb": 128.5,
+       "stallMs": 0.2,
+       "endAt": 1791989877357
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 128.5,
+       "heapMb": 21.8,
+       "peakRssMb": 128.5,
+       "stallMs": 0.3,
+       "endAt": 1791989877357
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.7,
+       "rssMb": 130.5,
+       "heapMb": 21.1,
+       "peakRssMb": 130.5,
+       "stallMs": 6.7,
+       "endAt": 1791989877364
+      },
+      {
+       "phase": "edges",
+       "ms": 16.7,
+       "rssMb": 130.5,
+       "heapMb": 21.1,
+       "peakRssMb": 130.5,
+       "stallMs": 16.7,
+       "endAt": 1791989877364,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 130.5,
+       "heapMb": 21.2,
+       "peakRssMb": 130.5,
+       "stallMs": 0.1,
+       "endAt": 1791989877364,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 130.5,
+       "heapMb": 21.2,
+       "peakRssMb": 130.5,
+       "stallMs": 0.1,
+       "endAt": 1791989877364,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.5,
+       "rssMb": 130.7,
+       "heapMb": 25.5,
+       "peakRssMb": 130.7,
+       "stallMs": 3.5,
+       "endAt": 1791989877368,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 131,
+       "heapMb": 25.5,
+       "peakRssMb": 131,
+       "stallMs": 0.5,
+       "endAt": 1791989877368,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 131,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 370,
+     "memory": {
+      "nodePeakMb": 131,
+      "treePeakSampledMb": 131,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 5.8,
+      "p95": 118.7,
+      "max": 118.7
+     },
+     "rep": 2
+    },
+    {
+     "mode": "cold",
+     "wallMs": 176,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.5,
+       "heapMb": 12.2,
+       "peakRssMb": 104.5,
+       "stallMs": 0.1,
+       "endAt": 1791989877612,
+       "httpMaxMs": 4.8
+      },
+      {
+       "phase": "scan",
+       "ms": 45.3,
+       "rssMb": 106,
+       "heapMb": 13.1,
+       "peakRssMb": 106,
+       "stallMs": 1.7,
+       "endAt": 1791989877657,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 106.1,
+       "heapMb": 13.3,
+       "peakRssMb": 106.1,
+       "stallMs": 0.9,
+       "endAt": 1791989877658,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 105.9,
+       "rssMb": 126.8,
+       "heapMb": 21.6,
+       "peakRssMb": 126.8,
+       "stallMs": 49.6,
+       "endAt": 1791989877764,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 101,
+        "hashMs": 1,
+        "extractMs": 98,
+        "writeMs": 4
+       },
+       "httpMaxMs": 120.9
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 12.1,
+       "rssMb": 127.8,
+       "heapMb": 21.4,
+       "peakRssMb": 127.8,
+       "stallMs": 12.1,
+       "endAt": 1791989877776
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 127.8,
+       "heapMb": 21.5,
+       "peakRssMb": 127.8,
+       "stallMs": 0.2,
+       "endAt": 1791989877776
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 127.8,
+       "heapMb": 21.6,
+       "peakRssMb": 127.8,
+       "stallMs": 0.3,
+       "endAt": 1791989877777
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.5,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 6.5,
+       "endAt": 1791989877783
+      },
+      {
+       "phase": "edges",
+       "ms": 19.1,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 19.1,
+       "endAt": 1791989877783,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 0.1,
+       "endAt": 1791989877783,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 129.6,
+       "heapMb": 20.7,
+       "peakRssMb": 129.6,
+       "stallMs": 0.1,
+       "endAt": 1791989877783,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.5,
+       "rssMb": 129.8,
+       "heapMb": 25,
+       "peakRssMb": 129.8,
+       "stallMs": 3.5,
+       "endAt": 1791989877787,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 129.9,
+       "heapMb": 25,
+       "peakRssMb": 129.9,
+       "stallMs": 0.3,
+       "endAt": 1791989877787,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 130,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 378,
+     "memory": {
+      "nodePeakMb": 130,
+      "treePeakSampledMb": 130,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 4.8,
+      "p95": 120.9,
+      "max": 120.9
+     },
+     "rep": 3
+    },
+    {
+     "mode": "warm",
+     "wallMs": 63,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.3,
+       "rssMb": 104.4,
+       "heapMb": 12.2,
+       "peakRssMb": 104.4,
+       "stallMs": 0.3,
+       "endAt": 1791989878030,
+       "httpMaxMs": 4.5
+      },
+      {
+       "phase": "scan",
+       "ms": 39.9,
+       "rssMb": 106.1,
+       "heapMb": 13.2,
+       "peakRssMb": 106.1,
+       "stallMs": 0.8,
+       "endAt": 1791989878070,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 106.2,
+       "heapMb": 13.7,
+       "peakRssMb": 106.2,
+       "stallMs": 0.8,
+       "endAt": 1791989878071,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 0.2,
+       "rssMb": 106.2,
+       "heapMb": 13.4,
+       "peakRssMb": 106.2,
+       "stallMs": 0,
+       "endAt": 1791989878071,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9.6,
+       "rssMb": 112,
+       "heapMb": 14.8,
+       "peakRssMb": 112,
+       "stallMs": 9.6,
+       "endAt": 1791989878081
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 112.1,
+       "heapMb": 14.8,
+       "peakRssMb": 112.1,
+       "stallMs": 0.2,
+       "endAt": 1791989878081
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 112.1,
+       "heapMb": 14.9,
+       "peakRssMb": 112.1,
+       "stallMs": 0.3,
+       "endAt": 1791989878081
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.6,
+       "rssMb": 114,
+       "heapMb": 17.9,
+       "peakRssMb": 114,
+       "stallMs": 6.6,
+       "endAt": 1791989878088
+      },
+      {
+       "phase": "edges",
+       "ms": 16.8,
+       "rssMb": 114,
+       "heapMb": 17.9,
+       "peakRssMb": 114,
+       "stallMs": 16.8,
+       "endAt": 1791989878088,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": 9.5
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 114,
+       "heapMb": 17.9,
+       "peakRssMb": 114,
+       "stallMs": 0.1,
+       "endAt": 1791989878088,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 114,
+       "heapMb": 17.9,
+       "peakRssMb": 114,
+       "stallMs": 0.1,
+       "endAt": 1791989878088,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 4.3,
+       "rssMb": 115.3,
+       "heapMb": 18.5,
+       "peakRssMb": 115.3,
+       "stallMs": 4.3,
+       "endAt": 1791989878092,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 115.6,
+       "heapMb": 18.6,
+       "peakRssMb": 115.6,
+       "stallMs": 0.5,
+       "endAt": 1791989878093,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 116,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 265,
+     "memory": {
+      "nodePeakMb": 116,
+      "treePeakSampledMb": 116,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 4.5,
+      "p95": 9.5,
+      "max": 9.5
+     },
+     "rep": 3
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 168,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 485
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.8,
+       "rssMb": 104.7,
+       "heapMb": 12.2,
+       "peakRssMb": 104.7,
+       "stallMs": 0.8,
+       "endAt": 1791989878336,
+       "httpMaxMs": 5.6
+      },
+      {
+       "phase": "scan",
+       "ms": 40.3,
+       "rssMb": 106.5,
+       "heapMb": 13.2,
+       "peakRssMb": 106.5,
+       "stallMs": 1.1,
+       "endAt": 1791989878376,
+       "counts": {
+        "seen": 121,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.8,
+       "rssMb": 106.5,
+       "heapMb": 14.1,
+       "peakRssMb": 106.5,
+       "stallMs": 0.8,
+       "endAt": 1791989878377,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 105.4,
+       "rssMb": 127.3,
+       "heapMb": 18.2,
+       "peakRssMb": 127.3,
+       "stallMs": 67.5,
+       "endAt": 1791989878482,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2362624,
+        "refs": 946,
+        "identifiers": 205,
+        "readMs": 101,
+        "hashMs": 1,
+        "extractMs": 98,
+        "writeMs": 4
+       },
+       "httpMaxMs": 112.4
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 9.3,
+       "rssMb": 127.6,
+       "heapMb": 25.3,
+       "peakRssMb": 127.6,
+       "stallMs": 9.3,
+       "endAt": 1791989878492
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 127.6,
+       "heapMb": 25.3,
+       "peakRssMb": 127.6,
+       "stallMs": 0.2,
+       "endAt": 1791989878492
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 127.6,
+       "heapMb": 25.5,
+       "peakRssMb": 127.6,
+       "stallMs": 0.3,
+       "endAt": 1791989878492
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.3,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 6.3,
+       "endAt": 1791989878499
+      },
+      {
+       "phase": "edges",
+       "ms": 16.2,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 16.2,
+       "endAt": 1791989878499,
+       "counts": {
+        "edges": 485
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 0.1,
+       "endAt": 1791989878499,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 129,
+       "heapMb": 24.3,
+       "peakRssMb": 129,
+       "stallMs": 0.1,
+       "endAt": 1791989878499,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.5,
+       "rssMb": 129.5,
+       "heapMb": 21.2,
+       "peakRssMb": 129.5,
+       "stallMs": 3.5,
+       "endAt": 1791989878502,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.5,
+       "rssMb": 129.7,
+       "heapMb": 21.2,
+       "peakRssMb": 129.7,
+       "stallMs": 0.5,
+       "endAt": 1791989878503,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 130,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 26,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 119,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "9c56341e83a5e6df",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "31274c9e6b5f1c28",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 370,
+     "memory": {
+      "nodePeakMb": 130,
+      "treePeakSampledMb": 130,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 5.6,
+      "p95": 112.4,
+      "max": 112.4
+     },
+     "rep": 3
+    }
+   ]
+  },
+  {
+   "name": "reale-Desktop",
+   "roots": [
+    "/Users/me/Desktop"
+   ],
+   "repeat": 3,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 32813,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 105073,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55755
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 106.2,
+       "heapMb": 12.2,
+       "peakRssMb": 106.2,
+       "stallMs": 0.1,
+       "endAt": 1791990023915,
+       "httpMaxMs": 7.4
+      },
+      {
+       "phase": "scan",
+       "ms": 1686.9,
+       "rssMb": 340.9,
+       "heapMb": 114.9,
+       "peakRssMb": 340.9,
+       "stallMs": 441.4,
+       "endAt": 1791990025602,
+       "counts": {
+        "seen": 105073,
+        "added": 105073,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 667.2
+      },
+      {
+       "phase": "projects",
+       "ms": 125.6,
+       "rssMb": 377.3,
+       "heapMb": 112.7,
+       "peakRssMb": 377.3,
+       "stallMs": 125.6,
+       "endAt": 1791990025727,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 25636.2,
+       "rssMb": 638.8,
+       "heapMb": 82.9,
+       "peakRssMb": 663.4,
+       "stallMs": 3109.2,
+       "endAt": 1791990051364,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420518,
+        "refs": 78821,
+        "identifiers": 10143,
+        "readMs": 24566,
+        "hashMs": 93,
+        "extractMs": 23462,
+        "writeMs": 966
+       },
+       "httpMaxMs": 3114.8
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1490.6,
+       "rssMb": 635.9,
+       "heapMb": 156,
+       "peakRssMb": 683.6,
+       "stallMs": 1490.6,
+       "endAt": 1791990052854
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 62.1,
+       "rssMb": 635.9,
+       "heapMb": 159,
+       "peakRssMb": 683.6,
+       "stallMs": 62.1,
+       "endAt": 1791990052916
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.5,
+       "rssMb": 635.9,
+       "heapMb": 163,
+       "peakRssMb": 683.6,
+       "stallMs": 9.5,
+       "endAt": 1791990052926
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2806.9,
+       "rssMb": 703,
+       "heapMb": 287.6,
+       "peakRssMb": 703,
+       "stallMs": 2806.9,
+       "endAt": 1791990055733
+      },
+      {
+       "phase": "edges",
+       "ms": 4369.2,
+       "rssMb": 703,
+       "heapMb": 287.6,
+       "peakRssMb": 703,
+       "stallMs": 4369.2,
+       "endAt": 1791990055733,
+       "counts": {
+        "edges": 55755
+       },
+       "httpMaxMs": 5321.1
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 703,
+       "heapMb": 287.6,
+       "peakRssMb": 703,
+       "stallMs": 0.1,
+       "endAt": 1791990055733,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.6,
+       "rssMb": 703.2,
+       "heapMb": 287.6,
+       "peakRssMb": 703.2,
+       "stallMs": 3.6,
+       "endAt": 1791990055737,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 863.8,
+       "rssMb": 816,
+       "heapMb": 385.4,
+       "peakRssMb": 862.5,
+       "stallMs": 863.8,
+       "endAt": 1791990056600,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 126.3,
+       "rssMb": 818.1,
+       "heapMb": 385.4,
+       "peakRssMb": 862.5,
+       "stallMs": 126.3,
+       "endAt": 1791990056727,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 862,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1662,
+      "imports": 6451,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10033,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "c5019fc8036fe881",
+      "links": "19c4e85beffbaba5",
+      "refpath": "777341db641d53f0",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "6dafa7467111042e",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 115.1,
+     "processMs": 33169,
+     "memory": {
+      "nodePeakMb": 862,
+      "treePeakSampledMb": 861,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 100,
+      "errors": 1,
+      "p50": 15,
+      "p95": 1091.7,
+      "max": 5321.1
+     },
+     "rep": 3,
+     "wallMsAll": [
+      31597,
+      32813,
+      33203
+     ],
+     "processMsAll": [
+      31935,
+      33169,
+      33560
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "warm",
+     "wallMs": 7188,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 26.7,
+       "rssMb": 137.1,
+       "heapMb": 12.2,
+       "peakRssMb": 137.1,
+       "stallMs": 26.7,
+       "endAt": 1791989912452,
+       "httpMaxMs": 31.4
+      },
+      {
+       "phase": "scan",
+       "ms": 1519.7,
+       "rssMb": 437.3,
+       "heapMb": 176.9,
+       "peakRssMb": 437.3,
+       "stallMs": 395,
+       "endAt": 1791989913972,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 6017.6
+      },
+      {
+       "phase": "projects",
+       "ms": 88.3,
+       "rssMb": 486.5,
+       "heapMb": 201.7,
+       "peakRssMb": 486.5,
+       "stallMs": 88.3,
+       "endAt": 1791989914060,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 32,
+       "rssMb": 498.5,
+       "heapMb": 207.3,
+       "peakRssMb": 498.5,
+       "stallMs": 22,
+       "endAt": 1791989914092,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1456.3,
+       "rssMb": 580,
+       "heapMb": 308.4,
+       "peakRssMb": 580,
+       "stallMs": 1456.3,
+       "endAt": 1791989915549
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 16.1,
+       "rssMb": 578.2,
+       "heapMb": 247.7,
+       "peakRssMb": 580.4,
+       "stallMs": 16.1,
+       "endAt": 1791989915565
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.8,
+       "rssMb": 578.4,
+       "heapMb": 253,
+       "peakRssMb": 580.4,
+       "stallMs": 9.8,
+       "endAt": 1791989915574
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2935.2,
+       "rssMb": 742.8,
+       "heapMb": 419.9,
+       "peakRssMb": 742.8,
+       "stallMs": 2935.2,
+       "endAt": 1791989918510
+      },
+      {
+       "phase": "edges",
+       "ms": 4417.4,
+       "rssMb": 742.8,
+       "heapMb": 419.9,
+       "peakRssMb": 742.8,
+       "stallMs": 4417.4,
+       "endAt": 1791989918510,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 742.8,
+       "heapMb": 419.9,
+       "peakRssMb": 742.8,
+       "stallMs": 0.2,
+       "endAt": 1791989918510,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.6,
+       "rssMb": 743,
+       "heapMb": 419.9,
+       "peakRssMb": 743,
+       "stallMs": 3.6,
+       "endAt": 1791989918513,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 821.1,
+       "rssMb": 859.6,
+       "heapMb": 528.5,
+       "peakRssMb": 903.8,
+       "stallMs": 821.1,
+       "endAt": 1791989919335,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 276.1,
+       "rssMb": 878.3,
+       "heapMb": 528.5,
+       "peakRssMb": 903.8,
+       "stallMs": 276.1,
+       "endAt": 1791989919611,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 920,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.1,
+     "processMs": 7561,
+     "memory": {
+      "nodePeakMb": 920,
+      "treePeakSampledMb": 920,
+      "nativePeakSampledMb": 105
+     },
+     "http": {
+      "probes": 26,
+      "errors": 1,
+      "p50": 0.6,
+      "p95": 103.3,
+      "max": 6017.6
+     },
+     "rep": 1,
+     "wallMsAll": [
+      6887,
+      7188,
+      7315
+     ],
+     "processMsAll": [
+      7238,
+      7561,
+      7687
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 32039,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 1,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 188.9,
+       "rssMb": 219.6,
+       "heapMb": 12.3,
+       "peakRssMb": 219.6,
+       "stallMs": 188.9,
+       "endAt": 1791989920247,
+       "httpMaxMs": 193.8
+      },
+      {
+       "phase": "scan",
+       "ms": 1543.1,
+       "rssMb": 498.9,
+       "heapMb": 176.8,
+       "peakRssMb": 498.9,
+       "stallMs": 363.2,
+       "endAt": 1791989921790,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 1,
+        "removed": 0
+       },
+       "httpMaxMs": 556.9
+      },
+      {
+       "phase": "projects",
+       "ms": 94.3,
+       "rssMb": 535.8,
+       "heapMb": 201.6,
+       "peakRssMb": 535.8,
+       "stallMs": 94.3,
+       "endAt": 1791989921885,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 25302.3,
+       "rssMb": 587.8,
+       "heapMb": 105.5,
+       "peakRssMb": 763.7,
+       "stallMs": 3147.7,
+       "endAt": 1791989947187,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420518,
+        "refs": 78821,
+        "identifiers": 10143,
+        "readMs": 24452,
+        "hashMs": 100,
+        "extractMs": 23345,
+        "writeMs": 746
+       },
+       "httpMaxMs": 3163.9
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1356.3,
+       "rssMb": 659,
+       "heapMb": 324.2,
+       "peakRssMb": 763.7,
+       "stallMs": 1356.3,
+       "endAt": 1791989948543
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 18.2,
+       "rssMb": 657.1,
+       "heapMb": 263.7,
+       "peakRssMb": 763.7,
+       "stallMs": 18.2,
+       "endAt": 1791989948561
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.7,
+       "rssMb": 657.3,
+       "heapMb": 269,
+       "peakRssMb": 763.7,
+       "stallMs": 9.7,
+       "endAt": 1791989948571
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2490,
+       "rssMb": 719.4,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 2490,
+       "endAt": 1791989951061
+      },
+      {
+       "phase": "edges",
+       "ms": 3874.3,
+       "rssMb": 719.4,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 3874.3,
+       "endAt": 1791989951061,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": 4901.1
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 719.4,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 0.2,
+       "endAt": 1791989951061,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.6,
+       "rssMb": 719.5,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 3.6,
+       "endAt": 1791989951065,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 714,
+       "rssMb": 769.1,
+       "heapMb": 370.9,
+       "peakRssMb": 769.1,
+       "stallMs": 714,
+       "endAt": 1791989951779,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 317.9,
+       "rssMb": 791.9,
+       "heapMb": 370.9,
+       "peakRssMb": 791.9,
+       "stallMs": 317.9,
+       "endAt": 1791989952097,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 792,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.2,
+     "processMs": 32384,
+     "memory": {
+      "nodePeakMb": 792,
+      "treePeakSampledMb": 792,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 97,
+      "errors": 1,
+      "p50": 10.2,
+      "p95": 1074.2,
+      "max": 4901.1
+     },
+     "rep": 1,
+     "wallMsAll": [
+      31690,
+      32039,
+      33245
+     ],
+     "processMsAll": [
+      32040,
+      32384,
+      33615
+     ],
+     "fingerprintsStable": true
+    }
+   ],
+   "raw": [
+    {
+     "mode": "cold",
+     "wallMs": 33203,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 105073,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55755
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.1,
+       "heapMb": 12.2,
+       "peakRssMb": 104.1,
+       "stallMs": 0.1,
+       "endAt": 1791989878762,
+       "httpMaxMs": 4.8
+      },
+      {
+       "phase": "scan",
+       "ms": 1916.4,
+       "rssMb": 340,
+       "heapMb": 100.9,
+       "peakRssMb": 340,
+       "stallMs": 375,
+       "endAt": 1791989880679,
+       "counts": {
+        "seen": 105073,
+        "added": 105073,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 580.7
+      },
+      {
+       "phase": "projects",
+       "ms": 96.9,
+       "rssMb": 371.2,
+       "heapMb": 146,
+       "peakRssMb": 371.2,
+       "stallMs": 96.9,
+       "endAt": 1791989880775,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 25501.5,
+       "rssMb": 683.7,
+       "heapMb": 254.6,
+       "peakRssMb": 723.5,
+       "stallMs": 3170.7,
+       "endAt": 1791989906277,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420434,
+        "refs": 78821,
+        "identifiers": 10142,
+        "readMs": 24411,
+        "hashMs": 95,
+        "extractMs": 23175,
+        "writeMs": 995
+       },
+       "httpMaxMs": 3204.7
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1724.4,
+       "rssMb": 699.3,
+       "heapMb": 173.1,
+       "peakRssMb": 755.9,
+       "stallMs": 1724.4,
+       "endAt": 1791989908001
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 61.9,
+       "rssMb": 699.4,
+       "heapMb": 176.1,
+       "peakRssMb": 755.9,
+       "stallMs": 61.9,
+       "endAt": 1791989908063
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.7,
+       "rssMb": 699.4,
+       "heapMb": 180.1,
+       "peakRssMb": 755.9,
+       "stallMs": 9.7,
+       "endAt": 1791989908073
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2941.1,
+       "rssMb": 725.6,
+       "heapMb": 299.8,
+       "peakRssMb": 755.9,
+       "stallMs": 2941.1,
+       "endAt": 1791989911014
+      },
+      {
+       "phase": "edges",
+       "ms": 4737.2,
+       "rssMb": 725.6,
+       "heapMb": 299.8,
+       "peakRssMb": 755.9,
+       "stallMs": 4737.2,
+       "endAt": 1791989911014,
+       "counts": {
+        "edges": 55755
+       },
+       "httpMaxMs": 5643.5
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 725.6,
+       "heapMb": 299.8,
+       "peakRssMb": 755.9,
+       "stallMs": 0.2,
+       "endAt": 1791989911014,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 8,
+       "rssMb": 725.8,
+       "heapMb": 299.8,
+       "peakRssMb": 755.9,
+       "stallMs": 8,
+       "endAt": 1791989911022,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 814.1,
+       "rssMb": 802.9,
+       "heapMb": 399.5,
+       "peakRssMb": 843.4,
+       "stallMs": 814.1,
+       "endAt": 1791989911836,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 127.6,
+       "rssMb": 805.4,
+       "heapMb": 399.5,
+       "peakRssMb": 843.4,
+       "stallMs": 127.6,
+       "endAt": 1791989911964,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 845,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1662,
+      "imports": 6451,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10033,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "c5019fc8036fe881",
+      "links": "19c4e85beffbaba5",
+      "refpath": "777341db641d53f0",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "6dafa7467111042e",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 115.1,
+     "processMs": 33560,
+     "memory": {
+      "nodePeakMb": 845,
+      "treePeakSampledMb": 836,
+      "nativePeakSampledMb": 105
+     },
+     "http": {
+      "probes": 110,
+      "errors": 1,
+      "p50": 6.6,
+      "p95": 1013.6,
+      "max": 5643.5
+     },
+     "rep": 1
+    },
+    {
+     "mode": "warm",
+     "wallMs": 7188,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 26.7,
+       "rssMb": 137.1,
+       "heapMb": 12.2,
+       "peakRssMb": 137.1,
+       "stallMs": 26.7,
+       "endAt": 1791989912452,
+       "httpMaxMs": 31.4
+      },
+      {
+       "phase": "scan",
+       "ms": 1519.7,
+       "rssMb": 437.3,
+       "heapMb": 176.9,
+       "peakRssMb": 437.3,
+       "stallMs": 395,
+       "endAt": 1791989913972,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 6017.6
+      },
+      {
+       "phase": "projects",
+       "ms": 88.3,
+       "rssMb": 486.5,
+       "heapMb": 201.7,
+       "peakRssMb": 486.5,
+       "stallMs": 88.3,
+       "endAt": 1791989914060,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 32,
+       "rssMb": 498.5,
+       "heapMb": 207.3,
+       "peakRssMb": 498.5,
+       "stallMs": 22,
+       "endAt": 1791989914092,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1456.3,
+       "rssMb": 580,
+       "heapMb": 308.4,
+       "peakRssMb": 580,
+       "stallMs": 1456.3,
+       "endAt": 1791989915549
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 16.1,
+       "rssMb": 578.2,
+       "heapMb": 247.7,
+       "peakRssMb": 580.4,
+       "stallMs": 16.1,
+       "endAt": 1791989915565
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.8,
+       "rssMb": 578.4,
+       "heapMb": 253,
+       "peakRssMb": 580.4,
+       "stallMs": 9.8,
+       "endAt": 1791989915574
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2935.2,
+       "rssMb": 742.8,
+       "heapMb": 419.9,
+       "peakRssMb": 742.8,
+       "stallMs": 2935.2,
+       "endAt": 1791989918510
+      },
+      {
+       "phase": "edges",
+       "ms": 4417.4,
+       "rssMb": 742.8,
+       "heapMb": 419.9,
+       "peakRssMb": 742.8,
+       "stallMs": 4417.4,
+       "endAt": 1791989918510,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 742.8,
+       "heapMb": 419.9,
+       "peakRssMb": 742.8,
+       "stallMs": 0.2,
+       "endAt": 1791989918510,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.6,
+       "rssMb": 743,
+       "heapMb": 419.9,
+       "peakRssMb": 743,
+       "stallMs": 3.6,
+       "endAt": 1791989918513,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 821.1,
+       "rssMb": 859.6,
+       "heapMb": 528.5,
+       "peakRssMb": 903.8,
+       "stallMs": 821.1,
+       "endAt": 1791989919335,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 276.1,
+       "rssMb": 878.3,
+       "heapMb": 528.5,
+       "peakRssMb": 903.8,
+       "stallMs": 276.1,
+       "endAt": 1791989919611,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 920,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.1,
+     "processMs": 7561,
+     "memory": {
+      "nodePeakMb": 920,
+      "treePeakSampledMb": 920,
+      "nativePeakSampledMb": 105
+     },
+     "http": {
+      "probes": 26,
+      "errors": 1,
+      "p50": 0.6,
+      "p95": 103.3,
+      "max": 6017.6
+     },
+     "rep": 1
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 32039,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 1,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 188.9,
+       "rssMb": 219.6,
+       "heapMb": 12.3,
+       "peakRssMb": 219.6,
+       "stallMs": 188.9,
+       "endAt": 1791989920247,
+       "httpMaxMs": 193.8
+      },
+      {
+       "phase": "scan",
+       "ms": 1543.1,
+       "rssMb": 498.9,
+       "heapMb": 176.8,
+       "peakRssMb": 498.9,
+       "stallMs": 363.2,
+       "endAt": 1791989921790,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 1,
+        "removed": 0
+       },
+       "httpMaxMs": 556.9
+      },
+      {
+       "phase": "projects",
+       "ms": 94.3,
+       "rssMb": 535.8,
+       "heapMb": 201.6,
+       "peakRssMb": 535.8,
+       "stallMs": 94.3,
+       "endAt": 1791989921885,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 25302.3,
+       "rssMb": 587.8,
+       "heapMb": 105.5,
+       "peakRssMb": 763.7,
+       "stallMs": 3147.7,
+       "endAt": 1791989947187,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420518,
+        "refs": 78821,
+        "identifiers": 10143,
+        "readMs": 24452,
+        "hashMs": 100,
+        "extractMs": 23345,
+        "writeMs": 746
+       },
+       "httpMaxMs": 3163.9
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1356.3,
+       "rssMb": 659,
+       "heapMb": 324.2,
+       "peakRssMb": 763.7,
+       "stallMs": 1356.3,
+       "endAt": 1791989948543
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 18.2,
+       "rssMb": 657.1,
+       "heapMb": 263.7,
+       "peakRssMb": 763.7,
+       "stallMs": 18.2,
+       "endAt": 1791989948561
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.7,
+       "rssMb": 657.3,
+       "heapMb": 269,
+       "peakRssMb": 763.7,
+       "stallMs": 9.7,
+       "endAt": 1791989948571
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2490,
+       "rssMb": 719.4,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 2490,
+       "endAt": 1791989951061
+      },
+      {
+       "phase": "edges",
+       "ms": 3874.3,
+       "rssMb": 719.4,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 3874.3,
+       "endAt": 1791989951061,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": 4901.1
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 719.4,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 0.2,
+       "endAt": 1791989951061,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.6,
+       "rssMb": 719.5,
+       "heapMb": 236.5,
+       "peakRssMb": 763.7,
+       "stallMs": 3.6,
+       "endAt": 1791989951065,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 714,
+       "rssMb": 769.1,
+       "heapMb": 370.9,
+       "peakRssMb": 769.1,
+       "stallMs": 714,
+       "endAt": 1791989951779,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 317.9,
+       "rssMb": 791.9,
+       "heapMb": 370.9,
+       "peakRssMb": 791.9,
+       "stallMs": 317.9,
+       "endAt": 1791989952097,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 792,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.2,
+     "processMs": 32384,
+     "memory": {
+      "nodePeakMb": 792,
+      "treePeakSampledMb": 792,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 97,
+      "errors": 1,
+      "p50": 10.2,
+      "p95": 1074.2,
+      "max": 4901.1
+     },
+     "rep": 1
+    },
+    {
+     "mode": "cold",
+     "wallMs": 31597,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 105073,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55755
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.7,
+       "heapMb": 12.2,
+       "peakRssMb": 104.7,
+       "stallMs": 0.1,
+       "endAt": 1791989952496,
+       "httpMaxMs": 4.6
+      },
+      {
+       "phase": "scan",
+       "ms": 1411.3,
+       "rssMb": 340.3,
+       "heapMb": 97.1,
+       "peakRssMb": 340.3,
+       "stallMs": 352.1,
+       "endAt": 1791989953908,
+       "counts": {
+        "seen": 105073,
+        "added": 105073,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 498.9
+      },
+      {
+       "phase": "projects",
+       "ms": 90.2,
+       "rssMb": 368.5,
+       "heapMb": 142.2,
+       "peakRssMb": 368.5,
+       "stallMs": 90.2,
+       "endAt": 1791989953998,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 24752.8,
+       "rssMb": 677.4,
+       "heapMb": 173.3,
+       "peakRssMb": 694,
+       "stallMs": 3148.1,
+       "endAt": 1791989978751,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420518,
+        "refs": 78821,
+        "identifiers": 10143,
+        "readMs": 23877,
+        "hashMs": 91,
+        "extractMs": 22836,
+        "writeMs": 779
+       },
+       "httpMaxMs": 3163.8
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1580.4,
+       "rssMb": 720.2,
+       "heapMb": 176.5,
+       "peakRssMb": 791.3,
+       "stallMs": 1580.4,
+       "endAt": 1791989980331
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 61.9,
+       "rssMb": 720.2,
+       "heapMb": 179.6,
+       "peakRssMb": 791.3,
+       "stallMs": 61.9,
+       "endAt": 1791989980393
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 10.8,
+       "rssMb": 720.2,
+       "heapMb": 121.4,
+       "peakRssMb": 791.3,
+       "stallMs": 10.8,
+       "endAt": 1791989980404
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2730.8,
+       "rssMb": 741.3,
+       "heapMb": 202.1,
+       "peakRssMb": 791.3,
+       "stallMs": 2730.8,
+       "endAt": 1791989983135
+      },
+      {
+       "phase": "edges",
+       "ms": 4384.2,
+       "rssMb": 741.3,
+       "heapMb": 202.2,
+       "peakRssMb": 791.3,
+       "stallMs": 4384.2,
+       "endAt": 1791989983135,
+       "counts": {
+        "edges": 55755
+       },
+       "httpMaxMs": 5298.4
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 741.3,
+       "heapMb": 202.2,
+       "peakRssMb": 791.3,
+       "stallMs": 0.2,
+       "endAt": 1791989983135,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 4.3,
+       "rssMb": 741.5,
+       "heapMb": 202.2,
+       "peakRssMb": 791.3,
+       "stallMs": 4.3,
+       "endAt": 1791989983140,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 827.8,
+       "rssMb": 766.4,
+       "heapMb": 301.6,
+       "peakRssMb": 810.6,
+       "stallMs": 827.8,
+       "endAt": 1791989983967,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 125.5,
+       "rssMb": 768.6,
+       "heapMb": 301.6,
+       "peakRssMb": 810.6,
+       "stallMs": 125.5,
+       "endAt": 1791989984093,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 811,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1662,
+      "imports": 6451,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10033,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "c5019fc8036fe881",
+      "links": "19c4e85beffbaba5",
+      "refpath": "777341db641d53f0",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "6dafa7467111042e",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 115.1,
+     "processMs": 31935,
+     "memory": {
+      "nodePeakMb": 811,
+      "treePeakSampledMb": 809,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 94,
+      "errors": 1,
+      "p50": 20.8,
+      "p95": 1059.5,
+      "max": 5298.4
+     },
+     "rep": 2
+    },
+    {
+     "mode": "warm",
+     "wallMs": 6887,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 18.3,
+       "rssMb": 136.7,
+       "heapMb": 12.2,
+       "peakRssMb": 136.7,
+       "stallMs": 18.3,
+       "endAt": 1791989984483,
+       "httpMaxMs": 23.3
+      },
+      {
+       "phase": "scan",
+       "ms": 1549,
+       "rssMb": 460.5,
+       "heapMb": 176.2,
+       "peakRssMb": 460.5,
+       "stallMs": 381.3,
+       "endAt": 1791989986032,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 5679.8
+      },
+      {
+       "phase": "projects",
+       "ms": 89.6,
+       "rssMb": 479.2,
+       "heapMb": 221.1,
+       "peakRssMb": 479.2,
+       "stallMs": 89.6,
+       "endAt": 1791989986122,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 32.3,
+       "rssMb": 494.8,
+       "heapMb": 176.2,
+       "peakRssMb": 494.8,
+       "stallMs": 22.3,
+       "endAt": 1791989986154,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1566.1,
+       "rssMb": 579.3,
+       "heapMb": 271.6,
+       "peakRssMb": 579.3,
+       "stallMs": 1566.1,
+       "endAt": 1791989987720
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 25.2,
+       "rssMb": 579.6,
+       "heapMb": 276.5,
+       "peakRssMb": 579.6,
+       "stallMs": 25.2,
+       "endAt": 1791989987745
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 10.5,
+       "rssMb": 579.9,
+       "heapMb": 281.8,
+       "peakRssMb": 579.9,
+       "stallMs": 10.5,
+       "endAt": 1791989987756
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2521.7,
+       "rssMb": 755.1,
+       "heapMb": 445.2,
+       "peakRssMb": 755.1,
+       "stallMs": 2521.7,
+       "endAt": 1791989990278
+      },
+      {
+       "phase": "edges",
+       "ms": 4123.6,
+       "rssMb": 755.1,
+       "heapMb": 445.2,
+       "peakRssMb": 755.1,
+       "stallMs": 4123.6,
+       "endAt": 1791989990278,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 755.1,
+       "heapMb": 445.2,
+       "peakRssMb": 755.1,
+       "stallMs": 0.1,
+       "endAt": 1791989990278,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.5,
+       "rssMb": 755.3,
+       "heapMb": 445.2,
+       "peakRssMb": 755.3,
+       "stallMs": 3.5,
+       "endAt": 1791989990281,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 785.5,
+       "rssMb": 892.3,
+       "heapMb": 590.6,
+       "peakRssMb": 892.3,
+       "stallMs": 785.5,
+       "endAt": 1791989991067,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 284.2,
+       "rssMb": 910.6,
+       "heapMb": 590.7,
+       "peakRssMb": 910.6,
+       "stallMs": 284.2,
+       "endAt": 1791989991351,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 943,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.1,
+     "processMs": 7238,
+     "memory": {
+      "nodePeakMb": 943,
+      "treePeakSampledMb": 943,
+      "nativePeakSampledMb": 108
+     },
+     "http": {
+      "probes": 27,
+      "errors": 1,
+      "p50": 0.6,
+      "p95": 88.6,
+      "max": 5679.8
+     },
+     "rep": 2
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 31690,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 182.4,
+       "rssMb": 218.9,
+       "heapMb": 12.3,
+       "peakRssMb": 218.9,
+       "stallMs": 182.4,
+       "endAt": 1791989991939,
+       "httpMaxMs": 187
+      },
+      {
+       "phase": "scan",
+       "ms": 1490.9,
+       "rssMb": 505.4,
+       "heapMb": 176.2,
+       "peakRssMb": 505.4,
+       "stallMs": 353.2,
+       "endAt": 1791989993430,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 561.6
+      },
+      {
+       "phase": "projects",
+       "ms": 97.6,
+       "rssMb": 523.9,
+       "heapMb": 221.1,
+       "peakRssMb": 523.9,
+       "stallMs": 97.6,
+       "endAt": 1791989993528,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 24935,
+       "rssMb": 751.1,
+       "heapMb": 175.9,
+       "peakRssMb": 754.4,
+       "stallMs": 3126,
+       "endAt": 1791990018463,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420518,
+        "refs": 78821,
+        "identifiers": 10143,
+        "readMs": 24098,
+        "hashMs": 91,
+        "extractMs": 23011,
+        "writeMs": 736
+       },
+       "httpMaxMs": 3133.8
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1430,
+       "rssMb": 797.7,
+       "heapMb": 361.8,
+       "peakRssMb": 797.7,
+       "stallMs": 1430,
+       "endAt": 1791990019893
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 22.3,
+       "rssMb": 797.9,
+       "heapMb": 366.8,
+       "peakRssMb": 797.9,
+       "stallMs": 22.3,
+       "endAt": 1791990019915
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 10.5,
+       "rssMb": 798.1,
+       "heapMb": 372.1,
+       "peakRssMb": 798.1,
+       "stallMs": 10.5,
+       "endAt": 1791990019925
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2462.7,
+       "rssMb": 914.1,
+       "heapMb": 211.2,
+       "peakRssMb": 948.1,
+       "stallMs": 2462.7,
+       "endAt": 1791990022388
+      },
+      {
+       "phase": "edges",
+       "ms": 3925.6,
+       "rssMb": 914.1,
+       "heapMb": 211.2,
+       "peakRssMb": 948.1,
+       "stallMs": 3925.6,
+       "endAt": 1791990022388,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": 4970.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 914.1,
+       "heapMb": 211.2,
+       "peakRssMb": 948.1,
+       "stallMs": 0.2,
+       "endAt": 1791990022388,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 6.7,
+       "rssMb": 914.1,
+       "heapMb": 211.2,
+       "peakRssMb": 948.1,
+       "stallMs": 6.7,
+       "endAt": 1791990022395,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 719.2,
+       "rssMb": 945.6,
+       "heapMb": 328.9,
+       "peakRssMb": 967.2,
+       "stallMs": 719.2,
+       "endAt": 1791990023114,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 331.8,
+       "rssMb": 947.3,
+       "heapMb": 328.9,
+       "peakRssMb": 967.2,
+       "stallMs": 331.8,
+       "endAt": 1791990023446,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 967,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.1,
+     "processMs": 32040,
+     "memory": {
+      "nodePeakMb": 967,
+      "treePeakSampledMb": 960,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 96,
+      "errors": 1,
+      "p50": 10.3,
+      "p95": 1078,
+      "max": 4970.9
+     },
+     "rep": 2
+    },
+    {
+     "mode": "cold",
+     "wallMs": 32813,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 105073,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55755
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 106.2,
+       "heapMb": 12.2,
+       "peakRssMb": 106.2,
+       "stallMs": 0.1,
+       "endAt": 1791990023915,
+       "httpMaxMs": 7.4
+      },
+      {
+       "phase": "scan",
+       "ms": 1686.9,
+       "rssMb": 340.9,
+       "heapMb": 114.9,
+       "peakRssMb": 340.9,
+       "stallMs": 441.4,
+       "endAt": 1791990025602,
+       "counts": {
+        "seen": 105073,
+        "added": 105073,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 667.2
+      },
+      {
+       "phase": "projects",
+       "ms": 125.6,
+       "rssMb": 377.3,
+       "heapMb": 112.7,
+       "peakRssMb": 377.3,
+       "stallMs": 125.6,
+       "endAt": 1791990025727,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 25636.2,
+       "rssMb": 638.8,
+       "heapMb": 82.9,
+       "peakRssMb": 663.4,
+       "stallMs": 3109.2,
+       "endAt": 1791990051364,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420518,
+        "refs": 78821,
+        "identifiers": 10143,
+        "readMs": 24566,
+        "hashMs": 93,
+        "extractMs": 23462,
+        "writeMs": 966
+       },
+       "httpMaxMs": 3114.8
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1490.6,
+       "rssMb": 635.9,
+       "heapMb": 156,
+       "peakRssMb": 683.6,
+       "stallMs": 1490.6,
+       "endAt": 1791990052854
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 62.1,
+       "rssMb": 635.9,
+       "heapMb": 159,
+       "peakRssMb": 683.6,
+       "stallMs": 62.1,
+       "endAt": 1791990052916
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 9.5,
+       "rssMb": 635.9,
+       "heapMb": 163,
+       "peakRssMb": 683.6,
+       "stallMs": 9.5,
+       "endAt": 1791990052926
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2806.9,
+       "rssMb": 703,
+       "heapMb": 287.6,
+       "peakRssMb": 703,
+       "stallMs": 2806.9,
+       "endAt": 1791990055733
+      },
+      {
+       "phase": "edges",
+       "ms": 4369.2,
+       "rssMb": 703,
+       "heapMb": 287.6,
+       "peakRssMb": 703,
+       "stallMs": 4369.2,
+       "endAt": 1791990055733,
+       "counts": {
+        "edges": 55755
+       },
+       "httpMaxMs": 5321.1
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 703,
+       "heapMb": 287.6,
+       "peakRssMb": 703,
+       "stallMs": 0.1,
+       "endAt": 1791990055733,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.6,
+       "rssMb": 703.2,
+       "heapMb": 287.6,
+       "peakRssMb": 703.2,
+       "stallMs": 3.6,
+       "endAt": 1791990055737,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 863.8,
+       "rssMb": 816,
+       "heapMb": 385.4,
+       "peakRssMb": 862.5,
+       "stallMs": 863.8,
+       "endAt": 1791990056600,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 126.3,
+       "rssMb": 818.1,
+       "heapMb": 385.4,
+       "peakRssMb": 862.5,
+       "stallMs": 126.3,
+       "endAt": 1791990056727,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 862,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1662,
+      "imports": 6451,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10033,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "c5019fc8036fe881",
+      "links": "19c4e85beffbaba5",
+      "refpath": "777341db641d53f0",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "6dafa7467111042e",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 115.1,
+     "processMs": 33169,
+     "memory": {
+      "nodePeakMb": 862,
+      "treePeakSampledMb": 861,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 100,
+      "errors": 1,
+      "p50": 15,
+      "p95": 1091.7,
+      "max": 5321.1
+     },
+     "rep": 3
+    },
+    {
+     "mode": "warm",
+     "wallMs": 7315,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 0,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 18,
+       "rssMb": 136.8,
+       "heapMb": 12.2,
+       "peakRssMb": 136.8,
+       "stallMs": 18,
+       "endAt": 1791990057123,
+       "httpMaxMs": 22.6
+      },
+      {
+       "phase": "scan",
+       "ms": 1601,
+       "rssMb": 444.3,
+       "heapMb": 174.8,
+       "peakRssMb": 444.3,
+       "stallMs": 399.7,
+       "endAt": 1791990058724,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 6052.8
+      },
+      {
+       "phase": "projects",
+       "ms": 109,
+       "rssMb": 484.5,
+       "heapMb": 199.5,
+       "peakRssMb": 484.5,
+       "stallMs": 109,
+       "endAt": 1791990058833,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 32.6,
+       "rssMb": 496.4,
+       "heapMb": 205.1,
+       "peakRssMb": 496.4,
+       "stallMs": 22.6,
+       "endAt": 1791990058866,
+       "counts": {
+        "files": 0,
+        "texts": 0,
+        "bytes": 0,
+        "refs": 0,
+        "identifiers": 0,
+        "readMs": 0,
+        "hashMs": 0,
+        "extractMs": 0,
+        "writeMs": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1481,
+       "rssMb": 617.8,
+       "heapMb": 224.3,
+       "peakRssMb": 634,
+       "stallMs": 1481,
+       "endAt": 1791990060347
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 16.1,
+       "rssMb": 617.9,
+       "heapMb": 229.2,
+       "peakRssMb": 634,
+       "stallMs": 16.1,
+       "endAt": 1791990060363
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 10.8,
+       "rssMb": 618,
+       "heapMb": 234.5,
+       "peakRssMb": 634,
+       "stallMs": 10.8,
+       "endAt": 1791990060374
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2909.6,
+       "rssMb": 675.9,
+       "heapMb": 386.7,
+       "peakRssMb": 675.9,
+       "stallMs": 2909.6,
+       "endAt": 1791990063283
+      },
+      {
+       "phase": "edges",
+       "ms": 4417.5,
+       "rssMb": 675.9,
+       "heapMb": 386.7,
+       "peakRssMb": 675.9,
+       "stallMs": 4417.5,
+       "endAt": 1791990063283,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 675.9,
+       "heapMb": 386.7,
+       "peakRssMb": 675.9,
+       "stallMs": 0.1,
+       "endAt": 1791990063283,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 6.6,
+       "rssMb": 676.1,
+       "heapMb": 386.7,
+       "peakRssMb": 676.1,
+       "stallMs": 6.6,
+       "endAt": 1791990063290,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 835.9,
+       "rssMb": 814.4,
+       "heapMb": 520.5,
+       "peakRssMb": 814.4,
+       "stallMs": 835.9,
+       "endAt": 1791990064126,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 290.4,
+       "rssMb": 833.3,
+       "heapMb": 520.5,
+       "peakRssMb": 833.3,
+       "stallMs": 290.4,
+       "endAt": 1791990064416,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 862,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.1,
+     "processMs": 7687,
+     "memory": {
+      "nodePeakMb": 862,
+      "treePeakSampledMb": 862,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 28,
+      "errors": 1,
+      "p50": 0.6,
+      "p95": 112.6,
+      "max": 6052.8
+     },
+     "rep": 3
+    },
+    {
+     "mode": "reextract",
+     "wallMs": 33245,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105073,
+      "added": 0,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90641,
+      "projects": 108,
+      "edges": 55754
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 185.7,
+       "rssMb": 219.6,
+       "heapMb": 12.2,
+       "peakRssMb": 219.6,
+       "stallMs": 185.7,
+       "endAt": 1791990065049,
+       "httpMaxMs": 190.6
+      },
+      {
+       "phase": "scan",
+       "ms": 1380.3,
+       "rssMb": 502.4,
+       "heapMb": 176.7,
+       "peakRssMb": 502.4,
+       "stallMs": 364.8,
+       "endAt": 1791990066429,
+       "counts": {
+        "seen": 105073,
+        "added": 0,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 531.3
+      },
+      {
+       "phase": "projects",
+       "ms": 91.4,
+       "rssMb": 534,
+       "heapMb": 198,
+       "peakRssMb": 534,
+       "stallMs": 91.4,
+       "endAt": 1791990066521,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 25981.9,
+       "rssMb": 609.3,
+       "heapMb": 146.5,
+       "peakRssMb": 686.4,
+       "stallMs": 3519.1,
+       "endAt": 1791990092503,
+       "counts": {
+        "files": 90641,
+        "texts": 23528,
+        "bytes": 427420518,
+        "refs": 78821,
+        "identifiers": 10143,
+        "readMs": 25111,
+        "hashMs": 101,
+        "extractMs": 23976,
+        "writeMs": 776
+       },
+       "httpMaxMs": 3539
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 1477.4,
+       "rssMb": 628.4,
+       "heapMb": 228.4,
+       "peakRssMb": 686.4,
+       "stallMs": 1477.4,
+       "endAt": 1791990093980
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 20.4,
+       "rssMb": 628.5,
+       "heapMb": 233.3,
+       "peakRssMb": 686.4,
+       "stallMs": 20.4,
+       "endAt": 1791990094000
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 10.1,
+       "rssMb": 628.5,
+       "heapMb": 238.6,
+       "peakRssMb": 686.4,
+       "stallMs": 10.1,
+       "endAt": 1791990094011
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 2967.8,
+       "rssMb": 759.4,
+       "heapMb": 380.6,
+       "peakRssMb": 759.4,
+       "stallMs": 2967.8,
+       "endAt": 1791990096978
+      },
+      {
+       "phase": "edges",
+       "ms": 4475.9,
+       "rssMb": 759.4,
+       "heapMb": 380.6,
+       "peakRssMb": 759.4,
+       "stallMs": 4475.9,
+       "endAt": 1791990096978,
+       "counts": {
+        "edges": 55754
+       },
+       "httpMaxMs": 5594.4
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 759.4,
+       "heapMb": 380.6,
+       "peakRssMb": 759.4,
+       "stallMs": 0.2,
+       "endAt": 1791990096979,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 5.1,
+       "rssMb": 759.4,
+       "heapMb": 380.6,
+       "peakRssMb": 759.4,
+       "stallMs": 5.1,
+       "endAt": 1791990096984,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 776.9,
+       "rssMb": 900.2,
+       "heapMb": 517.3,
+       "peakRssMb": 900.2,
+       "stallMs": 776.9,
+       "endAt": 1791990097761,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 347,
+       "rssMb": 922.9,
+       "heapMb": 517.4,
+       "peakRssMb": 922.9,
+       "stallMs": 347,
+       "endAt": 1791990098108,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 923,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90655,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1647,
+      "imports": 6453,
+      "links": 1084,
+      "mention": 5128,
+      "refpath": 10045,
+      "shared_id": 1342,
+      "similar": 28094,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "19c4e85beffbaba5",
+      "refpath": "9845ac55d456bf1a",
+      "mention": "68bc475dbf292163",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "8b29090bd93fa3ab",
+      "shared_id": "f09ccd6b1a297316",
+      "similar": "fc4051edc450bae9"
+     },
+     "dbMb": 122.2,
+     "processMs": 33615,
+     "memory": {
+      "nodePeakMb": 923,
+      "treePeakSampledMb": 923,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 96,
+      "errors": 1,
+      "p50": 10.5,
+      "p95": 1083.6,
+      "max": 5594.4
+     },
+     "rep": 3
+    }
+   ]
+  }
+ ]
+}

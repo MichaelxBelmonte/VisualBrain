@@ -1,0 +1,466 @@
+{
+ "label": "dopo-native-desktop",
+ "date": "2026-10-14T15:08:38.577Z",
+ "src": "src",
+ "engine": "native",
+ "machine": {
+  "cpu": "Apple M5 Pro",
+  "cores": 15,
+  "memGb": 24,
+  "node": "v24.21.0",
+  "arch": "arm64"
+ },
+ "cases": [
+  {
+   "name": "reale-Desktop",
+   "roots": [
+    "/Users/me/Desktop"
+   ],
+   "repeat": 1,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 36089,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105078,
+      "added": 105078,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 90646,
+      "projects": 108,
+      "edges": 55807
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 107.1,
+       "heapMb": 12.2,
+       "peakRssMb": 107.1,
+       "stallMs": 0.1,
+       "endAt": 1791990518651,
+       "httpMaxMs": 7.5
+      },
+      {
+       "phase": "scan",
+       "ms": 1869.4,
+       "rssMb": 337.1,
+       "heapMb": 112.3,
+       "peakRssMb": 337.1,
+       "stallMs": 371.7,
+       "endAt": 1791990520520,
+       "counts": {
+        "seen": 105078,
+        "added": 105078,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 573.8
+      },
+      {
+       "phase": "projects",
+       "ms": 103.3,
+       "rssMb": 375.5,
+       "heapMb": 113.1,
+       "peakRssMb": 375.5,
+       "stallMs": 103.3,
+       "endAt": 1791990520624,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 27153.3,
+       "rssMb": 633.3,
+       "heapMb": 217.3,
+       "peakRssMb": 736.7,
+       "stallMs": 3216.3,
+       "endAt": 1791990547777,
+       "counts": {
+        "files": 90646,
+        "texts": 23533,
+        "bytes": 427500990,
+        "refs": 78854,
+        "identifiers": 10193,
+        "readMs": 26048,
+        "hashMs": 95,
+        "extractMs": 24660,
+        "writeMs": 1011
+       },
+       "httpMaxMs": 3233
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 2230.7,
+       "rssMb": 690.7,
+       "heapMb": 145.7,
+       "peakRssMb": 736.7,
+       "stallMs": 2230.7,
+       "endAt": 1791990550008
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 81.2,
+       "rssMb": 690.7,
+       "heapMb": 148.8,
+       "peakRssMb": 736.7,
+       "stallMs": 81.2,
+       "endAt": 1791990550089
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 19.6,
+       "rssMb": 690.8,
+       "heapMb": 152.8,
+       "peakRssMb": 736.7,
+       "stallMs": 19.6,
+       "endAt": 1791990550108
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 3274.9,
+       "rssMb": 716.5,
+       "heapMb": 310.6,
+       "peakRssMb": 736.7,
+       "stallMs": 3274.9,
+       "endAt": 1791990553383
+      },
+      {
+       "phase": "edges",
+       "ms": 5606.5,
+       "rssMb": 716.5,
+       "heapMb": 310.6,
+       "peakRssMb": 736.7,
+       "stallMs": 5606.5,
+       "endAt": 1791990553383,
+       "counts": {
+        "edges": 55807
+       },
+       "httpMaxMs": 6960.9
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 716.5,
+       "heapMb": 310.6,
+       "peakRssMb": 736.7,
+       "stallMs": 0.2,
+       "endAt": 1791990553384,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 6.6,
+       "rssMb": 716.6,
+       "heapMb": 310.7,
+       "peakRssMb": 736.7,
+       "stallMs": 6.6,
+       "endAt": 1791990553390,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 1166.4,
+       "rssMb": 673.7,
+       "heapMb": 426.7,
+       "peakRssMb": 823.8,
+       "stallMs": 1166.4,
+       "endAt": 1791990554557,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 180.1,
+       "rssMb": 676.6,
+       "heapMb": 426.7,
+       "peakRssMb": 823.8,
+       "stallMs": 180.1,
+       "endAt": 1791990554737,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 824,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90660,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1936,
+      "external": 1663,
+      "imports": 6451,
+      "links": 1086,
+      "mention": 5130,
+      "refpath": 10048,
+      "shared_id": 1359,
+      "similar": 28109,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "c5019fc8036fe881",
+      "links": "1c4c43bf6513fa13",
+      "refpath": "b7e7fb51b54faf25",
+      "mention": "d4e459c70fedd179",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "e27537de6dfac732",
+      "external": "a9f2f4a1000f192e",
+      "shared_id": "80a993e8a662d52c",
+      "similar": "322526bafabb4a11"
+     },
+     "dbMb": 115,
+     "processMs": 36583,
+     "memory": {
+      "nodePeakMb": 824,
+      "treePeakSampledMb": 820,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 112,
+      "errors": 1,
+      "p50": 19.8,
+      "p95": 1085.5,
+      "max": 6960.9
+     },
+     "rep": 1,
+     "wallMsAll": [
+      36089
+     ],
+     "processMsAll": [
+      36583
+     ],
+     "fingerprintsStable": true
+    },
+    {
+     "mode": "warm",
+     "wallMs": 9235,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 105078,
+      "added": 0,
+      "changed": 38,
+      "removed": 0,
+      "extracted": 38,
+      "projects": 108,
+      "edges": 55807
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 88.4,
+       "rssMb": 139.7,
+       "heapMb": 12.2,
+       "peakRssMb": 139.7,
+       "stallMs": 88.4,
+       "endAt": 1791990555476,
+       "httpMaxMs": 96.8
+      },
+      {
+       "phase": "scan",
+       "ms": 2124.6,
+       "rssMb": 447.7,
+       "heapMb": 176.3,
+       "peakRssMb": 447.7,
+       "stallMs": 421.7,
+       "endAt": 1791990557600,
+       "counts": {
+        "seen": 105078,
+        "added": 0,
+        "changed": 38,
+        "removed": 0
+       },
+       "httpMaxMs": 532.4
+      },
+      {
+       "phase": "projects",
+       "ms": 95.9,
+       "rssMb": 491,
+       "heapMb": 201.1,
+       "peakRssMb": 491,
+       "stallMs": 95.9,
+       "endAt": 1791990557696,
+       "counts": {
+        "projects": 108
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 86.5,
+       "rssMb": 477.2,
+       "heapMb": 34.3,
+       "peakRssMb": 502.8,
+       "stallMs": 20.8,
+       "endAt": 1791990557783,
+       "counts": {
+        "files": 38,
+        "texts": 34,
+        "bytes": 1531940,
+        "refs": 239,
+        "identifiers": 2,
+        "readMs": 54,
+        "hashMs": 1,
+        "extractMs": 49,
+        "writeMs": 2
+       },
+       "httpMaxMs": 6843.8
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 2109.5,
+       "rssMb": 496.8,
+       "heapMb": 185.5,
+       "peakRssMb": 502.8,
+       "stallMs": 2109.5,
+       "endAt": 1791990559892
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 23.8,
+       "rssMb": 496.8,
+       "heapMb": 190.5,
+       "peakRssMb": 502.8,
+       "stallMs": 23.8,
+       "endAt": 1791990559916
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 18.1,
+       "rssMb": 494.5,
+       "heapMb": 130.4,
+       "peakRssMb": 502.8,
+       "stallMs": 18.1,
+       "endAt": 1791990559934
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 3607.6,
+       "rssMb": 629.1,
+       "heapMb": 308.5,
+       "peakRssMb": 629.1,
+       "stallMs": 3607.6,
+       "endAt": 1791990563542
+      },
+      {
+       "phase": "edges",
+       "ms": 5759.1,
+       "rssMb": 629.1,
+       "heapMb": 308.5,
+       "peakRssMb": 629.1,
+       "stallMs": 5759.1,
+       "endAt": 1791990563542,
+       "counts": {
+        "edges": 55807
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 629.1,
+       "heapMb": 308.5,
+       "peakRssMb": 629.1,
+       "stallMs": 0.2,
+       "endAt": 1791990563542,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 3.8,
+       "rssMb": 629.2,
+       "heapMb": 308.5,
+       "peakRssMb": 629.2,
+       "stallMs": 3.8,
+       "endAt": 1791990563546,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 823.8,
+       "rssMb": 735.3,
+       "heapMb": 407,
+       "peakRssMb": 776,
+       "stallMs": 823.8,
+       "endAt": 1791990564370,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 251.8,
+       "rssMb": 754.1,
+       "heapMb": 407,
+       "peakRssMb": 776,
+       "stallMs": 251.8,
+       "endAt": 1791990564622,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 788,
+     "nodes": {
+      "dir": 14393,
+      "external": 694,
+      "file": 90660,
+      "symlink": 25
+     },
+     "edgesByKind": {
+      "duplicate": 1937,
+      "external": 1648,
+      "imports": 6453,
+      "links": 1086,
+      "mention": 5131,
+      "refpath": 10060,
+      "shared_id": 1359,
+      "similar": 28108,
+      "symlink": 25
+     },
+     "fingerprint": {
+      "imports": "16e91077217d1b15",
+      "links": "1c4c43bf6513fa13",
+      "refpath": "63de3a3ecaa8562d",
+      "mention": "60367f4632f0ea9b",
+      "symlink": "8f647ebabf0be2f8",
+      "duplicate": "64344b52c952b78f",
+      "external": "66598f1d547437d0",
+      "shared_id": "80a993e8a662d52c",
+      "similar": "b71cb04310f665c5"
+     },
+     "dbMb": 122.1,
+     "processMs": 9646,
+     "memory": {
+      "nodePeakMb": 788,
+      "treePeakSampledMb": 758,
+      "nativePeakSampledMb": 107
+     },
+     "http": {
+      "probes": 38,
+      "errors": 1,
+      "p50": 0.9,
+      "p95": 532.4,
+      "max": 6843.8
+     },
+     "rep": 1,
+     "wallMsAll": [
+      9235
+     ],
+     "processMsAll": [
+      9646
+     ],
+     "fingerprintsStable": true
+    }
+   ]
+  }
+ ]
+}

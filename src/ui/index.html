@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual Brain</title>
+<script>try { var t = localStorage.getItem('vb:theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2' width='12' height='12' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body>
+<div id="app">
+  <header id="top" data-tauri-drag-region="deep">
+    <div class="hidden" aria-hidden="true"><span id="brain-label"></span><span id="root"></span></div>
+    <nav class="view-switch" aria-label="Vista"><button id="btn-brain" class="btn active" aria-pressed="true">Mappa</button><button id="btn-workspace" class="btn" aria-pressed="false">Operativa <span id="session-count">0</span></button></nav>
+      <div id="work-toolbar" class="work-toolbar show-tasks">
+        <div class="work-location">
+          <div class="work-context"><button id="work-toggle-rail" class="btn ghost icon-btn" aria-expanded="true" aria-controls="work-node-rail" title="Mostra o nascondi elenco" aria-label="Mostra o nascondi elenco"><span data-icon="panelCollapse"></span></button></div>
+          <nav class="work-navigation" aria-label="Operativa"><button id="work-board" class="btn ghost" aria-pressed="true" title="Incarichi, richieste e promemoria del nodo">Lavoro <b id="work-needs" class="needs-badge" hidden></b></button><button id="work-terminals" class="btn ghost" aria-pressed="false">Terminali</button><button id="work-git" class="btn ghost" aria-pressed="false" title="Codice, PR e cronologia Git del repository">Codice</button></nav>
+        </div>
+        <div class="actions">
+          <span class="work-view-group" role="group" aria-label="Disposizione dei terminali"><button id="work-single" class="btn ghost icon-btn" aria-label="Un terminale alla volta" title="Un terminale alla volta" aria-pressed="true"><span data-icon="single"></span></button><button id="work-grid" class="btn ghost icon-btn" aria-label="Affianca i terminali" title="Affianca i terminali" aria-pressed="false"><span data-icon="grid"></span></button></span>
+          <details class="work-overflow work-node-options"><summary aria-label="Menu del nodo selezionato" title="Menu del nodo selezionato: mappa e chiusura"><span class="shape project" aria-hidden="true"></span><span id="work-node-title" class="work-node-title">Nodo</span><span class="chevron" aria-hidden="true">▾</span></summary><div><button id="work-brain"><span>Mostra nella mappa</span><small>apre il nodo nella Mappa</small></button><div class="sep"></div><button id="work-close-node" class="danger"><span>Chiudi il nodo…</span><small id="work-close-node-hint">termina le sue sessioni e lo toglie dalla vista</small></button></div></details>
+          <details class="work-overflow work-new"><summary class="btn primary" title="Crea un incarico, un agente, una squadra, un terminale o aggiungi un nodo"><span data-icon="plus"></span><span class="control-label">Nuovo</span><span class="chevron" aria-hidden="true">▾</span></summary><div><button id="work-new-task"><span>Incarico</span><small>nella squadra aperta in Lavoro</small></button><button id="work-launch"><span>Agente</span><kbd>⌘J</kbd></button><button id="work-new-squad"><span>Squadra</span><small>orchestratore e operatori nel nodo</small></button><button id="work-shell"><span>Terminale</span><kbd>⌘⇧J</kbd></button><div class="sep"></div><button id="work-add-top"><span>Nodo</span><small>aggiunge un nodo a Operativa</small></button></div></details>
+        </div>
+      </div>
+    <div class="tools">
+
+      <button id="btn-search" class="btn" title="Cerca un file, una cartella o un progetto (⌘K)"><span data-icon="search"></span><span class="control-label">Cerca</span><kbd>⌘K</kbd></button>
+      <button id="btn-fit" class="btn" title="Riporta tutti gli elementi nella vista (F)">Inquadra</button>
+      <span class="gap"></span>
+      <button id="btn-edges" class="btn ghost" title="Azioni della mappa e collegamenti da mostrare">Vista ▾</button>
+      <button id="btn-more" class="btn ghost icon-btn" title="Impostazioni (⌘,)" aria-label="Impostazioni"><span data-icon="settings"></span></button>
+    </div>
+  </header>
+  <div class="banners">
+    <div id="update-banner" class="update-banner hidden" role="status"></div>
+    <div id="access-banner" class="update-banner hidden" role="alert"></div>
+  </div>
+  <main id="stage">
+    <canvas id="canvas"></canvas>
+    <div id="hint" class="hint"></div>
+    <div id="stage-loading" class="stage-loading" role="status" aria-live="polite"><span class="loading-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="stage-loading-text">Carico la mappa…</span></div>
+    <div id="legend" class="legend"></div>
+  </main>
+  <aside id="panel" class="panel hidden"></aside>
+  <section id="terminals" class="terminals show-tasks hidden">
+    <aside id="work-node-rail" class="work-rail" aria-label="Nodi e sessioni">
+      <div class="work-rail-head"><label class="rail-search"><span data-icon="search"></span><input id="work-filter" type="search" placeholder="Cerca nodi e sessioni" aria-label="Filtra nodi e sessioni" autocomplete="off" spellcheck="false"></label><button id="work-add" class="btn ghost icon-btn" title="Aggiungi nodo" aria-label="Aggiungi nodo"><span data-icon="plus"></span></button><button id="work-rail-dismiss" class="btn ghost icon-btn" title="Chiudi elenco" aria-label="Chiudi elenco"><span data-icon="close"></span></button></div>
+      <div id="work-state-filter" class="rail-states" role="radiogroup" aria-label="Filtra per stato"><button type="button" role="radio" data-state="all">Tutti</button><button type="button" role="radio" data-state="active" title="Agenti al lavoro">In corso</button><button type="button" role="radio" data-state="needs" title="Permessi, domande e bloccati">Serve te</button><button type="button" role="radio" data-state="ended" title="Processi chiusi">Terminati</button></div>
+      <section id="work-rail-links" class="work-rail-links hidden" aria-label="Collegamenti"></section>
+      <div id="work-list" class="work-list"></div>
+      <div id="work-rail-resize" class="work-rail-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Larghezza sidebar" title="Trascina per ridimensionare · doppio clic per ripristinare"></div>
+    </aside>
+    <button id="work-rail-backdrop" tabindex="-1" aria-label="Chiudi elenco"></button>
+    <div class="work-main">
+      <div id="work-message" role="status" class="work-message"></div>
+      <div id="work-git-view" class="work-tasks-view hidden"></div>
+      <div id="work-board-view" class="work-tasks-view work-board-view hidden"></div>
+      <div id="term-body" class="term-body"></div>
+    </div>
+  </section>
+  <footer id="status">
+    <span id="stats"></span>
+    <span id="progress" class="progress"></span>
+  </footer>
+  <span id="index-dot" class="index-dot" role="status" hidden></span>
+  <div id="overlay" class="overlay hidden"></div>
+  <div id="menu" class="popover hidden"></div>
+</div>
+<script type="module" src="main.js"></script>
+</body>
+</html>

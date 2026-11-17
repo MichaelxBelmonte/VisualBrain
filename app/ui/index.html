@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Visual Brain</title>
+<style>
+  :root { --bg: #fff; --fg: #111; --g: #777; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #f2f2f2; --g: #999; } }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 -apple-system, "SF Pro Text", Helvetica, Arial, sans-serif; }
+  .c { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .14em; font-size: 13px; }
+  .sq { width: 14px; height: 14px; border: 2px solid var(--fg); border-radius: 3px; }
+  #s { color: var(--g); max-width: 560px; text-align: center; white-space: pre-wrap; padding: 0 24px; }
+  #s.err { color: var(--fg); }
+  .dot { width: 6px; height: 6px; background: var(--fg); border-radius: 50%; animation: b 1s steps(2) infinite; }
+  @keyframes b { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+  <div class="c">
+    <div class="logo"><span class="sq"></span>BRAIN</div>
+    <div class="dot" id="d"></div>
+    <div id="s">Avvio…</div>
+  </div>
+  <script>
+    document.documentElement.lang = navigator.language.toLowerCase().startsWith('it') ? 'it' : 'en';
+    if (document.documentElement.lang === 'en') document.getElementById('s').textContent = 'Starting…';
+    window.__vb = function (text, error) {
+      var s = document.getElementById('s');
+      s.textContent = text;
+      s.className = error ? 'err' : '';
+      document.getElementById('d').style.display = error ? 'none' : '';
+    };
+  </script>
+</body>
+</html>

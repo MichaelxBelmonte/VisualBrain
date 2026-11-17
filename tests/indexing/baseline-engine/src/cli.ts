@@ -1,0 +1,121 @@
+// Command line: vb index | serve | stats | analyze | help
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { loadConfig, PROJECT_ROOT } from './server/config.ts';
+import { Db } from './server/db.ts';
+import { runIndex } from './server/index.ts';
+import { startServer } from './server/server.ts';
+import { GraphCache } from './server/cache.ts';
+import { makeProvider } from './server/llm/provider.ts';
+import { analyze, buildPayload } from './server/llm/analyze.ts';
+
+interface Flags { roots: string[]; port?: number; db?: string; watch: boolean; watchUi: boolean; open: boolean; consent: 'metadata' | 'excerpts'; dryRun: boolean; model?: string; provider?: string; subtrees: string[]; index: boolean; reextract: boolean }
+
+function parse(argv: string[]): { cmd: string; flags: Flags } {
+  const flags: Flags = { roots: [], watch: true, watchUi: false, open: false, consent: 'metadata', dryRun: false, subtrees: [], index: false, reextract: false };
+  let cmd = 'help';
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    const next = () => argv[++i];
+    if (!a.startsWith('--') && cmd === 'help') { cmd = a; continue; }
+    switch (a) {
+      case '--root': flags.roots.push(next()); break;
+      case '--port': flags.port = Number(next()); break;
+      case '--db': flags.db = next(); break;
+      case '--no-watch': flags.watch = false; break;
+      case '--watch-ui': flags.watchUi = true; break;
+      case '--open': flags.open = true; break;
+      case '--index': flags.index = true; break;
+      case '--reextract': flags.reextract = true; break;
+      case '--consent': flags.consent = next() === 'excerpts' ? 'excerpts' : 'metadata'; break;
+      case '--dry-run': flags.dryRun = true; break;
+      case '--model': flags.model = next(); break;
+      case '--provider': flags.provider = next(); break;
+      case '--subtree': flags.subtrees.push(next()); break;
+      default: console.error(`opzione sconosciuta: ${a}`); process.exit(2);
+    }
+  }
+  return { cmd, flags };
+}
+
+const HELP = `vb — Visual Brain
+
+  vb index   [--root DIR]... [--subtree DIR]... [--reextract]   indicizza (tutto, o solo i sottoalberi dati; --reextract rilegge i contenuti)
+  vb serve   [--port N] [--no-watch] [--watch-ui] [--open] [--index]   avvia il server (http://127.0.0.1:4747)
+  vb stats                                        numeri dell'indice
+  vb analyze [--consent metadata|excerpts] [--dry-run] [--model M] [--provider P]   analisi semantica con l'LLM
+
+  --root DIR   radice da indicizzare (ripetibile; predefinita: ~/Desktop)
+  --db FILE    file SQLite (predefinito: data/brain.db)
+`;
+
+async function main(): Promise<void> {
+  const { cmd, flags } = parse(process.argv.slice(2));
+  const cfg = loadConfig();
+  if (flags.roots.length) cfg.roots = flags.roots.map((r) => (r.startsWith('/') ? r : join(process.cwd(), r)));
+  if (flags.port) cfg.port = flags.port;
+  if (flags.model) cfg.llm.model = flags.model;
+  if (flags.provider) cfg.llm.provider = flags.provider as typeof cfg.llm.provider;
+  const dbFile = flags.db ?? join(cfg.dataDir, 'brain.db');
+  const log = (m: string) => process.stderr.write(m + '\n');
+
+  switch (cmd) {
+    case 'index': {
+      const db = new Db(dbFile);
+      let lastPhase = '';
+      const s = await runIndex(db, cfg, { subtrees: flags.subtrees.length ? flags.subtrees : undefined, reextract: flags.reextract }, (p) => {
+        if (p.message) log(`[${p.phase}] ${p.message}`);
+        else if (p.phase !== lastPhase || p.done % 10000 === 0) { lastPhase = p.phase; log(`[${p.phase}] ${p.done}${p.total ? '/' + p.total : ''}`); }
+      });
+      const cache = new GraphCache();
+      cache.load(db, cfg);
+      log(`fatto in ${s.ms} ms: ${cache.stats.nodes} nodi (${cache.stats.files} file, ${cache.stats.dirs} cartelle), ${cache.stats.edges} archi (${cache.stats.verifiedEdges} verificati, ${cache.stats.inferredEdges} inferiti), ${cache.stats.projects} progetti`);
+      db.close();
+      break;
+    }
+    case 'serve': {
+      if (flags.watchUi) {
+        const child = spawn(process.execPath, [join(PROJECT_ROOT, 'scripts', 'build-ui.mjs'), '--watch'], { stdio: 'inherit' });
+        process.on('exit', () => child.kill());
+      }
+      const db = new Db(dbFile);
+      await startServer(cfg, db, { watch: flags.watch, open: flags.open, indexOnStart: flags.index });
+      break;
+    }
+    case 'stats': {
+      const db = new Db(dbFile);
+      const cache = new GraphCache();
+      cache.load(db, cfg);
+      console.log(JSON.stringify(cache.stats, null, 2));
+      const kinds = db.all<{ kind: string; n: number; v: number }>('SELECT kind, COUNT(*) n, SUM(verified) v FROM edges WHERE hidden = 0 GROUP BY kind ORDER BY n DESC');
+      for (const k of kinds) console.log(`  ${k.kind.padEnd(10)} ${String(k.n).padStart(7)}  verificati ${k.v}`);
+      db.close();
+      break;
+    }
+    case 'analyze': {
+      const db = new Db(dbFile);
+      const cache = new GraphCache();
+      cache.load(db, cfg);
+      if (flags.dryRun) {
+        const p = buildPayload(db, cfg, cache, flags.consent);
+        log(`unità: ${p.nodes}, byte: ${p.bytes}, consenso: ${flags.consent}`);
+        console.log(p.payload);
+        db.close();
+        break;
+      }
+      const provider = makeProvider(cfg);
+      if (!provider) { log('nessun provider LLM configurato'); process.exit(1); }
+      const r = await analyze(db, cfg, cache, provider, flags.consent, log);
+      log(`run ${r.runId}: ${r.summary}`);
+      db.close();
+      break;
+    }
+    default:
+      console.log(HELP);
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

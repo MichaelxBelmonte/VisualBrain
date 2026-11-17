@@ -1,0 +1,7 @@
+{
+  "identifier": "local-ui",
+  "description": "interfaccia servita dal server locale: trascinare e ingrandire la finestra dalla barra in alto, tema della finestra",
+  "windows": ["main"],
+  "remote": { "urls": ["http://127.0.0.1:*"] },
+  "permissions": ["core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize", "core:window:allow-set-theme"]
+}

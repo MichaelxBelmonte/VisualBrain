@@ -1,0 +1,479 @@
+{
+ "label": "sym-nat",
+ "date": "2026-10-14T15:02:35.313Z",
+ "src": "src",
+ "engine": "native",
+ "machine": {
+  "cpu": "Apple M5 Pro",
+  "cores": 15,
+  "memGb": 24,
+  "node": "v24.21.0",
+  "arch": "arm64"
+ },
+ "cases": [
+  {
+   "name": "sintetico-20000",
+   "roots": [
+    "<sintetico>"
+   ],
+   "repeat": 1,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 1088,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.7,
+       "heapMb": 12.2,
+       "peakRssMb": 104.7,
+       "stallMs": 0.1,
+       "endAt": 1791990156924,
+       "httpMaxMs": 7.1
+      },
+      {
+       "phase": "scan",
+       "ms": 189.7,
+       "rssMb": 153.3,
+       "heapMb": 35.6,
+       "peakRssMb": 153.3,
+       "stallMs": 63.6,
+       "endAt": 1791990157113,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 69.5
+      },
+      {
+       "phase": "projects",
+       "ms": 17.4,
+       "rssMb": 161.9,
+       "heapMb": 32.7,
+       "peakRssMb": 161.9,
+       "stallMs": 17.4,
+       "endAt": 1791990157131,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 521.9,
+       "rssMb": 322.3,
+       "heapMb": 94.9,
+       "peakRssMb": 322.3,
+       "stallMs": 67.8,
+       "endAt": 1791990157653,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 411,
+        "hashMs": 24,
+        "extractMs": 281,
+        "writeMs": 92
+       },
+       "httpMaxMs": 73.1
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 72.7,
+       "rssMb": 330.7,
+       "heapMb": 103.2,
+       "peakRssMb": 331.2,
+       "stallMs": 72.7,
+       "endAt": 1791990157726
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.4,
+       "rssMb": 330.7,
+       "heapMb": 103.2,
+       "peakRssMb": 331.2,
+       "stallMs": 2.4,
+       "endAt": 1791990157728
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.2,
+       "rssMb": 330.7,
+       "heapMb": 103.2,
+       "peakRssMb": 331.2,
+       "stallMs": 0.2,
+       "endAt": 1791990157728
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 130.1,
+       "rssMb": 365.2,
+       "heapMb": 161.7,
+       "peakRssMb": 365.2,
+       "stallMs": 130.1,
+       "endAt": 1791990157858
+      },
+      {
+       "phase": "edges",
+       "ms": 205.6,
+       "rssMb": 365.2,
+       "heapMb": 161.7,
+       "peakRssMb": 365.2,
+       "stallMs": 205.6,
+       "endAt": 1791990157858,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": 353.6
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 365.2,
+       "heapMb": 161.7,
+       "peakRssMb": 365.2,
+       "stallMs": 0.2,
+       "endAt": 1791990157859,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 365.2,
+       "heapMb": 161.7,
+       "peakRssMb": 365.2,
+       "stallMs": 0.1,
+       "endAt": 1791990157859,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 126.8,
+       "rssMb": 378.1,
+       "heapMb": 134.5,
+       "peakRssMb": 378.1,
+       "stallMs": 126.8,
+       "endAt": 1791990157986,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 25.7,
+       "rssMb": 385.5,
+       "heapMb": 134.5,
+       "peakRssMb": 385.5,
+       "stallMs": 25.7,
+       "endAt": 1791990158011,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 386,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18.1,
+     "processMs": 1310,
+     "memory": {
+      "nodePeakMb": 386,
+      "treePeakSampledMb": 377,
+      "nativePeakSampledMb": 20
+     },
+     "http": {
+      "probes": 13,
+      "errors": 0,
+      "p50": 4,
+      "p95": 353.6,
+      "max": 353.6
+     },
+     "rep": 1,
+     "wallMsAll": [
+      1088
+     ],
+     "processMsAll": [
+      1310
+     ],
+     "fingerprintsStable": true
+    }
+   ],
+   "corpus": {
+    "files": 20200,
+    "dirs": 680,
+    "bytes": 358238566,
+    "vendorFiles": 3600,
+    "symlinks": 20,
+    "secrets": 31,
+    "duplicates": 89,
+    "projects": 30,
+    "generateMs": 1538
+   }
+  },
+  {
+   "name": "repo",
+   "roots": [
+    "/Users/me/Desktop/JetHR/strumenti/visual-brain"
+   ],
+   "repeat": 1,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 179,
+     "engine": {
+      "requested": "native",
+      "binary": "/Users/me/Desktop/JetHR/strumenti/visual-brain/native/indexer/bin/darwin-arm64/vb-indexer",
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 105.6,
+       "heapMb": 12.3,
+       "peakRssMb": 105.6,
+       "stallMs": 0.1,
+       "endAt": 1791990158253,
+       "httpMaxMs": 4.6
+      },
+      {
+       "phase": "scan",
+       "ms": 47.5,
+       "rssMb": 107.1,
+       "heapMb": 13.2,
+       "peakRssMb": 107.1,
+       "stallMs": 1.1,
+       "endAt": 1791990158300,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 107.2,
+       "heapMb": 13.4,
+       "peakRssMb": 107.2,
+       "stallMs": 0.9,
+       "endAt": 1791990158301,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 107.2,
+       "rssMb": 127.8,
+       "heapMb": 21.9,
+       "peakRssMb": 127.8,
+       "stallMs": 48.3,
+       "endAt": 1791990158408,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2363699,
+        "refs": 946,
+        "identifiers": 200,
+        "readMs": 103,
+        "hashMs": 1,
+        "extractMs": 99,
+        "writeMs": 4
+       },
+       "httpMaxMs": 124.6
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 11.7,
+       "rssMb": 129,
+       "heapMb": 21.7,
+       "peakRssMb": 129,
+       "stallMs": 11.7,
+       "endAt": 1791990158420
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 129,
+       "heapMb": 21.7,
+       "peakRssMb": 129,
+       "stallMs": 0.2,
+       "endAt": 1791990158420
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 129,
+       "heapMb": 21.8,
+       "peakRssMb": 129,
+       "stallMs": 0.3,
+       "endAt": 1791990158420
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.5,
+       "rssMb": 130.8,
+       "heapMb": 20.9,
+       "peakRssMb": 130.8,
+       "stallMs": 6.5,
+       "endAt": 1791990158427
+      },
+      {
+       "phase": "edges",
+       "ms": 18.7,
+       "rssMb": 130.8,
+       "heapMb": 20.9,
+       "peakRssMb": 130.8,
+       "stallMs": 18.7,
+       "endAt": 1791990158427,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 130.8,
+       "heapMb": 20.9,
+       "peakRssMb": 130.8,
+       "stallMs": 0.1,
+       "endAt": 1791990158427,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 130.8,
+       "heapMb": 20.9,
+       "peakRssMb": 130.8,
+       "stallMs": 0.1,
+       "endAt": 1791990158427,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.6,
+       "rssMb": 131,
+       "heapMb": 25.3,
+       "peakRssMb": 131,
+       "stallMs": 3.6,
+       "endAt": 1791990158431,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 131.1,
+       "heapMb": 25.3,
+       "peakRssMb": 131.1,
+       "stallMs": 0.3,
+       "endAt": 1791990158431,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 131,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 381,
+     "memory": {
+      "nodePeakMb": 131,
+      "treePeakSampledMb": 131,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 4,
+      "errors": 0,
+      "p50": 4.6,
+      "p95": 124.6,
+      "max": 124.6
+     },
+     "rep": 1,
+     "wallMsAll": [
+      179
+     ],
+     "processMsAll": [
+      381
+     ],
+     "fingerprintsStable": true
+    }
+   ]
+  }
+ ]
+}

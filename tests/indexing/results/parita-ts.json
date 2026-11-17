@@ -1,0 +1,1754 @@
+{
+ "label": "sym-ts",
+ "date": "2026-10-14T15:02:20.683Z",
+ "src": "src",
+ "engine": "ts",
+ "machine": {
+  "cpu": "Apple M5 Pro",
+  "cores": 15,
+  "memGb": 24,
+  "node": "v24.21.0",
+  "arch": "arm64"
+ },
+ "cases": [
+  {
+   "name": "sintetico-20000",
+   "roots": [
+    "<sintetico>"
+   ],
+   "repeat": 3,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 1328,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 105.4,
+       "heapMb": 12.2,
+       "peakRssMb": 105.4,
+       "stallMs": 0.1,
+       "endAt": 1791990147042,
+       "httpMaxMs": 4.3
+      },
+      {
+       "phase": "scan",
+       "ms": 356.2,
+       "rssMb": 252.7,
+       "heapMb": 86.9,
+       "peakRssMb": 252.7,
+       "stallMs": 63.3,
+       "endAt": 1791990147398,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 77.7
+      },
+      {
+       "phase": "projects",
+       "ms": 17,
+       "rssMb": 263.6,
+       "heapMb": 96.3,
+       "peakRssMb": 263.6,
+       "stallMs": 17,
+       "endAt": 1791990147415,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 570.7,
+       "rssMb": 357.2,
+       "heapMb": 114.2,
+       "peakRssMb": 357.2,
+       "stallMs": 61.8,
+       "endAt": 1791990147986,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 459,
+        "hashMs": 24,
+        "extractMs": 310,
+        "writeMs": 94
+       },
+       "httpMaxMs": 51.3
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 80.1,
+       "rssMb": 367.1,
+       "heapMb": 125.7,
+       "peakRssMb": 367.7,
+       "stallMs": 80.1,
+       "endAt": 1791990148066
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 3.3,
+       "rssMb": 367.1,
+       "heapMb": 125.7,
+       "peakRssMb": 367.7,
+       "stallMs": 3.3,
+       "endAt": 1791990148069
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 367.1,
+       "heapMb": 125.7,
+       "peakRssMb": 367.7,
+       "stallMs": 0.4,
+       "endAt": 1791990148070
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 139.4,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 139.4,
+       "endAt": 1791990148209
+      },
+      {
+       "phase": "edges",
+       "ms": 223.3,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 223.3,
+       "endAt": 1791990148209,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": 377.1
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 0.2,
+       "endAt": 1791990148209,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 0.1,
+       "endAt": 1791990148210,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 133,
+       "rssMb": 418.9,
+       "heapMb": 161.3,
+       "peakRssMb": 418.9,
+       "stallMs": 133,
+       "endAt": 1791990148343,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 27.1,
+       "rssMb": 424.9,
+       "heapMb": 161.3,
+       "peakRssMb": 424.9,
+       "stallMs": 27.1,
+       "endAt": 1791990148370,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 426,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18,
+     "processMs": 1547,
+     "memory": {
+      "nodePeakMb": 426,
+      "treePeakSampledMb": 425,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 17,
+      "errors": 0,
+      "p50": 3.7,
+      "p95": 377.1,
+      "max": 377.1
+     },
+     "rep": 2,
+     "wallMsAll": [
+      1299,
+      1328,
+      1475
+     ],
+     "processMsAll": [
+      1522,
+      1547,
+      1720
+     ],
+     "fingerprintsStable": true
+    }
+   ],
+   "raw": [
+    {
+     "mode": "cold",
+     "wallMs": 1475,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.2,
+       "rssMb": 106.2,
+       "heapMb": 12.2,
+       "peakRssMb": 106.2,
+       "stallMs": 0.2,
+       "endAt": 1791990142683,
+       "httpMaxMs": 7.2
+      },
+      {
+       "phase": "scan",
+       "ms": 409.3,
+       "rssMb": 259.1,
+       "heapMb": 115.7,
+       "peakRssMb": 259.1,
+       "stallMs": 75.6,
+       "endAt": 1791990143093,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 82.5
+      },
+      {
+       "phase": "projects",
+       "ms": 23.8,
+       "rssMb": 270,
+       "heapMb": 125.1,
+       "peakRssMb": 270,
+       "stallMs": 23.8,
+       "endAt": 1791990143116,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 643.4,
+       "rssMb": 364.1,
+       "heapMb": 102.5,
+       "peakRssMb": 364.1,
+       "stallMs": 69.1,
+       "endAt": 1791990143760,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 522,
+        "hashMs": 24,
+        "extractMs": 298,
+        "writeMs": 100
+       },
+       "httpMaxMs": 398.8
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 89.4,
+       "rssMb": 368.6,
+       "heapMb": 110.2,
+       "peakRssMb": 369.2,
+       "stallMs": 89.4,
+       "endAt": 1791990143849
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.9,
+       "rssMb": 368.6,
+       "heapMb": 110.2,
+       "peakRssMb": 369.2,
+       "stallMs": 2.9,
+       "endAt": 1791990143852
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 368.6,
+       "heapMb": 110.2,
+       "peakRssMb": 369.2,
+       "stallMs": 0.3,
+       "endAt": 1791990143852
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 138.1,
+       "rssMb": 390.1,
+       "heapMb": 115.2,
+       "peakRssMb": 390.1,
+       "stallMs": 138.1,
+       "endAt": 1791990143991
+      },
+      {
+       "phase": "edges",
+       "ms": 230.8,
+       "rssMb": 390.1,
+       "heapMb": 115.2,
+       "peakRssMb": 390.1,
+       "stallMs": 230.8,
+       "endAt": 1791990143991,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 390.1,
+       "heapMb": 115.2,
+       "peakRssMb": 390.1,
+       "stallMs": 0.1,
+       "endAt": 1791990143991,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 390.1,
+       "heapMb": 115.2,
+       "peakRssMb": 390.1,
+       "stallMs": 0.1,
+       "endAt": 1791990143991,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 139.2,
+       "rssMb": 406.6,
+       "heapMb": 151.7,
+       "peakRssMb": 406.6,
+       "stallMs": 139.2,
+       "endAt": 1791990144130,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 27,
+       "rssMb": 413.6,
+       "heapMb": 151.7,
+       "peakRssMb": 413.6,
+       "stallMs": 27,
+       "endAt": 1791990144157,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 414,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18,
+     "processMs": 1720,
+     "memory": {
+      "nodePeakMb": 414,
+      "treePeakSampledMb": 414,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 19,
+      "errors": 0,
+      "p50": 2.4,
+      "p95": 398.8,
+      "max": 398.8
+     },
+     "rep": 1
+    },
+    {
+     "mode": "cold",
+     "wallMs": 1328,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 105.4,
+       "heapMb": 12.2,
+       "peakRssMb": 105.4,
+       "stallMs": 0.1,
+       "endAt": 1791990147042,
+       "httpMaxMs": 4.3
+      },
+      {
+       "phase": "scan",
+       "ms": 356.2,
+       "rssMb": 252.7,
+       "heapMb": 86.9,
+       "peakRssMb": 252.7,
+       "stallMs": 63.3,
+       "endAt": 1791990147398,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 77.7
+      },
+      {
+       "phase": "projects",
+       "ms": 17,
+       "rssMb": 263.6,
+       "heapMb": 96.3,
+       "peakRssMb": 263.6,
+       "stallMs": 17,
+       "endAt": 1791990147415,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 570.7,
+       "rssMb": 357.2,
+       "heapMb": 114.2,
+       "peakRssMb": 357.2,
+       "stallMs": 61.8,
+       "endAt": 1791990147986,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 459,
+        "hashMs": 24,
+        "extractMs": 310,
+        "writeMs": 94
+       },
+       "httpMaxMs": 51.3
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 80.1,
+       "rssMb": 367.1,
+       "heapMb": 125.7,
+       "peakRssMb": 367.7,
+       "stallMs": 80.1,
+       "endAt": 1791990148066
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 3.3,
+       "rssMb": 367.1,
+       "heapMb": 125.7,
+       "peakRssMb": 367.7,
+       "stallMs": 3.3,
+       "endAt": 1791990148069
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.4,
+       "rssMb": 367.1,
+       "heapMb": 125.7,
+       "peakRssMb": 367.7,
+       "stallMs": 0.4,
+       "endAt": 1791990148070
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 139.4,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 139.4,
+       "endAt": 1791990148209
+      },
+      {
+       "phase": "edges",
+       "ms": 223.3,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 223.3,
+       "endAt": 1791990148209,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": 377.1
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 0.2,
+       "endAt": 1791990148209,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 403.2,
+       "heapMb": 121.9,
+       "peakRssMb": 403.2,
+       "stallMs": 0.1,
+       "endAt": 1791990148210,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 133,
+       "rssMb": 418.9,
+       "heapMb": 161.3,
+       "peakRssMb": 418.9,
+       "stallMs": 133,
+       "endAt": 1791990148343,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 27.1,
+       "rssMb": 424.9,
+       "heapMb": 161.3,
+       "peakRssMb": 424.9,
+       "stallMs": 27.1,
+       "endAt": 1791990148370,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 426,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18,
+     "processMs": 1547,
+     "memory": {
+      "nodePeakMb": 426,
+      "treePeakSampledMb": 425,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 17,
+      "errors": 0,
+      "p50": 3.7,
+      "p95": 377.1,
+      "max": 377.1
+     },
+     "rep": 2
+    },
+    {
+     "mode": "cold",
+     "wallMs": 1299,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 21038,
+      "added": 21038,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 20169,
+      "projects": 30,
+      "edges": 6781
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 105.3,
+       "heapMb": 12.2,
+       "peakRssMb": 105.3,
+       "stallMs": 0.1,
+       "endAt": 1791990151185,
+       "httpMaxMs": 4.5
+      },
+      {
+       "phase": "scan",
+       "ms": 351.1,
+       "rssMb": 252.8,
+       "heapMb": 103.6,
+       "peakRssMb": 252.8,
+       "stallMs": 72.6,
+       "endAt": 1791990151536,
+       "counts": {
+        "seen": 21038,
+        "added": 21038,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 64.6
+      },
+      {
+       "phase": "projects",
+       "ms": 17,
+       "rssMb": 262.3,
+       "heapMb": 112.9,
+       "peakRssMb": 262.3,
+       "stallMs": 17,
+       "endAt": 1791990151553,
+       "counts": {
+        "projects": 30
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 555.7,
+       "rssMb": 384.6,
+       "heapMb": 142.4,
+       "peakRssMb": 384.6,
+       "stallMs": 60.8,
+       "endAt": 1791990152109,
+       "counts": {
+        "files": 20169,
+        "texts": 3725,
+        "bytes": 62366389,
+        "refs": 4838,
+        "identifiers": 0,
+        "readMs": 435,
+        "hashMs": 24,
+        "extractMs": 293,
+        "writeMs": 102
+       },
+       "httpMaxMs": 48.5
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 72.4,
+       "rssMb": 392.1,
+       "heapMb": 149.9,
+       "peakRssMb": 392.7,
+       "stallMs": 72.4,
+       "endAt": 1791990152182
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 2.8,
+       "rssMb": 392.1,
+       "heapMb": 149.9,
+       "peakRssMb": 392.7,
+       "stallMs": 2.8,
+       "endAt": 1791990152185
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 392.1,
+       "heapMb": 149.9,
+       "peakRssMb": 392.7,
+       "stallMs": 0.3,
+       "endAt": 1791990152185
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 140.3,
+       "rssMb": 428,
+       "heapMb": 146.2,
+       "peakRssMb": 428,
+       "stallMs": 140.3,
+       "endAt": 1791990152325
+      },
+      {
+       "phase": "edges",
+       "ms": 215.9,
+       "rssMb": 428,
+       "heapMb": 146.2,
+       "peakRssMb": 428,
+       "stallMs": 215.9,
+       "endAt": 1791990152325,
+       "counts": {
+        "edges": 6781
+       },
+       "httpMaxMs": 363.7
+      },
+      {
+       "phase": "seed",
+       "ms": 0.2,
+       "rssMb": 428,
+       "heapMb": 146.2,
+       "peakRssMb": 428,
+       "stallMs": 0.2,
+       "endAt": 1791990152325,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 428,
+       "heapMb": 146.2,
+       "peakRssMb": 428,
+       "stallMs": 0.1,
+       "endAt": 1791990152325,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 131.3,
+       "rssMb": 443.3,
+       "heapMb": 186.1,
+       "peakRssMb": 443.3,
+       "stallMs": 131.3,
+       "endAt": 1791990152457,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 27.5,
+       "rssMb": 450.2,
+       "heapMb": 186.1,
+       "peakRssMb": 450.2,
+       "stallMs": 27.5,
+       "endAt": 1791990152484,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 451,
+     "nodes": {
+      "dir": 818,
+      "file": 20200,
+      "symlink": 20
+     },
+     "edgesByKind": {
+      "imports": 1843,
+      "links": 1215,
+      "mention": 676,
+      "refpath": 31,
+      "similar": 2996,
+      "symlink": 20
+     },
+     "fingerprint": {
+      "imports": "f97ec56b099e3235",
+      "links": "b9bec9b2e25645cc",
+      "refpath": "7037def7d104d62b",
+      "mention": "7f8def973b422403",
+      "symlink": "72bd2df8a3efac11",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "da39a3ee5e6b4b0d",
+      "shared_id": "da39a3ee5e6b4b0d",
+      "similar": "43e9611cefcd6b50"
+     },
+     "dbMb": 18,
+     "processMs": 1522,
+     "memory": {
+      "nodePeakMb": 451,
+      "treePeakSampledMb": 450,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 17,
+      "errors": 0,
+      "p50": 5.4,
+      "p95": 363.7,
+      "max": 363.7
+     },
+     "rep": 3
+    }
+   ],
+   "corpus": {
+    "files": 20200,
+    "dirs": 680,
+    "bytes": 358238566,
+    "vendorFiles": 3600,
+    "symlinks": 20,
+    "secrets": 31,
+    "duplicates": 89,
+    "projects": 30,
+    "generateMs": 2577
+   }
+  },
+  {
+   "name": "repo",
+   "roots": [
+    "/Users/me/Desktop/JetHR/strumenti/visual-brain"
+   ],
+   "repeat": 3,
+   "runs": [
+    {
+     "mode": "cold",
+     "wallMs": 246,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.7,
+       "heapMb": 12.2,
+       "peakRssMb": 104.7,
+       "stallMs": 0.1,
+       "endAt": 1791990152763,
+       "httpMaxMs": 4.5
+      },
+      {
+       "phase": "scan",
+       "ms": 115.9,
+       "rssMb": 175.2,
+       "heapMb": 29.4,
+       "peakRssMb": 175.2,
+       "stallMs": 0.1,
+       "endAt": 1791990152879,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 1.5
+      },
+      {
+       "phase": "projects",
+       "ms": 3.1,
+       "rssMb": 175.3,
+       "heapMb": 29.6,
+       "peakRssMb": 175.3,
+       "stallMs": 3.1,
+       "endAt": 1791990152882,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 103.5,
+       "rssMb": 186.5,
+       "heapMb": 51.3,
+       "peakRssMb": 186.5,
+       "stallMs": 74.9,
+       "endAt": 1791990152986,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2363699,
+        "refs": 946,
+        "identifiers": 200,
+        "readMs": 99,
+        "hashMs": 1,
+        "extractMs": 94,
+        "writeMs": 4
+       },
+       "httpMaxMs": 88.1
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 11.1,
+       "rssMb": 187.6,
+       "heapMb": 57.8,
+       "peakRssMb": 187.6,
+       "stallMs": 11.1,
+       "endAt": 1791990152997
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 187.6,
+       "heapMb": 57.8,
+       "peakRssMb": 187.6,
+       "stallMs": 0.2,
+       "endAt": 1791990152997
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 187.7,
+       "heapMb": 57.9,
+       "peakRssMb": 187.7,
+       "stallMs": 0.3,
+       "endAt": 1791990152998
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.8,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 6.8,
+       "endAt": 1791990153004
+      },
+      {
+       "phase": "edges",
+       "ms": 18.5,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 18.5,
+       "endAt": 1791990153004,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 0.1,
+       "endAt": 1791990153005,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 0.1,
+       "endAt": 1791990153005,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.6,
+       "rssMb": 195.2,
+       "heapMb": 45,
+       "peakRssMb": 195.2,
+       "stallMs": 3.6,
+       "endAt": 1791990153008,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 195.3,
+       "heapMb": 45,
+       "peakRssMb": 195.3,
+       "stallMs": 0.3,
+       "endAt": 1791990153009,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 195,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 457,
+     "memory": {
+      "nodePeakMb": 195,
+      "treePeakSampledMb": 195,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 1.5,
+      "p95": 88.1,
+      "max": 88.1
+     },
+     "rep": 1,
+     "wallMsAll": [
+      245,
+      246,
+      250
+     ],
+     "processMsAll": [
+      459,
+      457,
+      459
+     ],
+     "fingerprintsStable": true
+    }
+   ],
+   "raw": [
+    {
+     "mode": "cold",
+     "wallMs": 246,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.7,
+       "heapMb": 12.2,
+       "peakRssMb": 104.7,
+       "stallMs": 0.1,
+       "endAt": 1791990152763,
+       "httpMaxMs": 4.5
+      },
+      {
+       "phase": "scan",
+       "ms": 115.9,
+       "rssMb": 175.2,
+       "heapMb": 29.4,
+       "peakRssMb": 175.2,
+       "stallMs": 0.1,
+       "endAt": 1791990152879,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 1.5
+      },
+      {
+       "phase": "projects",
+       "ms": 3.1,
+       "rssMb": 175.3,
+       "heapMb": 29.6,
+       "peakRssMb": 175.3,
+       "stallMs": 3.1,
+       "endAt": 1791990152882,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 103.5,
+       "rssMb": 186.5,
+       "heapMb": 51.3,
+       "peakRssMb": 186.5,
+       "stallMs": 74.9,
+       "endAt": 1791990152986,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2363699,
+        "refs": 946,
+        "identifiers": 200,
+        "readMs": 99,
+        "hashMs": 1,
+        "extractMs": 94,
+        "writeMs": 4
+       },
+       "httpMaxMs": 88.1
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 11.1,
+       "rssMb": 187.6,
+       "heapMb": 57.8,
+       "peakRssMb": 187.6,
+       "stallMs": 11.1,
+       "endAt": 1791990152997
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 187.6,
+       "heapMb": 57.8,
+       "peakRssMb": 187.6,
+       "stallMs": 0.2,
+       "endAt": 1791990152997
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 187.7,
+       "heapMb": 57.9,
+       "peakRssMb": 187.7,
+       "stallMs": 0.3,
+       "endAt": 1791990152998
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.8,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 6.8,
+       "endAt": 1791990153004
+      },
+      {
+       "phase": "edges",
+       "ms": 18.5,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 18.5,
+       "endAt": 1791990153004,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 0.1,
+       "endAt": 1791990153005,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 195,
+       "heapMb": 40.6,
+       "peakRssMb": 195,
+       "stallMs": 0.1,
+       "endAt": 1791990153005,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.6,
+       "rssMb": 195.2,
+       "heapMb": 45,
+       "peakRssMb": 195.2,
+       "stallMs": 3.6,
+       "endAt": 1791990153008,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 195.3,
+       "heapMb": 45,
+       "peakRssMb": 195.3,
+       "stallMs": 0.3,
+       "endAt": 1791990153009,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 195,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 457,
+     "memory": {
+      "nodePeakMb": 195,
+      "treePeakSampledMb": 195,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 1.5,
+      "p95": 88.1,
+      "max": 88.1
+     },
+     "rep": 1
+    },
+    {
+     "mode": "cold",
+     "wallMs": 250,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 105,
+       "heapMb": 12.2,
+       "peakRssMb": 105,
+       "stallMs": 0.1,
+       "endAt": 1791990153304,
+       "httpMaxMs": 5.7
+      },
+      {
+       "phase": "scan",
+       "ms": 116.3,
+       "rssMb": 175.4,
+       "heapMb": 53.7,
+       "peakRssMb": 175.4,
+       "stallMs": 0.5,
+       "endAt": 1791990153420,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 1.2
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 175.5,
+       "heapMb": 53.9,
+       "peakRssMb": 175.5,
+       "stallMs": 0.9,
+       "endAt": 1791990153421,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 108.1,
+       "rssMb": 187.4,
+       "heapMb": 51.1,
+       "peakRssMb": 187.4,
+       "stallMs": 52.1,
+       "endAt": 1791990153529,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2363699,
+        "refs": 946,
+        "identifiers": 200,
+        "readMs": 104,
+        "hashMs": 1,
+        "extractMs": 100,
+        "writeMs": 4
+       },
+       "httpMaxMs": 91.2
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 11.7,
+       "rssMb": 188.6,
+       "heapMb": 57.5,
+       "peakRssMb": 188.6,
+       "stallMs": 11.7,
+       "endAt": 1791990153541
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 188.6,
+       "heapMb": 57.5,
+       "peakRssMb": 188.6,
+       "stallMs": 0.2,
+       "endAt": 1791990153541
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 188.6,
+       "heapMb": 57.6,
+       "peakRssMb": 188.6,
+       "stallMs": 0.3,
+       "endAt": 1791990153541
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 7.2,
+       "rssMb": 197.4,
+       "heapMb": 41.8,
+       "peakRssMb": 197.4,
+       "stallMs": 7.2,
+       "endAt": 1791990153548
+      },
+      {
+       "phase": "edges",
+       "ms": 19.4,
+       "rssMb": 197.4,
+       "heapMb": 41.8,
+       "peakRssMb": 197.4,
+       "stallMs": 19.4,
+       "endAt": 1791990153548,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 197.4,
+       "heapMb": 41.8,
+       "peakRssMb": 197.4,
+       "stallMs": 0.1,
+       "endAt": 1791990153549,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 197.4,
+       "heapMb": 41.8,
+       "peakRssMb": 197.4,
+       "stallMs": 0.1,
+       "endAt": 1791990153549,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 3.8,
+       "rssMb": 197.6,
+       "heapMb": 46.1,
+       "peakRssMb": 197.6,
+       "stallMs": 3.8,
+       "endAt": 1791990153552,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 197.7,
+       "heapMb": 46.1,
+       "peakRssMb": 197.7,
+       "stallMs": 0.3,
+       "endAt": 1791990153553,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 198,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 459,
+     "memory": {
+      "nodePeakMb": 198,
+      "treePeakSampledMb": 197,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 1.2,
+      "p95": 91.2,
+      "max": 91.2
+     },
+     "rep": 2
+    },
+    {
+     "mode": "cold",
+     "wallMs": 245,
+     "engine": {
+      "requested": "ts",
+      "binary": null,
+      "fallback": false,
+      "log": []
+     },
+     "summary": {
+      "seen": 121,
+      "added": 121,
+      "changed": 0,
+      "removed": 0,
+      "extracted": 98,
+      "projects": 2,
+      "edges": 486
+     },
+     "phases": [
+      {
+       "phase": "prepare",
+       "ms": 0.1,
+       "rssMb": 104.3,
+       "heapMb": 12.2,
+       "peakRssMb": 104.3,
+       "stallMs": 0.1,
+       "endAt": 1791990153844,
+       "httpMaxMs": 4.3
+      },
+      {
+       "phase": "scan",
+       "ms": 113.7,
+       "rssMb": 175,
+       "heapMb": 52.9,
+       "peakRssMb": 175,
+       "stallMs": 0.2,
+       "endAt": 1791990153958,
+       "counts": {
+        "seen": 121,
+        "added": 121,
+        "changed": 0,
+        "removed": 0
+       },
+       "httpMaxMs": 1.2
+      },
+      {
+       "phase": "projects",
+       "ms": 0.9,
+       "rssMb": 175.1,
+       "heapMb": 53.1,
+       "peakRssMb": 175.1,
+       "stallMs": 0.9,
+       "endAt": 1791990153959,
+       "counts": {
+        "projects": 2
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "extract",
+       "ms": 107.6,
+       "rssMb": 193.5,
+       "heapMb": 44,
+       "peakRssMb": 193.5,
+       "stallMs": 47.9,
+       "endAt": 1791990154066,
+       "counts": {
+        "files": 98,
+        "texts": 94,
+        "bytes": 2363699,
+        "refs": 946,
+        "identifiers": 200,
+        "readMs": 103,
+        "hashMs": 1,
+        "extractMs": 100,
+        "writeMs": 4
+       },
+       "httpMaxMs": 87.4
+      },
+      {
+       "phase": "edges:refs",
+       "ms": 10.9,
+       "rssMb": 194.6,
+       "heapMb": 50.3,
+       "peakRssMb": 194.6,
+       "stallMs": 10.9,
+       "endAt": 1791990154077
+      },
+      {
+       "phase": "edges:duplicate",
+       "ms": 0.2,
+       "rssMb": 194.6,
+       "heapMb": 50.3,
+       "peakRssMb": 194.6,
+       "stallMs": 0.2,
+       "endAt": 1791990154077
+      },
+      {
+       "phase": "edges:shared_id",
+       "ms": 0.3,
+       "rssMb": 194.6,
+       "heapMb": 50.5,
+       "peakRssMb": 194.6,
+       "stallMs": 0.3,
+       "endAt": 1791990154078
+      },
+      {
+       "phase": "edges:similar",
+       "ms": 6.4,
+       "rssMb": 195.5,
+       "heapMb": 63.5,
+       "peakRssMb": 195.5,
+       "stallMs": 6.4,
+       "endAt": 1791990154084
+      },
+      {
+       "phase": "edges",
+       "ms": 17.9,
+       "rssMb": 195.5,
+       "heapMb": 63.5,
+       "peakRssMb": 195.5,
+       "stallMs": 17.9,
+       "endAt": 1791990154084,
+       "counts": {
+        "edges": 486
+       },
+       "httpMaxMs": null
+      },
+      {
+       "phase": "seed",
+       "ms": 0.1,
+       "rssMb": 195.5,
+       "heapMb": 63.5,
+       "peakRssMb": 195.5,
+       "stallMs": 0.1,
+       "endAt": 1791990154084,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "externals",
+       "ms": 0.1,
+       "rssMb": 195.5,
+       "heapMb": 63.5,
+       "peakRssMb": 195.5,
+       "stallMs": 0.1,
+       "endAt": 1791990154084,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "rank",
+       "ms": 4.1,
+       "rssMb": 197.3,
+       "heapMb": 37.9,
+       "peakRssMb": 197.3,
+       "stallMs": 4.1,
+       "endAt": 1791990154089,
+       "httpMaxMs": null
+      },
+      {
+       "phase": "fts",
+       "ms": 0.3,
+       "rssMb": 197.4,
+       "heapMb": 37.9,
+       "peakRssMb": 197.4,
+       "stallMs": 0.3,
+       "endAt": 1791990154089,
+       "httpMaxMs": null
+      }
+     ],
+     "peakRssMb": 198,
+     "nodes": {
+      "dir": 23,
+      "external": 54,
+      "file": 98
+     },
+     "edgesByKind": {
+      "external": 52,
+      "imports": 180,
+      "links": 6,
+      "mention": 83,
+      "refpath": 94,
+      "shared_id": 8,
+      "similar": 63
+     },
+     "fingerprint": {
+      "imports": "8369f8bb897838bf",
+      "links": "f87c3a3800bef438",
+      "refpath": "6843851d686a9c21",
+      "mention": "f0a6d834db098b3d",
+      "symlink": "da39a3ee5e6b4b0d",
+      "duplicate": "da39a3ee5e6b4b0d",
+      "external": "fbed5d97b5a41cfd",
+      "shared_id": "50b63b37603f2750",
+      "similar": "ce470a90f5a1c006"
+     },
+     "dbMb": 0.6,
+     "processMs": 459,
+     "memory": {
+      "nodePeakMb": 198,
+      "treePeakSampledMb": 197,
+      "nativePeakSampledMb": 0
+     },
+     "http": {
+      "probes": 6,
+      "errors": 0,
+      "p50": 1.2,
+      "p95": 87.4,
+      "max": 87.4
+     },
+     "rep": 3
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+name: Build Visual Brain
+# Builds, tests and packages the universal Mac app. It never publishes: publishing is an explicit step
+# (node scripts/publish-release.mjs RUN_ID) run by the owner, who also signs the update feed on their own Mac.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write # a private draft release keeps the package; Actions artifact storage is shared and often full
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Rust targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            app/src-tauri/target
+            native/indexer/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('app/src-tauri/Cargo.lock', 'native/indexer/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - run: npm ci
+      - name: Tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
+      - name: Typecheck and tests
+        run: |
+          npm run typecheck
+          npm run test:work
+          node scripts/test-update.mjs
+          node scripts/test-launch.mjs
+          node scripts/test-terminal-service.mjs
+          node scripts/test-terminal-runtime.mjs
+          npm run test:harnesses
+      - name: Native indexer (arm64 + x64)
+        run: node scripts/build-indexer.mjs
+      - name: Package (universal, ad-hoc signed)
+        run: npm run package:mac
+      - name: Verify the package on this runner
+        run: |
+          cd release
+          shasum -a 256 -c Visual-Brain-*-mac-universal.zip.sha256
+          mkdir -p ../.build/verify && ditto -x -k Visual-Brain-*-mac-universal.zip ../.build/verify
+          codesign --verify --deep --strict "../.build/verify/Visual Brain.app"
+          /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "../.build/verify/Visual Brain.app/Contents/Info.plist"
+      - name: Clean profile and optional harness installers
+        run: |
+          node scripts/test-desktop.mjs "--runtime=.build/verify/Visual Brain.app/Contents/Resources/runtime"
+          node scripts/test-harness-clean.mjs "--runtime=.build/verify/Visual Brain.app/Contents/Resources/runtime"
+      - name: Keep the package in a private draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_id }}" release/Visual-Brain-*-mac-universal.zip release/Visual-Brain-*-mac-universal.zip.sha256 \
+            --draft --target "${{ github.sha }}" --title "Build ${{ github.run_id }}" --notes "Build privata di ${{ github.sha }}. Non è pubblica: si pubblica con scripts/publish-release.mjs."

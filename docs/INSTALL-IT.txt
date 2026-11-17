@@ -1,0 +1,49 @@
+VISUAL BRAIN 0.2.48 — MAC
+
+1. Estrai lo ZIP e trascina Visual Brain.app in Applicazioni PRIMA di aprirla.
+   Aperta dalla cartella Download o da quella dello ZIP, macOS la esegue da una
+   copia in sola lettura e gli aggiornamenti non si possono installare lì.
+   L'app ora prova a spostarsi da sola in Applicazioni, ma è meglio farlo subito.
+2. Apri l'app. Scegli Italiano o English e le cartelle da mappare.
+3. Premi «Crea la mia mappa» e attendi l'indicizzazione.
+
+Node è incluso: non servono npm, Rust o strumenti di sviluppo.
+Dal pannello del nodo, «Harness del nodo → Installa» scarica DeepSeek Harness
+o Harness² nel tuo profilo. Anche npm e uv sono inclusi; ogni utente configura
+il proprio account/provider. Il download non esegue chiamate ai modelli.
+Richiede macOS 13.5 o successivo. Il pacchetto universal include Intel e Apple Silicon.
+
+Questa build usa una firma stabile autofirmata, senza certificati Apple. Non è
+notarizzata: macOS può richiedere di autorizzare il primo avvio in Impostazioni
+di Sistema → Privacy e sicurezza. La firma mantiene la stessa identità tra le
+versioni; non concede accesso alle cartelle. Non disabilitare Gatekeeper o altre
+protezioni di sistema.
+
+La mappa funziona senza AI. Per avviare agenti occorre installare e autenticare
+Claude Code, Codex o Hermes separatamente con il proprio account.
+L'indice e la bacheca restano in ~/Library/Application Support/Visual Brain/.
+I log sono nella sottocartella logs. Le scansioni leggono le cartelle scelte;
+non modificano i file originali. Gli agenti lanciati possono modificare file
+secondo le istruzioni e i permessi del rispettivo CLI.
+
+Da Menu app → Impostazioni puoi cambiare lingua e cartelle. I contenuti e i nomi
+dei file non vengono tradotti. File non accessibili per i permessi di macOS
+possono non comparire; autorizza solo le cartelle che desideri indicizzare.
+
+La prima scansione locale non invia dati a provider esterni. L'uso degli agenti
+AI e dell'analisi semantica può inviare il contesto ai provider configurati.
+
+I terminali avviati dalla 0.2.17 restano attivi quando chiudi, aggiorni e riapri
+l'app. Durante la chiusura le API del grafo e della squadra non sono disponibili.
+Al primo passaggio dalla 0.2.16 o precedente, termina il lavoro delle vecchie
+sessioni prima di chiudere l'app: non sono trasferibili al nuovo motore.
+Riavvio del Mac e logout terminano le sessioni. I dati restano separati dall'app.
+
+PRIMO PASSAGGIO DALLA 0.2.44 O PRECEDENTE
+La firma cambia una volta. Prima di aggiornare, termina e chiudi tutte le sessioni
+agente/terminale. Dopo l'installazione, chiudi l'app con ⌘Q, attendi almeno 10
+secondi e riaprila da Applicazioni: il vecchio servizio terminali, se vuoto, si
+arresta da solo. In alternativa, dopo aver salvato e terminato il lavoro, riavvia
+il Mac. macOS può chiedere nuovamente il consenso per le cartelle scelte.
+Tenere terminali della vecchia versione aperti può continuare a provocare richieste
+ripetute fino a questo passaggio. L'aggiornamento non li interrompe automaticamente.

@@ -1,0 +1,57 @@
+{
+  "name": "visual-brain",
+  "version": "0.2.48",
+  "description": "Local-first visual brain: knowledge graph of the files on the Desktop, with agents launched from the nodes.",
+  "license": "MIT",
+  "author": "Michael Belmonte",
+  "homepage": "https://github.com/MichaelxBelmonte/VisualBrain",
+  "repository": { "type": "git", "url": "git+https://github.com/MichaelxBelmonte/VisualBrain.git" },
+  "bugs": { "url": "https://github.com/MichaelxBelmonte/VisualBrain/issues" },
+  "private": true,
+  "type": "module",
+  "bin": {
+    "vb": "./bin/vb.js"
+  },
+  "scripts": {
+    "build:ui": "node scripts/build-ui.mjs",
+    "watch:ui": "node scripts/build-ui.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "index": "node src/cli.ts index",
+    "serve": "node src/cli.ts serve",
+    "dev": "node src/cli.ts serve --watch-ui",
+    "postinstall": "node scripts/postinstall.mjs",
+    "prepare:runtime": "npm run build:ui && node scripts/prepare-runtime.mjs",
+    "release:feed": "node scripts/make-feed.mjs",
+    "release:publish": "node scripts/publish-release.mjs",
+    "test:update": "node scripts/test-update.mjs && node scripts/test-access.mjs",
+    "test:team": "node scripts/test-team-watch.mjs",
+    "test:harnesses": "node scripts/test-node-tasks-harnesses.mjs && node scripts/test-harness-installer.mjs && node scripts/test-agent-clis.mjs",
+    "package:mac": "node scripts/package-mac.mjs",
+    "install:mac": "node scripts/package-mac.mjs && node scripts/update-app.mjs --remove-bundle",
+    "package:mac:trial": "node scripts/package-mac.mjs --arch=universal --trial",
+    "test:index": "node scripts/test-index-integration.mjs && node scripts/test-first-map.mjs && node scripts/test-extract-parallel.mjs && node scripts/test-index-concurrency.mjs && node scripts/test-index-review.mjs && node scripts/test-api-write.mjs && node scripts/test-graph-determinism.mjs && node scripts/test-index-quality.mjs && node scripts/test-native-indexer.mjs && node scripts/test-index-watch.mjs && node scripts/test-index-responsive.mjs --no-compare",
+    "test:work": "node scripts/test-reminders.mjs && node scripts/test-reminders-agent.mjs && node scripts/test-reminder-board.mjs && node scripts/test-work-reorder.mjs && node scripts/test-work-rail.mjs && node scripts/test-work-responsive.mjs && node scripts/test-workspace-integration.mjs && node scripts/test-work-layout.mjs && node scripts/test-work-tiles.mjs && node scripts/test-work-connections.mjs && node scripts/test-work-channel.mjs && node scripts/test-work-input.mjs && node scripts/test-work-rename-link.mjs && node scripts/test-i18n.mjs && node scripts/test-team-watch.mjs && node scripts/test-attachments.mjs && node scripts/test-work-state.mjs && node scripts/test-work-roles.mjs && node scripts/test-session-codes.mjs && node scripts/test-ui-chrome.mjs && node scripts/test-explore.mjs && node scripts/test-resume.mjs && node scripts/test-worktrees.mjs && node scripts/test-syntax-imports.mjs && node scripts/test-git.mjs && node scripts/test-code-view.mjs && node scripts/test-project-workflows.mjs && node scripts/test-github-connect.mjs && node scripts/test-squad.mjs && node scripts/test-squads.mjs && node scripts/test-index-narrow.mjs && node scripts/test-rank.mjs && node scripts/test-term-replay.mjs && node scripts/test-launch.mjs && node scripts/test-team-mcp.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "d3-force": "^3.0.0",
+    "d3-quadtree": "^3.0.1",
+    "highlight.js": "^11.11.1",
+    "node-pty": "^1.1.0",
+    "web-tree-sitter": "^0.27.1",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.2",
+    "@types/d3-force": "^3.0.10",
+    "@types/d3-quadtree": "^3.0.6",
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.0"
+  }
+}
