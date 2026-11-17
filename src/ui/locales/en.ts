@@ -467,6 +467,8 @@ export const en: Record<string, string> = {
   "orchestratore e operatori nel nodo": "orchestrator and operators in the node",
   "aggiunge un nodo a Operativa": "adds a node to Workspace",
   "Serve te": "Needs you",
+  "Mostra altri {n}": "Show {n} more",
+  "Mostra meno": "Show less",
   "Fatto": "Done",
   "+ Incarico": "+ Task",
   "+ Promemoria": "+ Reminder",

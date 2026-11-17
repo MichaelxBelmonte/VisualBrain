@@ -2,7 +2,7 @@
 // Uso: node scripts/test-work-board.mjs — nessun server, nessuna app.
 import assert from 'node:assert/strict';
 import { setLanguage } from '../src/ui/i18n.ts';
-import { boardHint, inboxLane, taskLane, taskStatus } from '../src/ui/work-board.ts';
+import { boardHint, inboxLane, taskLane, taskStatus, youDisclosure } from '../src/ui/work-board.ts';
 
 setLanguage('it');
 const op = (alive = true) => ({ code: 'OP3', alive });
@@ -42,3 +42,16 @@ assert.equal(boardHint([t('working', 'a')], 1).text, 'In progress: 1. Nothing fo
 assert.equal(taskStatus({ status: 'pending' }).text, 'Unassigned');
 setLanguage('it');
 console.log('PASS "Serve te" hint: stopped squad, no tasks, in progress, unassigned, waiting, all done (IT/EN)');
+
+for (const total of [0, 1, 4, 9]) {
+  for (const columns of [1, 2, 3]) {
+    const shown = Math.min(total, 2 * columns);
+    assert.deepEqual(youDisclosure(total, columns, false), { shown, label: total > shown ? `Mostra altri ${total - shown}` : '' });
+    assert.deepEqual(youDisclosure(total, columns, true), { shown: total, label: total > shown ? 'Mostra meno' : '' });
+  }
+}
+setLanguage('en');
+assert.deepEqual(youDisclosure(9, 3, false), { shown: 6, label: 'Show 3 more' });
+assert.deepEqual(youDisclosure(9, 3, true), { shown: 9, label: 'Show less' });
+setLanguage('it');
+console.log('PASS "Serve te" shows two grid rows, counts the remaining cards and labels both actions in IT/EN');

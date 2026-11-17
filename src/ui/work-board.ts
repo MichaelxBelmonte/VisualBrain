@@ -29,6 +29,14 @@ export function taskLane(t: Pick<TeamTask, 'status'>): LaneId {
 export function inboxLane(i: Pick<InboxItem, 'column'>): LaneId { return i.column === 'new' || i.column === 'ready' ? 'you' : 'done'; }
 export const REMINDERS = 'reminders';
 
+/** The grid fills the available board width, including when the node sidebar changes size. */
+export function youDisclosure(total: number, columns: number, expanded: boolean): { shown: number; label: string } {
+  const limit = 2 * Math.max(1, columns);
+  if (total <= limit) return { shown: total, label: '' };
+  if (expanded) return { shown: total, label: tr('Mostra meno') };
+  return { shown: limit, label: tr('Mostra altri {n}').replace('{n}', String(total - limit)) };
+}
+
 /** One line under a task title: who has it and what happens next, in plain words. Pure, so the wording is testable. */
 export function taskStatus(t: Pick<TeamTask, 'status' | 'assignedTo'>, assignee?: { code?: string; name?: string; alive: boolean }): { text: string; tone: string } {
   const code = assignee?.code || assignee?.name || '';
@@ -76,6 +84,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
   let signature = '';
   let loading = false;
   let openCard: string | null = null;
+  let youExpanded = false;
   let panel: 'none' | 'settings' | 'link' | 'new' = 'none';
   let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -123,6 +132,35 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
 
   const isSquad = () => team !== 'brain' && team !== REMINDERS;
 
+  function selectNode(id: number | null): void {
+    if (nodeId === id) return;
+    nodeId = id; team = '1'; view = null; panel = 'none'; youExpanded = false;
+  }
+
+  function updateDisclosure(): void {
+    const grid = el.querySelector<HTMLElement>('.lavoro-you > .lavoro-cards');
+    const toggle = el.querySelector<HTMLButtonElement>('[data-you-toggle]');
+    if (!visible || !grid || !toggle) return;
+    const cards = grid.querySelectorAll<HTMLElement>('.lavoro-card');
+    // auto-fill resolves to one pixel track per column, even if a row has empty cells.
+    const columns = cards.length ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length : 1;
+    const { shown, label } = youDisclosure(cards.length, columns, youExpanded);
+    toggle.hidden = !label;
+    toggle.setAttribute('aria-expanded', String(youExpanded));
+    if (toggle.textContent !== label) toggle.textContent = label;
+    cards.forEach((card, i) => {
+      if (i >= shown && card.contains(document.activeElement)) toggle.focus({ preventScroll: true });
+      card.hidden = i >= shown;
+    });
+  }
+  let boardWidth = 0;
+  new ResizeObserver(([entry]) => {
+    if (entry.contentRect.width !== boardWidth) {
+      boardWidth = entry.contentRect.width;
+      updateDisclosure();
+    }
+  }).observe(el);
+
   /** The frame changes only with the node, the filter or the open panel; the data inside on every refresh. */
   function paintShell(): void {
     const key = `${nodeId}:${team}:${panel}:${nodes.map(n => n.id).join(',')}`;
@@ -132,7 +170,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     const addLabel = team === REMINDERS ? tr('+ Promemoria') : team === 'brain' ? '' : tr('+ Incarico');
     el.innerHTML = ui`<div class="board lavoro"><header class="lavoro-head">${nodes.length > 1 ? ui`<select data-node class="lavoro-node" aria-label="Nodo">${nodeOptions}</select>` : `<strong class="lavoro-node">${esc(nodes[0]?.name ?? '')}</strong>`}<nav class="lavoro-filters" aria-label="Squadre e promemoria"></nav><span class="lavoro-tools">${addLabel ? `<button class="btn small primary" data-new>${esc(addLabel)}</button>` : ''}<details class="work-overflow lavoro-menu"><summary class="btn small ghost" aria-label="${esc(tr('Menu della squadra'))}">···</summary><div>${isSquad() ? ui`<button data-add-agent><span>Aggiungi agente</span><small>nella squadra, con il suo ruolo</small></button><button data-panel="settings"><span>Impostazioni della squadra</span><small>obiettivo, consegna, memoria, limiti</small></button>` : ''}${team === 'brain' ? ui`<button data-panel="settings"><span>Riepilogo del Main Brain</span><small>e consegna dei rapporti</small></button>` : ''}<button data-panel="link"><span>Collega a…</span><small>un altro nodo, per scambiare messaggi</small></button><button data-reveal><span>Mostra nella mappa</span></button>${isSquad() ? ui`<div class="sep"></div><button data-archive class="danger"><span>Archivia la squadra</span><small>il ramo Git resta</small></button>` : ''}</div></details></span></header>
       <div class="lavoro-goal" data-goal></div><div class="board-error" role="alert"></div><div class="lavoro-panel" data-panel-box></div>
-      ${team === REMINDERS ? '' : ui`<section class="lavoro-you" data-lane="you" aria-live="polite"><h3>Serve te<span class="kanban-count"></span></h3><div class="lavoro-cards"></div></section>`}
+      ${team === REMINDERS ? '' : ui`<section class="lavoro-you" data-lane="you" aria-live="polite"><h3>Serve te<span class="kanban-count"></span></h3><div class="lavoro-cards" id="work-needs-cards"></div><button type="button" class="btn small ghost" data-you-toggle aria-controls="work-needs-cards" aria-expanded="false" hidden></button></section>`}
       <div class="lavoro-lanes">${LANES.map(([id, label]) => ui`<section class="lavoro-lane" data-lane="${id}"><h3>${tr(label)}<span class="kanban-count"></span></h3><div class="lavoro-cards"></div></section>`).join('')}</div>
       ${team === REMINDERS ? '' : ui`<details class="lavoro-messages"><summary>Messaggi <span data-message-count></span></summary><div class="board-messages" aria-live="polite"></div><form data-message class="board-row"><select name="to" aria-label="Destinatario"></select><textarea name="text" maxlength="1200" rows="1" required placeholder="Istruzione, risposta o decisione…" aria-label="Messaggio"></textarea><button class="btn small">Invia</button></form></details>`}</div>`;
     paintPanel();
@@ -156,7 +194,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
   function bindShell(): void {
     const q = <T extends Element = HTMLElement>(s: string) => el.querySelector<T>(s);
     const node = q<HTMLSelectElement>('select[data-node]');
-    if (node) node.onchange = () => { nodeId = Number(node.value); team = '1'; view = null; panel = 'none'; paint(); void refresh(true); };
+    if (node) node.onchange = () => { selectNode(Number(node.value)); paint(); void refresh(true); };
     const message = q<HTMLFormElement>('[data-message]');
     if (message) {
       message.onsubmit = e => { e.preventDefault(); void act(async () => { await api.teamMessage(nodeId!, message.querySelector<HTMLSelectElement>('[name=to]')!.value || null, message.querySelector<HTMLTextAreaElement>('[name=text]')!.value, team); message.querySelector<HTMLTextAreaElement>('[name=text]')!.value = ''; }); };
@@ -182,6 +220,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
       const d = t.dataset;
       if (t.closest('.lavoro-menu') && t.tagName === 'BUTTON') t.closest('details')!.open = false;
       if (d.goto) cb.open(d.goto);
+      else if (d.youToggle !== undefined) { youExpanded = !youExpanded; updateDisclosure(); }
       else if (d.filter) { team = d.filter; view = null; panel = 'none'; openCard = null; paint(); void refresh(true); }
       else if (d.new !== undefined) setPanel(panel === 'new' ? 'none' : 'new');
       else if (d.panel) setPanel(d.panel as typeof panel);
@@ -270,7 +309,8 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
       lane.classList.toggle('alert', id === 'you' && lanes.you.length > 0);
       if (!typing || !lane.contains(typing)) lane.querySelector('.lavoro-cards')!.innerHTML = cards.join('') || (id === 'you' ? hintLine() : `<p class="kanban-empty muted">${esc(empty[id])}</p>`);
     }
-    if (focusedCard && document.activeElement === document.body) el.querySelector<HTMLElement>(`[data-card="${CSS.escape(focusedCard)}"]`)?.focus({ preventScroll: true });
+    updateDisclosure();
+    if (focusedCard && document.activeElement === document.body) el.querySelector<HTMLElement>(`[data-card="${CSS.escape(focusedCard)}"]:not([hidden])`)?.focus({ preventScroll: true });
     paintMessages();
     paintError();
   }
@@ -390,7 +430,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
   return (nextNodes, selected, show, nextTeam) => {
     nodes = nextNodes;
     const node = selected !== null && nodes.some(n => n.id === selected) ? selected : nodeId !== null && nodes.some(n => n.id === nodeId) ? nodeId : nodes[0]?.id ?? null;
-    if (node !== nodeId) { nodeId = node; team = '1'; view = null; panel = 'none'; }
+    selectNode(node);
     if (nextTeam && nextTeam !== team) { team = nextTeam; view = null; panel = 'none'; }
     visible = show;
     if (!visible) { if (timer) { clearInterval(timer); timer = null; } return; }

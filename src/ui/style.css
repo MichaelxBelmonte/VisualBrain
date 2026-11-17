@@ -1291,6 +1291,8 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .lavoro-links li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 /* "Serve te": quiet one-liner when empty, a highlighted row of cards when something waits on the person. */
 .lavoro-you { display: flex; flex-direction: column; gap: 8px; }
+.lavoro-you [data-you-toggle] { align-self: flex-start; }
+.lavoro-you [hidden] { display: none; }
 .lavoro-you > h3 { display: none; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--role-attention); }
 .lavoro-you.alert > h3 { display: flex; }
 .lavoro-you .kanban-count { background: var(--role-attention); color: var(--bg); font-weight: 600; }
