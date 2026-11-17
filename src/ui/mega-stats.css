@@ -61,3 +61,33 @@
 .mega-stats-dialog :is(input,select) { width: 100%; min-height: 34px; padding: 4px 8px; border: 1px solid var(--g3); border-radius: 6px; background: var(--bg); color: var(--fg); }
 .mega-stats-dialog .mega-stats-status:empty { display: none; }
 .mega-stats-dialog footer { display: flex; justify-content: end; flex-wrap: wrap; gap: 8px; }
+.mega-stats-providers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; }
+.mega-stats-provider { min-width: 0; padding: 12px 0; border-top: 1px solid var(--g2); }
+.mega-stats-provider dl { display: grid; grid-template-columns: minmax(90px, .85fr) minmax(0, 1.6fr); gap: 5px 10px; margin-top: 9px; font-size: 12px; }
+.mega-stats-provider dt { color: var(--g5); }
+.mega-stats-provider dd { margin: 0; }
+.mega-stats-provider meter { display: block; width: 100%; max-width: 180px; height: 9px; margin-top: 4px; }
+
+.mega-routing-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.mega-routing-head [hidden] { display: none; }
+.mega-routing > .mega-stats-meta { margin: 4px 0 10px; }
+.mega-stats .mega-stats-provider { margin: 0; padding: 0; }
+.mega-quota-title { display: inline-flex; gap: 6px 12px; align-items: baseline; flex-wrap: wrap; }
+.mega-quota-title strong { font-size: 12px; font-weight: 550; color: var(--g5); }
+.mega-quota-title [data-status="limited"], .mega-quota-title [data-status="margin"] { color: var(--role-blocked); }
+.mega-stats-provider summary > .mega-stats-meta { display: block; margin: 3px 0 0 16px; }
+.mega-routing-rule { padding: 10px 0 0; border-top: 1px solid var(--g2); }
+.mega-routing-rule > .btn { margin: 8px 0; }
+.mega-stats-rule { display: grid; grid-template-columns: fit-content(60%) 1fr; gap: 4px 14px; font-size: 12px; }
+.mega-stats-rule dt { color: var(--g5); }
+.mega-stats-rule dd { margin: 0; }
+.mega-routing-rule ul { margin: 0; padding-left: 18px; }
+.mega-routing-rule li { padding: 3px 0; font-size: 12px; }
+.mega-stats-dialog .mega-routing-check { display: flex; align-items: center; gap: 7px; color: var(--fg); }
+.mega-routing-check input[type=checkbox] { width: 15px; height: 15px; min-height: 0; margin: 0; }
+.mega-stats-dialog fieldset { margin: 0; min-width: 0; padding: 8px; border: 1px solid var(--g2); border-radius: 6px; }
+.mega-stats-dialog legend { font-size: 12px; }
+.mega-routing-provider { display: grid; grid-template-columns: minmax(90px, .9fr) minmax(0, 1.2fr); align-items: center; gap: 6px; padding: 3px 0; }
+
+.mega-routing { container-type: inline-size; }
+@container (max-width: 575px) { .mega-stats-providers { grid-template-columns: minmax(0, 1fr); } }

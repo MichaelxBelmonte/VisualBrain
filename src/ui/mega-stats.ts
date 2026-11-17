@@ -1,5 +1,6 @@
 import type { CoordinationRequest, MegaStatsReport, StatsLatency, StatsMeasures, StatsSession, StatsTeam } from '../shared/mega-stats.ts';
 import { getLanguage, t } from './i18n.ts';
+import { mountQuotaPanel } from './quota-panel.ts';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, className?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -77,12 +78,6 @@ function table(caption: string, headers: string[], rows: string[][]): HTMLTableE
     for (const value of cells) tr.append(el('td', value));
   }
   return tab;
-}
-
-function fact(list: HTMLDListElement, label: string, value: string | HTMLElement) {
-  const dd = el('dd');
-  dd.append(value);
-  list.append(el('dt', label), dd);
 }
 
 function latencyTable(m: StatsMeasures) {
@@ -295,7 +290,7 @@ export function mountMegaStats(root: HTMLElement): () => void {
   const meta = el('p', undefined, 'mega-stats-meta');
   const title = el('div');
   title.append(el('h2', t('Stats del Mega Brain')), meta);
-  const refresh = button(t('Aggiorna statistiche'), () => { void load(); });
+  const refresh = button(t('Aggiorna statistiche'), () => { routing.update(routingScope(), true); void load(); });
   head.append(title, refresh);
   const filters = el('div', undefined, 'mega-stats-filters');
   const hours = filterField(t('Periodo')), project = filterField(t('Progetto')), team = filterField(t('Squadra')), session = filterField(t('Sessione'));
@@ -309,8 +304,11 @@ export function mountMegaStats(root: HTMLElement): () => void {
   filters.append(hours.label, project.label, team.label, session.label);
   const status = el('p', undefined, 'mega-stats-status');
   status.setAttribute('role', 'status');
-  const report = el('div');
-  page.append(head, filters, status, report);
+  const overview = el('div'), quotaRoot = el('div'), report = el('div');
+  const routing = mountQuotaPanel(quotaRoot);
+  let listedTeams: StatsTeam[] = [];
+  const routingScope = () => listedTeams.find(g => g.key === team.select.value) ?? null;
+  page.append(head, filters, status, overview, quotaRoot, report);
   root.classList.add('mega-stats-view');
   root.replaceChildren(page);
   let request: AbortController | undefined;
@@ -332,6 +330,7 @@ export function mountMegaStats(root: HTMLElement): () => void {
     }
     const focusKey = report.contains(document.activeElement) ? (document.activeElement as HTMLElement)?.dataset.focusKey : undefined;
     const projects = r.projects.map(p => ({ value: String(p.id), label: p.name }));
+    listedTeams = r.teams;
     const teams = r.teams.filter(t => !projectId || String(t.projectId) === projectId);
     options(project.select, [allProjects, ...projects], projectId);
     options(team.select, [allTeams, ...teams.map(t => ({ value: t.key, label: t.name }))], teamKey);
@@ -359,7 +358,9 @@ export function mountMegaStats(root: HTMLElement): () => void {
         attention.append(team ? boardButton(s.nodeId,team.id,target) : el('p',target));
       }
     }
-    report.replaceChildren(metrics, turnCoverage, attention, observations, drilldown, sources(r), coordination());
+    overview.replaceChildren(metrics, turnCoverage);
+    routing.update(routingScope());
+    report.replaceChildren(attention, observations, drilldown, sources(r), coordination());
     for (const d of report.querySelectorAll<HTMLDetailsElement>('details')) d.open = expanded.has(d.dataset.key);
     if (focusKey) [...report.querySelectorAll<HTMLElement>('[data-focus-key]')].find(x => x.dataset.focusKey === focusKey)?.focus({ preventScroll: true });
     rendered = true;
@@ -370,6 +371,7 @@ export function mountMegaStats(root: HTMLElement): () => void {
     const now = new AbortController();
     request = now;
     if (reset) {
+      overview.replaceChildren();
       report.replaceChildren();
       meta.replaceChildren();
       rendered = false;
@@ -401,6 +403,7 @@ export function mountMegaStats(root: HTMLElement): () => void {
   filters.addEventListener('change', e => {
     if (e.target === project.select) options(team.select, [allTeams], '');
     if (e.target === project.select || e.target === team.select) { options(session.select, [allSessions], ''); choices = []; }
+    routing.update(routingScope());
     void load(true);
   });
   function schedule() {
@@ -414,10 +417,12 @@ export function mountMegaStats(root: HTMLElement): () => void {
   document.addEventListener('visibilitychange', schedule);
   window.addEventListener('vb:stats-changed', schedule);
   const interval = window.setInterval(schedule, 30_000);
+  routing.update(null);
   void load();
   return () => {
     disposed = true;
     request?.abort();
+    routing.dispose();
     window.clearInterval(interval);
     window.clearTimeout(debounce);
     window.removeEventListener('vb:stats-changed', schedule);
