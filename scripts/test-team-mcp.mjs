@@ -12,7 +12,7 @@ const runtimeArg=process.argv.find(a=>a.startsWith('--runtime='));
 const runtime=runtimeArg?resolve(runtimeArg.slice(10)):null;
 const arch=process.argv.find(a=>a.startsWith('--arch='))?.slice(7)||process.arch;
 const executable=runtime?join(runtime,`node-${arch}`):process.execPath;
-const bridge=runtime?join(runtime,'server/src/server/team-mcp.mjs'):new URL('../src/server/team-mcp.mjs',import.meta.url).pathname;
+const bridge=runtime?join(runtime,'server/src/server/team-mcp.mjs'):resolve(import.meta.dirname,'../src/server/team-mcp.mjs');
 const children=[], calls=[], inbox=[];
 let expired=false;
 const server=createServer(async(req,res)=>{

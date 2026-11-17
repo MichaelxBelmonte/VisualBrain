@@ -1,11 +1,12 @@
 // Execute the real Terminals methods with disposable state, without opening a PTY or browser.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { build } from 'esbuild';
 import { nodePickerGroups } from '../src/ui/work-tiles.ts';
 
 const bundle = await build({
-  entryPoints: [new URL('../src/ui/terminal.ts', import.meta.url).pathname],
+  entryPoints: [resolve(import.meta.dirname, '../src/ui/terminal.ts')],
   bundle: true, write: false, platform: 'node', format: 'esm', logLevel: 'silent',
   plugins: [{ name: 'unused-xterm', setup(builder) {
     builder.onResolve({ filter: /^@xterm\// }, args => ({ path: args.path, namespace: 'test' }));
