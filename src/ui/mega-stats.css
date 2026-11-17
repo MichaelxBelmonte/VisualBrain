@@ -45,3 +45,19 @@
 .mega-stats details .mega-stats-kpis dd { font-size: 19px; }
 .mega-stats-sources { margin-top: 20px; }
 .mega-stats-sources p { max-width: 80ch; color: var(--g5); font-size: 12px; }
+.mega-stats .mega-stats-turn-coverage { margin-top: 8px; }
+.mega-stats-controls { display: grid; justify-items: start; gap: 4px; color: var(--g5); font-size: 12px; }
+.mega-stats-controls .btn { margin: 3px 0; }
+.mega-stats-dialog {
+  width: min(390px, calc(100vw - 24px)); max-height: calc(100vh - 24px); padding: 20px;
+  border: 1px solid var(--g3); border-radius: 12px; box-shadow: var(--shadow-pop);
+  background: var(--bg); color: var(--fg); font: inherit; overflow: auto;
+}
+.mega-stats-dialog::backdrop { background: rgb(0 0 0 / 36%); }
+.mega-stats-dialog h3 { margin: 0; }
+.mega-stats-dialog .mega-stats-meta { margin: 5px 0; }
+.mega-stats-dialog form { display: grid; gap: 12px; margin-top: 16px; }
+.mega-stats-dialog label { display: grid; gap: 4px; color: var(--g5); font-size: 12px; }
+.mega-stats-dialog :is(input,select) { width: 100%; min-height: 34px; padding: 4px 8px; border: 1px solid var(--g3); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.mega-stats-dialog .mega-stats-status:empty { display: none; }
+.mega-stats-dialog footer { display: flex; justify-content: end; flex-wrap: wrap; gap: 8px; }

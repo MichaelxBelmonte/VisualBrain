@@ -1,4 +1,4 @@
-import type { MegaStatsReport, StatsLatency, StatsMeasures, StatsSession } from '../shared/mega-stats.ts';
+import type { CoordinationRequest, MegaStatsReport, StatsLatency, StatsMeasures, StatsSession, StatsTeam } from '../shared/mega-stats.ts';
 import { getLanguage, t } from './i18n.ts';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, className?: string): HTMLElementTagNameMap[K] {
@@ -132,7 +132,97 @@ function sessionDetail(s: StatsSession) {
   return d;
 }
 
-function breakdown(r: MegaStatsReport, projectId: string, teamKey: string, sessionId: string) {
+function preferenceLabels() {
+  return {
+    mode: { suggest: t('Suggerisci incarichi'), assign: t('Assegna incarichi') },
+    provider: { balanced: t('Bilanciata'), codex: 'Codex', claude: 'Claude' },
+  };
+}
+
+function teamControls(team: StatsTeam, edit: (team: StatsTeam) => void) {
+  const wrap = el('div', undefined, 'mega-stats-controls');
+  const recipient = team.recipient ?? t('Nessun destinatario attivo');
+  const policy = team.autoSpawn ? t('Abilitato') : t('Disabilitato');
+  wrap.append(el('p', t('Destinatario') + ' · ' + recipient),
+    el('p', t('Avvio automatico degli agenti nella squadra') + ' · ' + policy));
+  const req = team.requested;
+  if (req) {
+    const labels = preferenceLabels();
+    const requested = el('p', t('Richiesta in attesa') + ' · ' + numeric(req.cadenceMinutes) + ' min · ' + labels.mode[req.mode] + ' · ' + labels.provider[req.provider] + ' · ');
+    requested.append(timestamp(req.updatedAt));
+    wrap.append(requested);
+  } else wrap.append(el('p', t('Nessuna preferenza richiesta')));
+  const change = button(t('Richiedi preferenze di coordinamento'), () => edit(team), 'btn small');
+  change.dataset.focusKey = 'preferences:' + team.key;
+  wrap.append(change);
+  return wrap;
+}
+
+function preferenceEditor(team: StatsTeam, parent: HTMLElement, onSaved: () => void) {
+  const dialog = el('dialog', undefined, 'mega-stats-dialog');
+  const title = el('h3', t('Preferenze di coordinamento'));
+  title.id = 'mega-stats-preference-title';
+  dialog.setAttribute('aria-labelledby', title.id);
+  const recipient = team.recipient ?? t('Nessun destinatario attivo');
+  const target = el('p', team.name + ' · ' + recipient, 'mega-stats-meta');
+  const explanation = el('p', t('La richiesta resta in attesa del motore Mega Brain.'), 'mega-stats-meta');
+  const form = el('form');
+  const cadenceLabel = el('label', t('Cadenza dei controlli (minuti)'));
+  const cadence = el('input');
+  cadence.name = 'cadenceMinutes';
+  cadence.type = 'number';
+  cadence.required = true;
+  cadence.min = '1';
+  cadence.max = '1440';
+  cadence.step = '1';
+  cadence.placeholder = '1–1440';
+  cadence.value = team.requested ? String(team.requested.cadenceMinutes) : '';
+  cadenceLabel.append(cadence);
+  const mode = filterField(t('Gestione incarichi')), provider = filterField(t('Preferenza agente'));
+  mode.select.name = 'mode';
+  provider.select.name = 'provider';
+  const labels = preferenceLabels();
+  options(mode.select, Object.entries(labels.mode).map(([value, label]) => ({ value, label })), team.requested?.mode ?? 'suggest');
+  options(provider.select, Object.entries(labels.provider).map(([value, label]) => ({ value, label })), team.requested?.provider ?? 'balanced');
+  const error = el('p', undefined, 'mega-stats-status');
+  error.setAttribute('role', 'alert');
+  const foot = el('footer');
+  const cancel = button(t('Chiudi'), () => dialog.close());
+  const save = el('button', t('Salva richiesta'), 'btn primary');
+  save.type = 'submit';
+  foot.append(cancel, save);
+  form.append(cadenceLabel, mode.label, provider.label, error, foot);
+  dialog.append(title, target, explanation, form);
+  parent.append(dialog);
+  dialog.addEventListener('close', () => {
+    dialog.remove();
+    const origin = [...parent.querySelectorAll<HTMLElement>('[data-focus-key]')].find(x => x.dataset.focusKey === 'preferences:' + team.key);
+    (origin ?? parent.querySelector<HTMLButtonElement>('.mega-stats-head button'))?.focus({ preventScroll: true });
+  }, { once: true });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    if (save.disabled || !form.reportValidity()) return;
+    save.disabled = true;
+    error.textContent = '';
+    try {
+      const res = await fetch('/api/mega-stats/preferences', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: team.nodeId, teamId: team.id, cadenceMinutes: cadence.valueAsNumber,
+          mode: mode.select.value, provider: provider.select.value }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const request: CoordinationRequest = await res.json();
+      if (request.status !== 'pending') throw new Error('Unexpected status');
+      if (dialog.open) dialog.close();
+      onSaved();
+    } catch { error.textContent = t('Impossibile salvare la richiesta. Riprova.'); }
+    finally { save.disabled = false; }
+  };
+  dialog.showModal();
+  cadence.focus();
+}
+
+function breakdown(r: MegaStatsReport, projectId: string, teamKey: string, sessionId: string, edit: (team: StatsTeam) => void) {
   const section = el('section', undefined, 'mega-stats-section');
   section.append(el('h3', t('Progetti e squadre')));
   const selectedSession = r.sessions.find(s => s.id === sessionId);
@@ -149,7 +239,7 @@ function breakdown(r: MegaStatsReport, projectId: string, teamKey: string, sessi
     for (const team of teams) {
       const group = details(team.name, 'team:' + team.key);
       group.className = 'mega-stats-group';
-      group.append(boardButton(team.nodeId, team.id, t('Apri e assegna incarichi')));
+      group.append(boardButton(team.nodeId, team.id, t('Apri e assegna incarichi')), teamControls(team, edit));
       const members = sessions.filter(s => s.teamKey === team.key);
       group.querySelector('summary')!.append(el('small', sessionCount(members.length)));
       if (!members.length) group.append(el('p', t('Nessuna sessione per questi filtri.'), 'mega-stats-meta'));
@@ -240,7 +330,11 @@ export function mountMegaStats(root: HTMLElement): () => void {
     const metrics = summary(r.totals);
     const observations = el('section', undefined, 'mega-stats-section');
     observations.append(latencyTable(r.totals), el('p', t('Errori HTTP') + ' · ' + numeric(r.totals.httpErrors) + '   ·   ' + t('Retry osservati') + ' · ' + numeric(r.totals.retries), 'mega-stats-meta'));
-    report.replaceChildren(metrics, observations, breakdown(r, projectId, teamKey, sessionId), sources(r), coordination());
+    const known = r.sessions.filter(s => s.turnSource !== null).length;
+    const turnCoverage = el('p', t('Sessioni con fonte dei turni') + ' · ' + numeric(known) + '   ·   ' +
+      t('Sessioni senza fonte') + ' · ' + numeric(r.sessions.length - known), 'mega-stats-meta mega-stats-turn-coverage');
+    const drilldown = breakdown(r, projectId, teamKey, sessionId, team => preferenceEditor(team, page, () => { void load(); }));
+    report.replaceChildren(metrics, turnCoverage, observations, drilldown, sources(r), coordination());
     for (const d of report.querySelectorAll<HTMLDetailsElement>('details')) d.open = expanded.has(d.dataset.key);
     if (focusKey) [...report.querySelectorAll<HTMLElement>('[data-focus-key]')].find(x => x.dataset.focusKey === focusKey)?.focus({ preventScroll: true });
     rendered = true;
