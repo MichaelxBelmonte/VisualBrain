@@ -241,6 +241,7 @@ export interface LaunchOptions {
 export interface TeamMessage { id: number; from: string; to: string | null; text: string; createdAt: number }
 export interface TeamLink { id: string; srcNodeId: number; dstNodeId: number; srcSessionId: string | null; dstSessionId: string | null }
 export interface TeamTask {
+  routing?: import('./quota-routing.ts').TaskRoute;
   id: string; title: string; scope: string[]; assignedTo: string | null;
   status: 'pending' | 'working' | 'done' | 'blocked'; result: string; createdBy: string; updatedAt: number;
   /** The result waits on the sorting board (manual delivery): the orchestrator sees the status, not the result, until it is forwarded. */

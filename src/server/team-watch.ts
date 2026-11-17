@@ -41,7 +41,7 @@ export function checkIdle(ctx: ApiCtx, now = Date.now(), reminded: Reminded = ne
   for (const { nodeId, team, sessions } of bySquad.values()) {
     const board = ctx.teams.get(nodeId, team);
     const open = board.tasks.filter(t => t.status !== 'done');
-    const unassigned = open.filter(t => t.assignedTo === null && t.status === 'pending');
+    const unassigned = open.filter(t => t.assignedTo === null && t.status === 'pending' && !t.routing);
     // Each reminder of the same situation waits twice as long as the previous one, and after MAX_REMINDERS there are no more.
     const due = (key: string) => { const r = reminded.get(key); return !r || (r.count < MAX_REMINDERS && now - r.at >= REMIND_EVERY_MS * 2 ** (r.count - 1)); };
     const mark = (key: string, session: string) => reminded.set(key, { at: now, count: (reminded.get(key)?.count ?? 0) + 1, session });

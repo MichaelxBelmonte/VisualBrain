@@ -35,8 +35,10 @@ import { connectGithub, githubRepositories } from './github-connect.ts';
 import { gitEnv } from './git.ts';
 import { mapQuery, type StartupMap } from './startup-map.ts';
 import type { MegaStats } from './mega-stats.ts';
+import type { QuotaRouter } from './quota-router.ts';
 
 export interface ApiCtx {
+  routing?: QuotaRouter;
   stats?: MegaStats;
   db: Db;
   startupMap?: StartupMap;
@@ -261,6 +263,19 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     sendJson(response, status, body);
   };
   try {
+    if (path==='/api/mega-stats/routing' || path==='/api/mega-stats/routing/refresh') {
+      if(req.headers.authorization || req.headers['sec-fetch-site']!=='same-origin')throw new HttpError(403,'Solo dalla pagina Stats');
+      if(!ctx.routing)throw new HttpError(503,'Routing non disponibile');
+      const node=url.searchParams.has('node')?Number(url.searchParams.get('node')):null,team=url.searchParams.get('team')??'1';
+      if(!isTeamId(team))throw new HttpError(400,'Squadra non valida');
+      if(node!==null){requireNode(ctx,node);if(team!=='brain'&&!ctx.teams.team(node,team))throw new HttpError(404,'Squadra non trovata');}
+      if(path.endsWith('/refresh') && method==='POST'){
+        try {await ctx.routing.refresh(ctx);} catch {throw new HttpError(503,'Il CLI non ha restituito una quota aggiornata');}
+      } else if(method==='PUT' && node!==null && team!=='brain' && !path.endsWith('/refresh')) {
+        ctx.routing.configure(node,team,await readJson(req)); ctx.routing.tick(ctx);ctx.stats?.signal();
+      } else if(method!=='GET' || path.endsWith('/refresh')) throw new HttpError(405,'Metodo non consentito');
+      return sendJson(res,200,ctx.routing.view(ctx,node,team));
+    }
     if (path === '/api/mega-stats' || path === '/api/mega-stats/preferences') {
       if (req.headers.authorization || req.headers['sec-fetch-site'] !== 'same-origin') throw new HttpError(403, 'Solo dalla pagina Stats');
       if (!ctx.stats?.available) throw new HttpError(503, 'Telemetria non disponibile');
@@ -549,6 +564,16 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       ctx.teams.unlink(m[1]); ctx.stats?.signal(); return send(res, 200, { ok: true });
     }
 
+    m = /^\/api\/work\/(\d+)\/quota$/.exec(path);
+    if(m && method==='POST'){
+      const b=await readJson(req);
+      const t=typeof b.from==='string'?ctx.terms.get(b.from):undefined;
+      if(!t?.info.alive||!t.info.role||t.info.agent==='shell'||t.info.nodeId!==Number(m[1])||!t.teamToken||req.headers.authorization!=='Bearer '+t.teamToken)throw new HttpError(403,'Sessione non autorizzata');
+      if(!ctx.routing)throw new HttpError(503,'Routing non disponibile');
+      const team=ctx.teams.teamOf(t.info.nodeId,t.info);
+      ctx.routing.report(t.info.nodeId,team,t.info.agent,b);ctx.stats?.bind(req,t.info.nodeId,team,t.info.id);
+      ctx.routing.tick(ctx);ctx.stats?.signal();return sendJson(res,200,{ok:true});
+    }
     m = /^\/api\/work\/(\d+)\/turn$/.exec(path);
     if (m && method === 'POST') {
       const b = await readJson(req);
@@ -562,7 +587,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       ctx.stats?.capture(() => ctx.stats!.turn(t.info,phase,typeof b.turnId === 'string' ? b.turnId : undefined));
       return sendJson(res,200,{ok:true});
     }
-    m = /^\/api\/work\/(\d+)(?:\/(messages|tasks|state|spawn|wake|inbox|forward|proposals)(?:\/([a-z0-9-]+))?)?$/.exec(path);
+    m = /^\/api\/work\/(\d+)(?:\/(messages|tasks|state|spawn|wake|inbox|forward|proposals|handoff)(?:\/([a-z0-9-]+))?)?$/.exec(path);
     if (m) {
       const nodeId = Number(m[1]);
       const node = requireNode(ctx, nodeId);
@@ -571,7 +596,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const b = method === 'GET' ? {} : await readJson(req);
       const actor = boundedText(method === 'GET' ? url.searchParams.get('session') ?? undefined : b.from, 80) || 'user';
       const member = actor === 'user' ? undefined : ctx.terms.get(actor);
-      if (actor !== 'user' && (!member || !member.info.alive || member.info.nodeId !== nodeId || !member.info.role || req.headers.authorization !== `Bearer ${member.teamToken}`)) throw new HttpError(403, 'Sessione non autorizzata per questo nodo');
+      if ((actor !== 'user' || req.headers.authorization) && (!member || !member.info.alive || member.info.nodeId !== nodeId || !member.info.role || req.headers.authorization !== `Bearer ${member.teamToken}`)) throw new HttpError(403, 'Sessione non autorizzata per questo nodo');
       // The board: an agent's own squad (the Main Brain's own board for it); the person names one (default: the first squad).
       const requested = method === 'GET' ? url.searchParams.get('team') ?? undefined : b.team;
       if (requested !== undefined && !isTeamId(requested)) throw new HttpError(400, 'Squadra non valida');
@@ -679,9 +704,15 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       if (action === 'tasks' && !taskId && method === 'POST') {
         if (!canManage || isBrain) throw new HttpError(403, 'Solo l’orchestratore crea incarichi');
         const assignedTo = recipient(b.assignedTo);
+        if(ctx.routing?.rule(nodeId,team).enabled) return send(res,201,ctx.routing.create(ctx,nodeId,team,actor,b,assignedTo));
         const task = ctx.teams.createTask(nodeId, actor, { title: b.title, scope: b.scope, assignedTo }, team);
         ctx.teams.message(nodeId, actor, assignedTo, `${english ? 'Task' : 'Incarico'} ${task.id}: ${task.title}`, team);
         notify(); return send(res, 201, task);
+      }
+      if(action==='handoff' && taskId && method==='POST') {
+        if(isBrain || !ctx.routing?.rule(nodeId,team).enabled)throw new HttpError(409,'Routing non attivo per questa squadra');
+        if(board.policy.delivery==='manual' && actor!=='user')throw new HttpError(409,'La persona deve confermare il checkpoint nella squadra a consegna manuale');
+        return send(res,200,ctx.routing.handoff(ctx,nodeId,team,taskId,actor,b));
       }
       if (action === 'tasks' && taskId && method === 'PATCH') {
         if (isBrain) throw new HttpError(403, 'Il Main Brain non ha incarichi');
@@ -689,6 +720,11 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         const manual = finishing && board.policy.delivery === 'manual' && (member?.info.role === 'operator' || member?.info.role === 'reviewer');
         const before = board.tasks.find(t => t.id === taskId);
         const assignedTo = b.assignedTo === undefined ? undefined : recipient(b.assignedTo);
+        if(before?.routing && (ctx.routing?.rule(nodeId,team).enabled || (before.routing.handoff && !before.routing.handoff.to))) {
+          if(assignedTo!==undefined && assignedTo!==before.assignedTo)throw new HttpError(409,'Per cambiare proprietario consegna un checkpoint verificato');
+          if(before.status!=='done' && !before.assignedTo && b.status==='working')throw new HttpError(409,'In attesa di un proprietario compatibile con la quota');
+          if(before.routing.handoff && !before.routing.handoff.to && b.status && b.status!=='blocked')throw new HttpError(409,'Consegna in attesa di un successore');
+        }
         const changed = !before || (b.status !== undefined && b.status !== before.status)
           || (b.result !== undefined && (typeof b.result !== 'string' || b.result.trim() !== before.result))
           || (assignedTo !== undefined && assignedTo !== before.assignedTo);
@@ -712,6 +748,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       }
       if (action === 'spawn' && method === 'POST') {
         if (!member || member.info.role !== 'orchestrator' || !board.policy.autoSpawn) throw new HttpError(403, 'Avvio automatico non abilitato per questo orchestratore');
+        if(ctx.routing && isCli(b.agent) && !ctx.routing.permitsProvider(nodeId,team,b.agent))throw new HttpError(409,'Il routing della squadra sospende nuovi incarichi per questo provider');
         if (!['operator', 'reviewer'].includes(String(b.role))) throw new HttpError(400, 'Un delegato deve essere operatore o revisore');
         boundedText(b.task, 1000, true);
         const launched = await startSession(ctx, nodeDetail(ctx, nodeId), { ...b, id: nodeId, mode: 'embedded', parentId: actor, teamId: team } as unknown as LaunchRequest);

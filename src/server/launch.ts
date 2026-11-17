@@ -85,13 +85,15 @@ export function claudeHookSettings(memoryDir?: string): string {
   const post = (fields: string) => ({ type: 'command', timeout: 5, command: `[ -n "$VB_STATE_URL" ] && printf 'Authorization: Bearer %s\\n' "$VB_TEAM_TOKEN" | curl -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' -H @- --data '{"from":"'"$VB_SESSION_ID"'",${fields},"source":"hook"}' "$VB_STATE_URL" >/dev/null 2>&1; true` });
   const state = (s: string) => [{ hooks: [post(`"state":"${s}"`)] }];
   const attention = (matcher: string, kind: string) => ({ matcher, hooks: [post(`"attention":"${kind}"`)] });
+  const quotaReporter = [process.execPath,fileURLToPath(new URL('./provider-quota.mjs',import.meta.url))]
+    .map(s=>"'"+s.replaceAll("'","'\\''")+"'").join(' ');
   return JSON.stringify({
     // A squad with its own memory: Claude Code reads and writes auto memory there instead of the project's directory.
     ...(memoryDir ? { autoMemoryDirectory: memoryDir } : {}),
     hooks: {
       UserPromptSubmit: state('working'),
       Stop: state('idle'),
-      StopFailure: state('idle'),
+      StopFailure: [...state('idle'), {matcher:'rate_limit',hooks:[{type:'command',timeout:3,command:quotaReporter+' >/dev/null 2>&1; true'}]}],
       // notification_type; idle_prompt ("waiting for your input" after a finished turn) is not a question, so it is left out.
       Notification: [attention('permission_prompt|worker_permission_prompt', 'permission'), attention('elicitation_dialog|elicitation_url_dialog|agent_needs_input', 'input')],
     },

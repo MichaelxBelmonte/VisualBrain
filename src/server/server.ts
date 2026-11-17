@@ -16,6 +16,7 @@ import { startTeamWatch } from './team-watch.ts';
 import { stopHarnessInstalls } from './harness-installer.ts';
 import { graphJson, handleApi, sendJsonText, type ApiCtx } from './api.ts';
 import { MegaStats } from './mega-stats.ts';
+import { QuotaRouter } from './quota-router.ts';
 import { mapQuery, StartupMap } from './startup-map.ts';
 import { dbFileOf, runIndexOffThread } from './index-runner.ts';
 import { coalesceSubtrees } from './scan.ts';
@@ -206,14 +207,15 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   let stats: MegaStats | undefined;
   try { stats = new MegaStats(join(cfg.dataDir, 'work-stats.sqlite'), () => events.send({type:'stats:changed'})); }
   catch { console.warn('[stats] Archivio locale non disponibile.'); }
+  const routing = new QuotaRouter(cfg.dataDir);
   const ctx: ApiCtx = {
-    db, cfg, cache, startupMap, terms, teams, updater, access, state, startIndex, startAnalyze, configure, stats,
+    db, cfg, cache, startupMap, terms, teams, updater, access, state, startIndex, startAnalyze, configure, stats, routing,
     previewAnalyze: (consent) => buildPayload(db, cfg, cache, consent),
     changed: (reason) => events.send({ type: 'graph:changed', reason }),
   };
   const heartbeat = () => stats?.capture(() => stats!.heartbeat(ctx));
   heartbeat();
-  const statsTimer = setInterval(heartbeat, 15_000);
+  const statsTimer = setInterval(() => { heartbeat(); if(mapReady) routing.tick(ctx); }, 15_000);
 
   const uiDir = join(PROJECT_ROOT, 'dist', 'ui');
   const serveStatic = (req: IncomingMessage, res: ServerResponse): void => {

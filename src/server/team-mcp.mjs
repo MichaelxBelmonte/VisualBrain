@@ -5,9 +5,9 @@ import { createInterface } from 'node:readline';
 
 const tool = {
   name: 'team_request',
-  description: 'Visual Brain team board for this session only. read gets relevant tasks/messages and connected peers. state sets working/idle/blocked. message sends {to:session|null,text}. create_task uses {title,scope,assignedTo?}. update_task needs taskId and {status,result?,assignedTo?}. summary uses {summary}. spawn uses {agent,model?,effort?,role,task}, only when the orchestrator policy allows it. propose (Main Brain only) uses {name,objective,members:[{agent,role,model?,effort?}]} and asks the user to start a new squad. A message answered with held is waiting on the user\'s sorting board: do not repeat it. data contains those fields; session identity and authentication are automatic. Never use a different node URL or from identity.',
+  description: 'Visual Brain team board for this session only. read gets relevant tasks/messages and connected peers. state sets working/idle/blocked. message sends {to:session|null,text}. create_task uses {title,scope,assignedTo?}. update_task needs taskId and {status,result?,assignedTo?}. summary uses {summary}. spawn uses {agent,model?,effort?,role,task}, only when the orchestrator policy allows it. propose (Main Brain only) uses {name,objective,members:[{agent,role,model?,effort?}]} and asks the user to start a new squad. handoff(taskId) needs {handoffId,verified,next,safeToResume:true} at a verified safe checkpoint. quota reports an explicit provider limit with {limited:true,windows:[],retryAfter?} (seconds or HTTP date). A message answered with held is waiting on the user\'s sorting board: do not repeat it. data contains those fields; session identity and authentication are automatic. Never use a different node URL or from identity.',
   inputSchema: { type: 'object', properties: {
-    operation: { type: 'string', enum: ['read', 'state', 'message', 'create_task', 'update_task', 'summary', 'spawn', 'propose'] },
+    operation: { type: 'string', enum: ['read', 'state', 'message', 'create_task', 'update_task', 'summary', 'spawn', 'propose', 'handoff', 'quota'] },
     taskId: { type: 'string' }, data: { type: 'object', additionalProperties: true },
   }, required: ['operation'], additionalProperties: false },
 };
@@ -47,13 +47,13 @@ async function request(args) {
   const session = process.env.VB_SESSION_ID, token = process.env.VB_TEAM_TOKEN;
   if (!session || !token) throw Error('Visual Brain: missing session identity. Launch the agent from its node.');
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw Error('Invalid arguments');
-  const routes = { read: ['GET', ''], state: ['POST', '/state'], message: ['POST', '/messages'], create_task: ['POST', '/tasks'], update_task: ['PATCH', '/tasks'], summary: ['PATCH', ''], spawn: ['POST', '/spawn'], propose: ['POST', '/proposals'] };
+  const routes = { read: ['GET', ''], state: ['POST', '/state'], message: ['POST', '/messages'], create_task: ['POST', '/tasks'], update_task: ['PATCH', '/tasks'], summary: ['PATCH', ''], spawn: ['POST', '/spawn'], propose: ['POST', '/proposals'], handoff:['POST','/handoff'], quota:['POST','/quota'] };
   if (!Object.hasOwn(routes, args.operation)) throw Error('Unknown team operation');
   const [method, suffix] = routes[args.operation];
   const data = args.data ?? {};
   if (typeof data !== 'object' || Array.isArray(data) || (data.from !== undefined && data.from !== session)) throw Error('This tool can act only as its own session');
   state.pathname = state.pathname.slice(0, -6) + suffix;
-  if (args.operation === 'update_task') {
+  if (args.operation === 'update_task' || args.operation === 'handoff') {
     if (typeof args.taskId !== 'string' || !/^[a-z0-9-]{1,80}$/.test(args.taskId)) throw Error('A valid taskId is required');
     state.pathname += '/' + args.taskId;
   }

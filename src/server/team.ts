@@ -214,14 +214,28 @@ export class Teams {
     b.messages.push(m); b.messages = b.messages.slice(-500);
     this.save(nodeId, b, team); return m;
   }
-  createTask(nodeId: number, from: string, body: { title?: unknown; scope?: unknown; assignedTo?: string | null }, team = DEFAULT_TEAM): TeamTask {
+  createTask(nodeId: number, from: string, body: { title?: unknown; scope?: unknown; assignedTo?: string | null; routing?: TeamTask['routing'] }, team = DEFAULT_TEAM): TeamTask {
     const b = structuredClone(this.get(nodeId, team));
     if (b.tasks.filter(t => t.status !== 'done').length >= 100) throw new TeamError(409, 'Troppi incarichi aperti');
     if (body.scope !== undefined && (!Array.isArray(body.scope) || body.scope.length > 16 || body.scope.some(p => typeof p !== 'string' || p.length > 500))) throw new TeamError(400, 'scope: massimo 16 percorsi');
     const task: TeamTask = { id: randomUUID().slice(0, 8), title: boundedText(body.title, 1000, true), scope: body.scope as string[] ?? [], assignedTo: body.assignedTo ?? null, status: 'pending', result: '', createdBy: from, updatedAt: Date.now() };
+    if (body.routing) task.routing = body.routing;
     b.tasks.push(task);
     b.tasks = [...b.tasks.filter(t => t.status === 'done').slice(-100), ...b.tasks.filter(t => t.status !== 'done')];
     this.save(nodeId, b, team); return task;
+  }
+  /** Commit the owner, checkpoint and owner's notice in one board-file rename. No PTY is started or stopped. */
+  routeTask(nodeId: number, team: string, taskId: string, assignedTo: string | null, routing: NonNullable<TeamTask['routing']>, message?: string): TeamTask {
+    const b = structuredClone(this.get(nodeId,team));
+    const task = b.tasks.find(t=>t.id===taskId);
+    if (!task || task.status==='done') throw new TeamError(409,'Incarico non disponibile');
+    task.assignedTo = assignedTo; task.routing = routing; task.updatedAt = routing.at;
+    task.status = routing.handoff && !routing.handoff.to ? 'blocked' : 'pending';
+    if (message && assignedTo) {
+      b.messages.push({id:(b.messages.at(-1)?.id ?? 0)+1,from:'visual-brain',to:assignedTo,text:message,createdAt:routing.at});
+      b.messages = b.messages.slice(-500);
+    }
+    this.save(nodeId,b,team); return task;
   }
   changeTask(nodeId: number, taskId: string, actor: string, role: AgentRole | undefined, body: { status?: unknown; result?: unknown; assignedTo?: string | null; held?: boolean }, team = DEFAULT_TEAM): TeamTask {
     const b = structuredClone(this.get(nodeId, team));
@@ -251,6 +265,12 @@ export class Teams {
       const b = structuredClone(this.get(nodeId, id));
       let changed = false;
       for (const t of b.tasks) if (t.assignedTo === sessionId && t.status !== 'done') {
+        if (t.routing) {
+          if (t.status !== 'blocked') {
+            t.status = 'blocked'; t.routing.reason = 'Proprietario terminato: serve un checkpoint verificato'; t.updatedAt = Date.now(); changed = true;
+          }
+          continue;
+        }
         t.assignedTo = null; t.status = 'pending'; t.updatedAt = Date.now(); changed = true;
       }
       if (changed) this.save(nodeId, b, id);
