@@ -257,6 +257,7 @@ export class Teams {
     }
     if (body.result !== undefined) task.result = boundedText(body.result, 2000);
     if (body.held !== undefined) { if (body.held) task.held = true; else delete task.held; }
+    else if (b.policy.delivery !== 'manual' && task.result !== prior.result) delete task.held;
     if (task.status === prior.status && task.result === prior.result && task.assignedTo === prior.assignedTo && task.held === prior.held) return task;
     task.updatedAt = Date.now(); this.save(nodeId, b, team); return task;
   }
@@ -323,7 +324,12 @@ export class Teams {
     if (text.length + tail.length > 4000) text = text.slice(0, 3990 - tail.length) + '…';
     const now = Date.now();
     for (const i of items as InboxItem[]) { i.column = 'forwarded'; i.forwardedTo = to; i.forwardedAt = now; i.updatedAt = now; }
-    if (release) for (const i of items as InboxItem[]) { const task = i.taskId ? b.tasks.find(t => t.id === i.taskId) : undefined; if (task) delete task.held; }
+    if (release) for (const i of items as InboxItem[]) {
+      const task = i.taskId ? b.tasks.find(t => t.id === i.taskId) : undefined;
+      // Forwarding an older report does not release a newer revision. False retains the manual provenance.
+      const latest = task && b.inbox?.findLast(entry => entry.taskId === task.id);
+      if (task && latest?.id === i.id && (task.result || task.title) === i.text) task.held = false;
+    }
     this.save(nodeId, b, team);
     return { text: text + tail, items: items as InboxItem[] };
   }
@@ -358,18 +364,41 @@ export class Teams {
   }
 
   /** Each squad of the node with its counts: what the board, the map and the Main Brain show. */
-  summaries(nodeId: number, sessions: TerminalInfo[]): TeamSummary[] {
+  summaries(nodeId: number, sessions: TerminalInfo[], brain?: { id: string; allHandoffs: boolean }): TeamSummary[] {
     return this.teams(nodeId).map(team => {
       const board = this.get(nodeId, team.id);
       const own = sessions.filter(s => s.nodeId === nodeId && s.role && s.role !== 'brain' && this.teamOf(nodeId, s) === team.id);
       const tasks = { pending: 0, working: 0, done: 0, blocked: 0 };
       for (const t of board.tasks) tasks[t.status]++;
       const orchestrator = own.find(s => s.alive && s.role === 'orchestrator');
-      return {
+      const summary: TeamSummary = {
         ...team, summary: board.summary, delivery: board.policy.delivery ?? 'auto', maxAgents: board.policy.maxAgents, sessions: own.length, alive: own.filter(s => s.alive).length,
         orchestrator: orchestrator ? orchestrator.code ?? orchestrator.id : null, tasks,
         inbox: (board.inbox ?? []).filter(i => i.column === 'new' || i.column === 'ready').length,
       };
+      if (brain && !team.archived) {
+        const reports = board.tasks.filter(t => t.result || t.status === 'blocked' || t.status === 'done')
+          .sort((a, b) => b.updatedAt - a.updatedAt);
+        summary.handoffsTotal = reports.length;
+        const codes = this.get(nodeId).codes?.ids ?? {};
+        summary.handoffs = (brain.allHandoffs ? reports : reports.slice(0, 10)).map(task => {
+          const owner = own.find(s => s.id === task.assignedTo);
+          const receipt = board.inbox?.findLast(i => i.taskId === task.id);
+          const sameReport = receipt?.text === (task.result || task.title);
+          const manual = task.held !== undefined || board.policy.delivery === 'manual' || sameReport;
+          const withheld = manual && !(sameReport && receipt?.forwardedTo === brain.id);
+          const result = withheld ? null : task.result || null;
+          const sha = result?.match(/\b(?:commit|sha(?:-?1|-?256)?)(?:\s*[:=]\s*|\s+)[`(]?([a-f\d]{64}|[a-f\d]{7,40})\b/i)?.[1] ?? null;
+          const reported = result?.match(/\b(?:branch|ramo)(?:\s*[:=]\s*`?|\s+`)([\w./-]+)/i)?.[1]?.replace(/\.+$/, '');
+          const terminalState = task.status === 'done' || task.status === 'blocked';
+          const contextual = !manual && terminalState ? owner?.branch ?? team.worktree?.branch : undefined;
+          const branch = result ? reported ?? contextual ?? null : null;
+          return { taskId: task.id, title: task.title, assignedTo: task.assignedTo ? codes[task.assignedTo] ?? task.assignedTo : null,
+            status: task.status, updatedAt: task.updatedAt, withheld, result: result?.slice(0, 350) ?? null, branch, sha,
+            branchSource: !branch ? null : reported ? 'report' : owner?.branch ? 'session' : 'team' };
+        });
+      }
+      return summary;
     });
   }
 
@@ -425,6 +454,7 @@ export function teamInstructions(base: string, id: string, _token: string, role:
     lines.push(words(
       'Coordina gli orchestratori del nodo. Leggi obiettivi e squadre, affida il lavoro agli orchestratori, aggiorna il riepilogo con decisioni e prossimi passi. Per un obiettivo distinto proponi una squadra (un orchestratore, massimo 8 agenti): la avvia l’utente. Non modificare file né assegnare incarichi agli operatori.',
       'Coordinate the node’s orchestrators. Read squad objectives, give work to orchestrators and record decisions and next steps in the summary. For a distinct objective propose a squad (one orchestrator, up to 8 agents); the user starts it. Do not edit files or assign tasks to operators.'));
+    lines.push(words('Prima di affidare lavoro, controlla teamList[].handoffs; per i riferimenti più vecchi aggiungi &handoffs=all al GET autenticato.', 'Before assigning work to an orchestrator, check teamList[].handoffs; append &handoffs=all to your authenticated GET for older references.'));
   } else if (role === 'orchestrator') {
     if (squad) lines.push(words('Guidi la squadra ', 'You lead squad ') + squad + '.');
     lines.push(words(
@@ -432,8 +462,8 @@ export function teamInstructions(base: string, id: string, _token: string, role:
       'Read the objective and assign independent tasks to your squad’s operators with scope and expected result. Verify handoffs, unblock or reassign, then distribute remaining work. Reuse sessions; spawn only within autoSpawn and capacity limits. Update the summary and report milestones, blocks and completion to the Main Brain listed on the board.'));
   } else {
     lines.push(words(
-      'Rispondi al tuo orchestratore. Rivendica l’incarico (working) prima di modificare file; resta nel suo scope. Se bloccato, indica cosa manca e chi può sbloccare. Alla consegna indica verifiche, percorsi, residuo e responsabile. Poi controlla la bacheca: rivendica un incarico libero adatto o segna idle. Non avviare altri agenti.',
-      'Report to your orchestrator. Claim the task (working) before editing; stay within scope. If blocked, say what is missing and who can unblock it. At handoff give checks, paths, remaining work and its owner. Then check the board: claim suitable pending work or mark idle. Do not spawn agents.'));
+      'Rispondi al tuo orchestratore. Rivendica l’incarico (working) prima di modificare file; resta nel suo scope. Se bloccato, indica cosa manca e chi può sbloccare. Alla consegna indica verifiche, percorsi, residuo e responsabile. Per un commit indica «ramo: …» e «SHA: …». Poi controlla la bacheca: rivendica un incarico libero adatto o segna idle. Non avviare altri agenti.',
+      'Report to your orchestrator. Claim the task (working) before editing; stay within scope. If blocked, say what is missing and who can unblock it. At handoff give checks, paths, remaining work and its owner. For a commit include “branch: …” and “SHA: …”. Then check the board: claim suitable pending work or mark idle. Do not spawn agents.'));
     if (role === 'reviewer') lines.push(words('Revisione in sola lettura salvo incarico esplicito di modifica.', 'Review read-only unless explicitly assigned an edit.'));
   }
   if (task) lines.push(words('Obiettivo: ', 'Objective: ') + task);

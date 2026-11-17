@@ -89,4 +89,63 @@ try {
   assert.equal((await read(op)).messages.length,1);
   idle(op);
   assert.equal(wakeSession(ctx,op),false);
+
+  // Ownership changes notify only affected sessions. A second board read still carries durable task state.
+  const worker = (await api('POST','/api/launch',{id:7,agent:'codex',mode:'embedded',role:'operator'})).info.id;
+  const unrelated = (await api('POST','/api/launch',{id:7,agent:'codex',mode:'embedded',role:'reviewer'})).info.id;
+  await api('PATCH',path,{status:'pending'},orc);
+  assert.ok((await read(op)).messages.some(m=>m.to===op && m.text.includes(task.id) && m.text.includes('riaperto')));
+  await api('PATCH',path,{assignedTo:worker},orc);
+  assert.ok((await read(op)).messages.some(m=>m.text.includes(task.id) && m.text.includes('Interrompi')));
+  assert.ok((await read(worker)).messages.some(m=>m.to===worker && m.text.includes(task.id) && m.text.includes('riassegnato')));
+  assert.equal((await read(unrelated)).messages.length,0);
+  await api('PATCH',path,{assignedTo:worker},orc);
+  assert.equal((await read(worker)).messages.length,0);
+  await api('PATCH',path,{status:'blocked',result:'Manca il dato.'},worker);
+  await api('PATCH',path,{status:'working'},orc);
+  assert.ok((await read(worker)).messages.some(m=>m.text.includes('sbloccato')));
+  await api('PATCH',path,{status:'done',result:'Verificato menu EN. Ramo: feature/menu. Commit abcdef1.'},worker);
+  const recap = async () => (await read(brain)).teamList.find(t=>t.id===squad.teamId).handoffs.find(h=>h.taskId===task.id);
+  let h = await recap();
+  assert.deepEqual([h.status,h.assignedTo,h.sha,h.branch,h.withheld],['done','OP2','abcdef1','feature/menu',false]);
+  assert.match(h.result,/menu EN/);
+  assert.deepEqual(await recap(),h,'recap is not consumed with inbox messages');
+  assert.equal((await read(worker)).teamList,undefined,'a worker cannot read the cross-squad recap');
+
+  await api('PATCH','/api/work/7',{team:squad.teamId,delivery:'manual'});
+  await api('PATCH',path,{status:'pending'},orc);
+  await api('PATCH',path,{status:'blocked',result:'Dati riservati. Ramo: private/hidden. SHA: deadbee.'},worker);
+  const hidden = async () => {
+    const row = await recap();
+    assert.ok(row.withheld);
+    assert.deepEqual([row.result,row.branch,row.sha],[null,null,null]);
+  };
+  await hidden();
+  const oldReceipt = ctx.teams.get(7).inbox.at(-1).id;
+  await api('POST','/api/work/7/forward',{team:squad.teamId,items:[oldReceipt],to:orc});
+  await hidden(); // Forwarding to the orchestrator is a different audience.
+  await api('PATCH',path,{status:'blocked',result:'Nuovo blocco. Ramo: other/secret. SHA: beefabc.'},worker);
+  await api('POST','/api/work/7/forward',{team:squad.teamId,items:[oldReceipt],to:orc});
+  assert.match((await read(orc)).tasks.find(t=>t.id===task.id).result,/in smistamento/);
+  await api('POST','/api/work/7/forward',{team:squad.teamId,items:[oldReceipt],to:brain});
+  await hidden(); // An old revision cannot release a newer report.
+  const currentReceipt = ctx.teams.get(7).inbox.at(-1).id;
+  await api('POST','/api/work/7/forward',{team:squad.teamId,items:[currentReceipt],to:brain});
+  h = await recap();
+  assert.deepEqual([h.withheld,h.assignedTo,h.sha,h.branch],[false,'OP2','beefabc','other/secret']);
+  await api('PATCH','/api/work/7',{team:squad.teamId,delivery:'auto'});
+  await api('PATCH',path,{status:'done',result:'Verifica conclusa, nessun commit richiesto.'},worker);
+  h = await recap();
+  assert.equal(h.withheld,false);
+  assert.equal(h.sha,null,'never derive a hash from a task id or an older result');
+  for (let i=0;i<11;i++) {
+    const row = ctx.teams.createTask(7,orc,{title:'Earlier report '+i,assignedTo:worker});
+    ctx.teams.changeTask(7,row.id,worker,'operator',{status:'done',result:'Verified.'});
+  }
+  const recent = (await read(brain)).teamList.find(t=>t.id===squad.teamId);
+  assert.equal(recent.handoffs.length,10);
+  assert.equal(recent.handoffsTotal,12);
+  const full = await api('GET','/api/work/7?session='+brain+'&handoffs=all',undefined,brain);
+  assert.equal(full.teamList.find(t=>t.id===squad.teamId).handoffs.length,12);
+  console.log('PASS targeted reopen, unblock and transfer; retained Main Brain refs respect manual forwarding and revisions');
 } finally { rmSync(dir, {recursive:true,force:true}); }

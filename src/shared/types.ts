@@ -269,6 +269,14 @@ export interface TeamSummary extends TeamInfo {
   summary: string; delivery: 'auto' | 'manual';
   sessions: number; alive: number; orchestrator: string | null; maxAgents: number;
   tasks: Record<TeamTask['status'], number>; inbox: number;
+  /** Recent task references on the authenticated Main Brain board. Read handoffs=all for the full retained list. */
+  handoffs?: BrainTaskHandoff[];
+  handoffsTotal?: number;
+}
+export interface BrainTaskHandoff {
+  taskId: string; title: string; assignedTo: string | null; status: TeamTask['status']; updatedAt: number;
+  withheld: boolean; result: string | null; branch: string | null; sha: string | null;
+  branchSource: 'report' | 'session' | 'team' | null;
 }
 /**
  * Claude Code auto memory for a squad's sessions. leaders: the orchestrator (and the Main Brain) use the project's memory,

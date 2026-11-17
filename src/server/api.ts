@@ -632,7 +632,8 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         const messages = board.messages.filter(msg => msg.id > member.seenMessage && msg.from !== actor && (!msg.to || msg.to === actor)).slice(0, 50);
         if (messages.length) member.seenMessage = messages.at(-1)!.id;
         const { inbox: _inbox, ...own } = visible(board);
-        if (isBrain) return send(res, 200, { ...own, messages, sessions, peers, links, teamList: ctx.teams.summaries(nodeId, all).filter(t => !t.archived) });
+        if (isBrain) return send(res, 200, { ...own, messages, sessions, peers, links,
+          teamList: ctx.teams.summaries(nodeId, all, { id: actor, allHandoffs: url.searchParams.get('handoffs') === 'all' }).filter(t => !t.archived) });
         // With manual delivery a held result is not the orchestrator's yet: it sees the status, the person forwards the content.
         const held = english ? '(delivered, being sorted by the user)' : '(consegnato, in smistamento dall’utente)';
         const tasks = member.info.role === 'orchestrator' ? board.tasks.map(t => t.held ? { ...t, result: held } : t) : board.tasks.filter(t => t.assignedTo === actor || (t.assignedTo === null && t.status !== 'done'));
@@ -735,14 +736,34 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         if (!changed && task.assignedTo === before?.assignedTo) return send(res, 200, task);
         if (manual) ctx.teams.hold(nodeId, team, { kind: task.status === 'done' ? 'result' : 'blocked', from: actor, text: task.result || task.title, taskId: task.id, taskTitle: task.title });
         const target = sessions.find(s => s.alive && s.role === 'orchestrator' && s.id !== actor);
-        if (target && (task.status === 'done' || task.status === 'blocked')) {
+        const notified = new Set<string>();
+        const inform = (id: string | null, text: string) => {
+          if (!id || id === actor || notified.has(id) || !sessions.some(s => s.alive && s.id === id)) return;
+          notified.add(id);
+          ctx.teams.message(nodeId, actor, id, text, team);
+          wake(id);
+        };
+        const ownerChanged = before && before.assignedTo !== task.assignedTo;
+        const reopened = before?.status === 'done' && task.status !== 'done';
+        const unblocked = before?.status === 'blocked' && (task.status === 'pending' || task.status === 'working');
+        const label = (english ? 'Task ' : 'Incarico ') + task.id;
+        if (ownerChanged && before.assignedTo) {
+          const owner = task.assignedTo ? codeOf(task.assignedTo) : (english ? 'unassigned' : 'da assegnare');
+          inform(before.assignedTo, `${label} → ${owner}. ${english ? 'Stop working on this task.' : 'Interrompi il lavoro su questo incarico.'}`);
+        }
+        if (ownerChanged || reopened || unblocked) {
+          const change = reopened ? (english ? 'reopened' : 'riaperto') : unblocked ? (english ? 'unblocked' : 'sbloccato') : (english ? 'reassigned' : 'riassegnato');
+          const message = `${label} · ${change} (${task.status}). ${english ? 'Check owner and latest result before continuing.' : 'Controlla assegnatario e ultimo esito prima di proseguire.'}`;
+          inform(task.assignedTo, message);
+          if (target && (reopened || unblocked || ownerChanged && before.assignedTo)) inform(target.id, message);
+        }
+        if (target && !notified.has(target.id) && (task.status === 'done' || task.status === 'blocked')) {
           const done = task.status === 'done';
           const word = done ? (english ? 'Done' : 'Completato') : (english ? 'Blocked' : 'Bloccato');
           const next = task.held ? (english ? 'held for the user to forward' : 'in smistamento dall’utente')
             : done ? (english ? 'review the result on the board' : 'verifica il risultato in bacheca')
             : (english ? 'check the blocker and decide who acts next' : 'verifica il blocco e decidi chi interviene');
-          ctx.teams.message(nodeId, actor, target.id, `${word} ${task.id} · ${codeOf(task.assignedTo ?? actor)} · ${next}.`, team);
-          wake(target.id);
+          inform(target.id, `${word} ${task.id} · ${codeOf(task.assignedTo ?? actor)} · ${next}.`);
         }
         return send(res, 200, task);
       }
