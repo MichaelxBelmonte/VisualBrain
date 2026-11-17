@@ -64,6 +64,11 @@ export function openWorkLauncher(options: {
   }
   if (options.proposal) options.proposal.members.forEach((m, i) => { if (i < choices.length) choices[i] = { agent: m.agent, model: m.model ?? '', effort: m.effort ?? '', role: m.role }; });
   const total = () => squad && restored ? restored.members.length : squad ? Math.min(HARD_MAX, extra + (addOnly ? 0 : 1)) : 1;
+  const launchLabel = () => {
+    if (!squad) return tr('Avvia');
+    const count = total();
+    return count === 1 ? tr('Avvia 1 agente') : tr('Avvia {n} agenti').replace('{n}', String(count));
+  };
   // One agent line for everyone unless the saved roster, a proposal or a saved squad already differ per member.
   let customize = squad && !allSame(choices, total());
   overlay.dataset.mode = 'work-launch';
@@ -136,8 +141,12 @@ export function openWorkLauncher(options: {
     savedBox.classList.toggle('hidden', !savedShown);
     more.classList.toggle('hidden', !teamShown && !savedShown);
     const target = teamId === 'new' ? (teamNameInput.value.trim() || tr('nuova squadra')) : teams.find(t => t.id === teamId)?.name ?? '';
-    const parts = [teamShown && target ? target : '', restored ? restored.name : '', !restored && savedShown && savedSquads.length ? ui`${savedSquads.length} salvate` : ''].filter(Boolean);
-    form.querySelector('[data-more-summary]')!.textContent = tr('Altre opzioni') + (parts.length ? ' · ' + parts.join(' · ') : '');
+    const parts = [teamShown && target ? target : '', restored?.name];
+    if (!restored && savedShown && savedSquads.length) {
+      parts.push(savedSquads.length === 1 ? tr('1 squadra salvata') : tr('{n} squadre salvate').replace('{n}', String(savedSquads.length)));
+    }
+    const summary = parts.filter(Boolean).join(' · ');
+    form.querySelector('[data-more-summary]')!.textContent = tr('Altre opzioni') + (summary ? ' · ' + summary : '');
   };
   const renderTeams = () => {
     const list = teams.filter(t => !t.archived || t.id === teamId);
@@ -278,9 +287,16 @@ export function openWorkLauncher(options: {
     customizeButton.classList.toggle('hidden', !squad);
     customizeButton.textContent = customize ? tr('Uguale per tutti') : tr('Personalizza per agente');
     form.querySelectorAll<HTMLElement>('[data-preset-choice]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.presetChoice === 'squad') === squad)));
-    submit.textContent = squad ? tr('Avvia {n} agenti').replace('{n}', String(count)) : tr('Avvia');
+    submit.textContent = launchLabel();
     refreshObjective(); refreshCapacity();
-    form.querySelector('[data-preset-hint]')!.textContent = squad ? (addOnly ? tr('Collegati all’orchestratore') : tr('Orchestratore + operatori, già collegati tra loro')) : options.mode === 'external' ? tr('In Terminal.app') : '';
+    const hint = form.querySelector('[data-preset-hint]')!;
+    if (!squad) hint.textContent = options.mode === 'external' ? tr('In Terminal.app') : '';
+    else if (addOnly) hint.textContent = count === 1 ? tr('Collegato all’orchestratore') : tr('Collegati all’orchestratore');
+    else if (count === 1) {
+      const role = choices[0].role ?? 'orchestrator';
+      hint.textContent = role === 'orchestrator' ? tr('Solo orchestratore') : roles[role];
+    }
+    else hint.textContent = tr('Orchestratore + operatori, già collegati tra loro');
   };
   customizeButton.onclick = () => { customize = !customize; renderRows(); };
   // Missing or signed-out CLIs: say which, and where to fix it, instead of a silent disabled option.
@@ -330,7 +346,7 @@ export function openWorkLauncher(options: {
       for (const [i, choice] of choices.slice(0, total()).entries()) try { if (squad) localStorage.setItem(ui`vb:roster:${i}`, JSON.stringify({ agent: choice.agent, model: choice.model, effort: choice.effort })); localStorage.setItem(ui`vb:model:${choice.agent}`, choice.model); } catch { /* storage unavailable */ }
       busy = false; close(); options.launched(sessions, squad, external, warning);
     } catch (err) { error.textContent = String(err); }
-    finally { busy = false; submit.disabled = false; submit.textContent = squad ? tr('Avvia {n} agenti').replace('{n}', String(total())) : tr('Avvia'); refreshCapacity(); }
+    finally { busy = false; submit.disabled = false; submit.textContent = launchLabel(); refreshCapacity(); }
   };
   return close;
 }
