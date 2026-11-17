@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { UPDATE_PUBLIC_KEY } from '../src/server/update-key.ts';
-import { UPDATE_REPO, parseFeed } from '../src/server/updater.ts';
+import { UPDATE_REPO, forget, parseFeed } from '../src/server/updater.ts';
 import { buildFeed, signFeed } from './make-feed.mjs';
 import { verifyReleaseIdentity } from './local-signing.mjs';
 
@@ -44,6 +44,7 @@ run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
 verifyReleaseIdentity(root, app);
 const plist = key => execFileSync('/usr/libexec/PlistBuddy', ['-c', `Print ${key}`, join(app, 'Contents/Info.plist')], { encoding: 'utf8' }).trim();
 if (plist('CFBundleIdentifier') !== 'com.jethr.visualbrain' || plist('CFBundleShortVersionString') !== version) throw Error('L’app nel pacchetto non corrisponde alla versione del nome.');
+await forget(probe); // the extracted copy leaves Launch Services and the disk: no "forbidden" icon in Launchpad
 const pkgVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 if (!zip.startsWith(work) && pkgVersion !== version) throw Error(`package.json è ${pkgVersion}, il pacchetto ${version}.`);
 
