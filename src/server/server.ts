@@ -39,6 +39,8 @@ const WATCH_QUIET_MS = 1200;
 const WATCH_MAX_WAIT_MS = 8000;
 /** More distinct subtrees than this collapse into their parents. */
 const MAX_SUBTREES = 12;
+/** Repaint nudge of a reattached full-screen program: the real size returns 80–400 ms after the smaller one. */
+const REPAINT_MIN = 80, REPAINT_WAIT = 400;
 /**
  * New, vanished or moved paths make the next pass a full one (about a minute on a large Desktop, against under a second for
  * files rewritten in place). Agents create files all the time while they work, so these wait: for a quiet spell, never sooner
@@ -243,10 +245,15 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
         const replay = replayState(term.buffer);
         if (replay.prefix) ws.send(replay.prefix);
         for (const chunk of term.buffer) ws.send(chunk);
-        const listener = (data: string) => { if (ws.readyState === ws.OPEN) ws.send(data); };
+        // Set while a repaint nudge waits for the program to answer the smaller size (see below).
+        let restore: (() => void) | null = null;
+        const listener = (data: string) => { if (ws.readyState === ws.OPEN) ws.send(data); restore?.(); };
         term.listeners.add(listener);
         // The kept output of a full-screen program is a tail of screen diffs, not a whole screen: on the first size
         // the client sends, a one-row nudge makes the program redraw everything (a same-size resize signals nothing).
+        // The real size goes back only once the program has answered the smaller one (its first output), or after
+        // REPAINT_WAIT: two resizes that both arrive while the program is busy merge into one SIGWINCH, which then
+        // reports the unchanged size and nothing is redrawn.
         let repaint = replay.fullScreen, size = { cols: 0, rows: 0 };
         ws.on('message', (raw) => {
           if (stopping) return;
@@ -257,8 +264,12 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
               size = { cols: Number(m.cols), rows: Number(m.rows) };
               if (!repaint || size.rows < 3) { terms.resize(id, size.cols, size.rows); return; }
               repaint = false;
+              let done = false;
+              const back = () => { if (done) return; done = true; restore = null; clearTimeout(timer); if (!stopping && terms.get(id)?.info.alive) terms.resize(id, size.cols, size.rows); };
+              const start = Date.now(), timer = setTimeout(back, REPAINT_WAIT);
+              // Output may also be unrelated (a spinner): never earlier than REPAINT_MIN, as before; a pause lets the redraw finish.
+              restore = () => setTimeout(back, Math.max(20, REPAINT_MIN - (Date.now() - start)));
               terms.resize(id, size.cols, size.rows - 1);
-              setTimeout(() => { if (!stopping && terms.get(id)?.info.alive) terms.resize(id, size.cols, size.rows); }, 80);
             }
           } catch { /* ignore */ }
         });

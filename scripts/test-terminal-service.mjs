@@ -12,10 +12,11 @@ const root = runtime ? resolve(runtime, 'server') : resolve(import.meta.dirname,
 const { TerminalService } = await import(pathToFileURL(join(root, 'src/server/terminal-service.ts')));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const waitFor = async (label, check, ms = 15000) => {
+/** `detail` describes the state at the moment of the timeout, not when the wait started. */
+const waitFor = async (label, check, ms = 15000, detail) => {
   const until = Date.now() + ms;
   while (Date.now() < until) { if (await check()) return; await sleep(25); }
-  throw new Error('Timeout: ' + label);
+  throw new Error('Timeout: ' + label + (detail ? ': ' + detail() : ''));
 };
 const freePort = () => new Promise(resolve => {
   const server = createServer().listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(() => resolve(port)); });
@@ -73,8 +74,9 @@ try {
     file: '/bin/sh', args: ['-c', 'echo START:$$; while read line; do echo ANSWER:$line:$$; done'], cwd: files, title: 'fixture', env: { VB_FIXTURE: 'original' } });
   const pid = term.proc.pid;
   // A full-screen program whose alternate-screen switch is no longer in the kept tail: only its mouse tracking shows.
+  // It reports its size on SIGWINCH and also polls it, so the check does not depend on how fast the OS delivers signals.
   await service.spawn({ id: 'fullscreen-fixture', agent: 'claude', file: '/bin/sh', cwd: files, title: 'fullscreen',
-    args: ['-c', "trap 'echo WINCH:$(stty size)' WINCH; printf '\\033[?1000h\\033[?1006hREADY\\n'; while :; do sleep 0.05; done"] });
+    args: ['-c', "trap 'echo WINCH:$(stty size)' WINCH; printf '\\033[?1000h\\033[?1006hREADY\\n'; last=$(stty size); while :; do sleep 0.05; now=$(stty size); [ \"$now\" != \"$last\" ] && echo SIZE:$now; last=$now; done"] });
   service.rename(term.info.id, 'Kept name');
   term.info.workState = 'idle'; term.info.stateAt = 1234; term.info.parentId = 'parent-fixture';
   term.seenMessage = 42; term.injectedMessage = 43;
@@ -132,7 +134,7 @@ try {
   await waitFor('fullscreen replay', () => frames.join('').includes('READY'));
   assert.equal(frames[0], '\x1b[?1049h', 'the alternate screen comes before the replay');
   full.send(JSON.stringify({ type: 'resize', cols: 101, rows: 31 }));
-  await waitFor('repaint nudge: ' + JSON.stringify(frames.join('').slice(-200)), () => /WINCH:30 101[\s\S]*WINCH:31 101/.test(frames.join('')));
+  await waitFor('repaint nudge', () => /(WINCH|SIZE):30 101[\s\S]*(WINCH|SIZE):31 101/.test(frames.join('')), 15000, () => JSON.stringify(frames.join('').slice(-300)));
   full.close();
   assert.equal((await request('/api/terminals/fullscreen-fixture', 'DELETE')).status, 200);
   console.log('PASS full-screen session: alternate screen restored before the replay, one repaint on the first size');
