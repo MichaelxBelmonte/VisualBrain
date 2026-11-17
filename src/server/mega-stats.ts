@@ -14,7 +14,7 @@ type Event = Scope & { kind: string; ms: number; error: number };
 type Samples = { metrics: StatsMeasures; turns: number[]; http: number[] };
 const emptyLatency = (): StatsLatency => ({ n: 0, p50Ms: null, p95Ms: null });
 const samples = (): Samples => ({
-  metrics: { turns: null, turnsPerHour: null, turnLatency: emptyLatency(), http: 0, httpPerHour: null,
+  metrics: { turns: null, unpairedTurns: 0, turnsPerHour: null, turnLatency: emptyLatency(), http: 0, httpPerHour: null,
     httpLatency: emptyLatency(), httpErrors: 0, retries: null, completed: 0, completedPerHour: null, waiting: 0, blocked: 0 },
   turns: [], http: [],
 });
@@ -39,6 +39,7 @@ export class MegaStats {
   private live = new Map<string, { state: string | null; attention: string | null; since: number | null }>();
   private notifyTimer?: ReturnType<typeof setTimeout>;
   private closed = false;
+  available = true;
   private changed: () => void;
 
   constructor(path: string, changed: () => void = () => {}, now = Date.now()) {
@@ -49,6 +50,7 @@ export class MegaStats {
       CREATE TABLE IF NOT EXISTS members (sid TEXT PRIMARY KEY, node INTEGER, team TEXT, label TEXT, agent TEXT, role TEXT, created INTEGER, seen INTEGER);
       CREATE TABLE IF NOT EXISTS events (at INTEGER, kind TEXT, node INTEGER, team TEXT, sid TEXT, ms REAL, error INTEGER, k TEXT UNIQUE);
       CREATE INDEX IF NOT EXISTS stats_event_window ON events(at,node);
+      CREATE INDEX IF NOT EXISTS stats_event_scope ON events(node,at);
       CREATE TABLE IF NOT EXISTS turns (sid TEXT, id TEXT, start INTEGER, stop INTEGER, source TEXT, run TEXT, PRIMARY KEY(sid,id));
       CREATE INDEX IF NOT EXISTS stats_turn_start ON turns(start);
       CREATE TABLE IF NOT EXISTS sources (sid TEXT PRIMARY KEY, source TEXT, first INTEGER, last INTEGER);
@@ -72,7 +74,17 @@ export class MegaStats {
   }
   close(now = Date.now()) {
     this.closed = true;
-    clearTimeout(this.notifyTimer); this.beat(now); this.db.close();
+    clearTimeout(this.notifyTimer); this.capture(() => this.beat(now)); this.db.close();
+  }
+  /** Optional local measurements must not interrupt a terminal or change the result of a board operation. */
+  capture(write: () => void) {
+    if (!this.available) return;
+    try { write(); }
+    catch {
+      this.available = false;
+      console.warn('[stats] Registrazione sospesa: archivio locale non disponibile.');
+      if (!this.closed) this.signal();
+    }
   }
   snapshot(ctx: ApiCtx, now = Date.now()) {
     const found = new Set<string>();
@@ -118,17 +130,24 @@ export class MegaStats {
     const start = performance.now();
     const match = /^\/api\/(?:work|node|git|code|nodes)\/(\d+)(?:\/|$)/.exec(path);
     if (match) this.bind(req, Number(match[1]), null, null);
+    if (path === '/api/explore' || path === '/api/reminders' || path === '/api/reminder-board') {
+      const q = new URL(req.url!, 'http://local').searchParams;
+      const id = q.get(path === '/api/explore' ? 'node' : 'nodeId');
+      if (id && /^[1-9]\d*$/.test(id)) this.bind(req,Number(id),null,null);
+    }
     const term = /^\/api\/terminals\/([a-z0-9-]+)(?:\/|$)/.exec(path);
     const info = term && ctx.terms.get(term[1])?.info;
     if (info && info.nodeId != null && !req.headers.authorization) this.bind(req, info.nodeId, info.role ? ctx.teams.teamOf(info.nodeId, info) : null, info.id);
     res.once('finish', () => {
       if (this.closed) return;
-      this.http(this.scopes.get(req), performance.now() - start, res.statusCode);
+      this.capture(() => this.http(this.scopes.get(req), performance.now() - start, res.statusCode));
     });
   }
   done(node: number, team: string, sid: string | null, task: string, at = Date.now()) {
-    this.db.prepare("INSERT OR IGNORE INTO events VALUES (?,'done',?,?,?,0,0,?)").run(at, node, team, sid, JSON.stringify([node, team, task]));
-    this.signal();
+    this.capture(() => {
+      this.db.prepare("INSERT OR IGNORE INTO events VALUES (?,'done',?,?,?,0,0,?)").run(at, node, team, sid, JSON.stringify([node, team, task]));
+      this.signal();
+    });
   }
   turn(s: TerminalInfo, phase: 'ready' | 'start' | 'stop' | 'interrupted', id?: string, at = Date.now()) {
     // Existing Claude state hooks report sequential turns without an ID. Never pair these across an API restart.
@@ -185,13 +204,17 @@ export class MegaStats {
       for (const t of [...ctx.teams.teams(nodeId), {id:'brain', name:'Main Brain'}]) {
         const lead = rows.find(r => r.node === nodeId && r.team === t.id && (r.role === 'brain' || r.role === 'orchestrator') && this.live.has(r.sid));
         const saved = this.db.prepare('SELECT body FROM preferences WHERE node=? AND team=?').get(nodeId,t.id);
+        const board = ctx.teams.get(nodeId,t.id);
         teams.push({ key:`${nodeId}:${t.id}`, id:t.id, name:t.name, nodeId,projectId,recipient:lead?.label ?? null,
-          autoSpawn:ctx.teams.get(nodeId,t.id).policy.autoSpawn, requested:saved ? JSON.parse(String(saved.body)) : null });
+          blockedTasks:board.tasks.filter(task => task.status === 'blocked' && (!filters.session || task.assignedTo === filters.session)).length,
+          autoSpawn:board.policy.autoSpawn, requested:saved ? JSON.parse(String(saved.body)) : null });
       }
     }
-    let unattributedHttp = 0;
-    for (const e of this.db.prepare('SELECT kind,node,team,sid,ms,error FROM events WHERE at>=? AND at<=?').iterate(from,now) as unknown as Iterable<Event>) {
-      if (e.node == null) { if (e.kind === 'http') unattributedHttp++; continue; }
+    const unattributedHttp = Number(this.db.prepare('SELECT COUNT(*) AS n FROM events WHERE node IS NULL AND at BETWEEN ? AND ?').get(from,now)!.n);
+    const nodeIds = this.db.prepare('SELECT DISTINCT node FROM events WHERE node IS NOT NULL').all()
+      .map(row => Number(row.node)).filter(node => projectOk(this.project(ctx,node)));
+    for (const e of this.db.prepare('SELECT kind,node,team,sid,ms,error FROM events WHERE node IN (SELECT value FROM json_each(?)) AND at BETWEEN ? AND ?')
+      .iterate(JSON.stringify(nodeIds),from,now) as unknown as Iterable<Event>) {
       if (!accepts(e)) continue;
       const group = e.sid && groups.get(e.sid);
       for (const acc of group ? [totals, group] : [totals]) {
@@ -211,6 +234,7 @@ export class MegaStats {
         acc.metrics.turns ??= 0;
         if (e.start != null && e.start >= from && e.start <= now) acc.metrics.turns++;
         if (e.stop != null && e.stop >= from && e.stop <= now && e.start != null && e.stop >= e.start) acc.turns.push(e.stop - e.start);
+        else if (e.stop == null || e.start == null || e.stop < e.start) acc.metrics.unpairedTurns++;
       }
     }
     const observedMs = Number(this.db.prepare('SELECT SUM(MAX(0,MIN(stop,?)-MAX(start,?))) AS ms FROM runs WHERE stop>=? AND start<=?').get(now,from,from,now)?.ms ?? 0);

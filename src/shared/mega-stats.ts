@@ -2,6 +2,7 @@
 export interface StatsLatency { n: number; p50Ms: number | null; p95Ms: number | null }
 export interface StatsMeasures {
   turns: number | null;
+  unpairedTurns: number;
   turnsPerHour: number | null;
   turnLatency: StatsLatency;
   http: number;
@@ -28,6 +29,7 @@ export interface CoordinationRequest {
 export interface StatsTeam {
   key: string; id: string; name: string; nodeId: number; projectId: number;
   recipient: string | null; autoSpawn: boolean; requested: CoordinationRequest | null;
+  blockedTasks: number;
 }
 export interface MegaStatsReport {
   from: number; to: number; updatedAt: number; observedMs: number; coverageStart: number;

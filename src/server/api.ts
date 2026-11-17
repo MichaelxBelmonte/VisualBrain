@@ -263,7 +263,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
   try {
     if (path === '/api/mega-stats' || path === '/api/mega-stats/preferences') {
       if (req.headers.authorization || req.headers['sec-fetch-site'] !== 'same-origin') throw new HttpError(403, 'Solo dalla pagina Stats');
-      if (!ctx.stats) throw new HttpError(503, 'Telemetria non disponibile');
+      if (!ctx.stats?.available) throw new HttpError(503, 'Telemetria non disponibile');
       if (path === '/api/mega-stats' && method === 'GET') {
         const hours = Number(url.searchParams.get('hours') ?? 24);
         if (![1,24,168].includes(hours)) throw new HttpError(400, 'Intervallo non valido');
@@ -540,12 +540,13 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const srcSessionId = endpoint(b.srcSessionId, srcNodeId), dstSessionId = endpoint(b.dstSessionId, dstNodeId);
       if (srcNodeId === dstNodeId && srcSessionId === dstSessionId) throw new HttpError(400, 'Scegli due sessioni o nodi diversi');
       const link = ctx.teams.link({ srcNodeId, dstNodeId, srcSessionId, dstSessionId });
+      ctx.stats?.signal();
       return send(res, 201, link);
     }
     m = /^\/api\/team-links\/([a-z0-9-]+)$/.exec(path);
     if (m && method === 'DELETE') {
       if (req.headers.authorization) throw new HttpError(403, 'I canali si rimuovono da Operativa');
-      ctx.teams.unlink(m[1]); return send(res, 200, { ok: true });
+      ctx.teams.unlink(m[1]); ctx.stats?.signal(); return send(res, 200, { ok: true });
     }
 
     m = /^\/api\/work\/(\d+)\/turn$/.exec(path);
@@ -557,7 +558,8 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       if (b.phase !== 'ready' && ((b.phase !== 'start' && b.phase !== 'stop' && b.phase !== 'interrupted') || typeof b.turnId !== 'string' || !/^[\w-]{1,100}$/.test(b.turnId)))
         throw new HttpError(400,'Evento turno non valido');
       ctx.stats?.bind(req,t.info.nodeId,ctx.teams.teamOf(t.info.nodeId,t.info),t.info.id);
-      ctx.stats?.turn(t.info,b.phase,typeof b.turnId === 'string' ? b.turnId : undefined);
+      const phase = b.phase;
+      ctx.stats?.capture(() => ctx.stats!.turn(t.info,phase,typeof b.turnId === 'string' ? b.turnId : undefined));
       return sendJson(res,200,{ok:true});
     }
     m = /^\/api\/work\/(\d+)(?:\/(messages|tasks|state|spawn|wake|inbox|forward|proposals)(?:\/([a-z0-9-]+))?)?$/.exec(path);
@@ -639,13 +641,13 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
           || (hasAttention && b.attention !== null && b.attention !== 'permission' && b.attention !== 'input')
           || (b.source !== undefined && b.source !== 'agent' && b.source !== 'hook')) throw new HttpError(400, 'Stato o sessione non validi');
         if (b.source === 'hook' && member.info.agent === 'claude' && (b.state === 'working' || b.state === 'idle'))
-          ctx.stats?.turn(member.info,b.state === 'working' ? 'start' : 'stop');
+          ctx.stats?.capture(() => ctx.stats!.turn(member.info,b.state === 'working' ? 'start' : 'stop'));
         if (hasState) {
           setWorkState(member.info, b.state as 'working' | 'idle' | 'blocked', b.source === 'hook' ? 'hook' : 'agent');
           if (b.state !== 'blocked') setAttention(member.activity, member.info, null); // a turn started or ended: the prompt was answered
         }
         if (hasAttention) setAttention(member.activity, member.info, b.attention as 'permission' | 'input' | null);
-        ctx.stats?.snapshot(ctx);
+        ctx.stats?.capture(() => ctx.stats!.snapshot(ctx));
         if (hasState) wake(actor);
         return send(res, 200, { state: member.info.workState, attention: member.info.attention ?? null });
       }
@@ -810,7 +812,12 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     if (path === '/api/launch-squad' && method === 'POST') {
       if (req.headers.authorization) throw new HttpError(403, 'Avvia la squadra dalla vista Operativa');
       const b = await readJson(req);
-      return send(res, 201, await startSquad(ctx, nodeDetail(ctx, Number(b.id)), b as unknown as import('../shared/types.ts').SquadRequest));
+      const detail = nodeDetail(ctx, Number(b.id));
+      ctx.stats?.bind(req, detail.id, null, null);
+      const squad = await startSquad(ctx, detail, b as unknown as import('../shared/types.ts').SquadRequest);
+      ctx.stats?.bind(req, detail.id, squad.teamId, null);
+      ctx.stats?.capture(() => ctx.stats!.snapshot(ctx));
+      return send(res, 201, squad);
     }
 
     if (path === '/api/launch' && method === 'POST') {
@@ -819,7 +826,10 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const free = b.agent === 'shell' && (b.id === undefined || b.id === null);
       if (free && req.headers.authorization) throw new HttpError(403, 'I terminali si aprono dall’interfaccia');
       const detail = free ? null : nodeDetail(ctx, Number(b.id));
+      if (detail) ctx.stats?.bind(req,detail.id,null,null);
       const result = await startSession(ctx, detail, b);
+      if (detail && result.info) ctx.stats?.bind(req,detail.id,result.info.teamId ?? null,result.info.id);
+      ctx.stats?.capture(() => ctx.stats!.snapshot(ctx));
       return send(res, result.info ? 201 : 200, result);
     }
 

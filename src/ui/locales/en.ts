@@ -639,4 +639,13 @@ export const en: Record<string, string> = {
   "Impossibile salvare la richiesta. Riprova.": "Could not save the request. Try again.",
   "Sessioni con fonte dei turni": "Sessions with a turn source",
   "Sessioni senza fonte": "Sessions without a source",
+  "Apri bacheca Main Brain": "Open Main Brain board",
+  "Il Main Brain riceve messaggi e propone squadre. Gli incarichi si assegnano nelle bacheche delle squadre.": "The Main Brain receives messages and proposes squads. Use a squad board to assign tasks.",
+  "Dove intervenire": "Needs attention",
+  "Incarichi bloccati": "Blocked tasks",
+  "Turni senza coppia": "Turns without a matched pair",
+  "HTTP locali conclusi, attribuiti al nodo o alla sessione. Gli errori hanno stato HTTP ≥ 400. Il traffico del modello e i retry del provider non sono misurati.": "Completed local HTTP calls attributed to the node or session. Errors have HTTP status ≥ 400. Model traffic and provider retries are unmeasured.",
+  "Turni: avvii rilevati dagli hook. Latenza: tempo tra invio e fine del turno, per le coppie concluse nel periodo. I turni senza coppia sono esclusi dai percentili.": "Turns count starts observed by hooks. Latency measures submission to end for matched pairs ending within the period. Percentiles exclude unpaired events.",
+  "Codex richiede hook abilitati e approvati in /hooks. Le sessioni precedenti e gli altri CLI possono avere copertura parziale.": "Codex requires hooks enabled and trusted in /hooks. Older sessions and other CLIs may have partial coverage.",
+  "Incarichi: prima transizione osservata a completato, attribuita all’assegnatario. Conservazione locale: 7 giorni.": "Tasks count the first observed completion, attributed to the assignee. Local retention is seven days.",
 };

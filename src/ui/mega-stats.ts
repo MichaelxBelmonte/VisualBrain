@@ -79,6 +79,12 @@ function table(caption: string, headers: string[], rows: string[][]): HTMLTableE
   return tab;
 }
 
+function fact(list: HTMLDListElement, label: string, value: string | HTMLElement) {
+  const dd = el('dd');
+  dd.append(value);
+  list.append(el('dt', label), dd);
+}
+
 function latencyTable(m: StatsMeasures) {
   const row = (label: string, l: StatsLatency) => [label, numeric(l.n), duration(l.p50Ms), duration(l.p95Ms)];
   return table(t('Tempi osservati'), [t('Misura'), t('Campioni'), 'P50', 'P95'], [
@@ -235,11 +241,12 @@ function breakdown(r: MegaStatsReport, projectId: string, teamKey: string, sessi
     project.querySelector('summary')!.append(el('small', sessionCount(sessions.length)));
     const teams = r.teams.filter(team => team.projectId === p.id && (!teamKey || team.key === teamKey) &&
       (!selectedSession || selectedSession.teamKey === team.key));
-    project.append(boardButton(p.id, 'brain', t('Apri incarichi del Main Brain')));
+    project.append(boardButton(p.id, 'brain', t('Apri bacheca Main Brain')));
     for (const team of teams) {
       const group = details(team.name, 'team:' + team.key);
       group.className = 'mega-stats-group';
-      group.append(boardButton(team.nodeId, team.id, t('Apri e assegna incarichi')), teamControls(team, edit));
+      if (team.id === 'brain') group.append(el('p',t('Il Main Brain riceve messaggi e propone squadre. Gli incarichi si assegnano nelle bacheche delle squadre.'),'mega-stats-meta'));
+      group.append(boardButton(team.nodeId, team.id, t(team.id === 'brain' ? 'Apri bacheca Main Brain' : 'Apri e assegna incarichi')), teamControls(team, edit));
       const members = sessions.filter(s => s.teamKey === team.key);
       group.querySelector('summary')!.append(el('small', sessionCount(members.length)));
       if (!members.length) group.append(el('p', t('Nessuna sessione per questi filtri.'), 'mega-stats-meta'));
@@ -264,7 +271,11 @@ function sources(r: MegaStatsReport) {
   d.append(windowLine, coverage,
     el('p', t('I tassi usano le ore osservate dal server. Attese e blocchi contano le sessioni vive nello stato attuale.')),
     el('p', t('P50 e P95 usano il rango più vicino sulle coppie di eventi osservate. N/D indica che manca una misura.')),
-    el('p', t('Le richieste HTTP nel riepilogo sono attribuite alle sessioni filtrate.')),
+    el('p', t('HTTP locali conclusi, attribuiti al nodo o alla sessione. Gli errori hanno stato HTTP ≥ 400. Il traffico del modello e i retry del provider non sono misurati.')),
+    el('p', t('Turni: avvii rilevati dagli hook. Latenza: tempo tra invio e fine del turno, per le coppie concluse nel periodo. I turni senza coppia sono esclusi dai percentili.')),
+    el('p', t('Codex richiede hook abilitati e approvati in /hooks. Le sessioni precedenti e gli altri CLI possono avere copertura parziale.')),
+    el('p', t('Incarichi: prima transizione osservata a completato, attribuita all’assegnatario. Conservazione locale: 7 giorni.')),
+    el('p', t('Turni senza coppia') + ' · ' + numeric(r.totals.unpairedTurns ?? null)),
     el('p', t('HTTP senza attribuzione, globale') + ' · ' + numeric(r.unattributedHttp)));
   return d;
 }
@@ -311,8 +322,8 @@ export function mountMegaStats(root: HTMLElement): () => void {
 
   function render(r: MegaStatsReport, projectId: string, teamKey: string, sessionId: string) {
     const expanded = new Set([...report.querySelectorAll<HTMLDetailsElement>('details[open]')].map(d => d.dataset.key));
+    const selected = r.sessions.find(s => s.id === sessionId);
     if (!rendered) {
-      const selected = r.sessions.find(s => s.id === sessionId);
       const team = r.teams.find(t => t.key === teamKey);
       const project = selected?.projectId ?? team?.projectId ?? projectId;
       if (project) expanded.add('project:' + project);
@@ -334,7 +345,21 @@ export function mountMegaStats(root: HTMLElement): () => void {
     const turnCoverage = el('p', t('Sessioni con fonte dei turni') + ' · ' + numeric(known) + '   ·   ' +
       t('Sessioni senza fonte') + ' · ' + numeric(r.sessions.length - known), 'mega-stats-meta mega-stats-turn-coverage');
     const drilldown = breakdown(r, projectId, teamKey, sessionId, team => preferenceEditor(team, page, () => { void load(); }));
-    report.replaceChildren(metrics, turnCoverage, observations, drilldown, sources(r), coordination());
+    const attention = el('section', undefined, 'mega-stats-section');
+    const stalledTeams = teams.filter(g => g.blockedTasks && (!teamKey || g.key === teamKey) &&
+      (!selected || selected.teamKey === g.key));
+    const waiting = r.sessions.filter(s => s.metrics.blocked || s.metrics.waiting);
+    if (stalledTeams.length || waiting.length) {
+      attention.append(el('h3',t('Dove intervenire')));
+      for (const g of stalledTeams) attention.append(boardButton(g.nodeId,g.id,
+        [r.projects.find(p => p.id === g.projectId)?.name,g.name,t('Incarichi bloccati') + ' · ' + g.blockedTasks].filter(Boolean).join(' / ')));
+      for (const s of waiting) {
+        const team = r.teams.find(g => g.key === s.teamKey);
+        const target = [r.projects.find(p => p.id===s.projectId)?.name,s.label,t(s.metrics.blocked ? 'Bloccato' : 'In attesa')].filter(Boolean).join(' / ');
+        attention.append(team ? boardButton(s.nodeId,team.id,target) : el('p',target));
+      }
+    }
+    report.replaceChildren(metrics, turnCoverage, attention, observations, drilldown, sources(r), coordination());
     for (const d of report.querySelectorAll<HTMLDetailsElement>('details')) d.open = expanded.has(d.dataset.key);
     if (focusKey) [...report.querySelectorAll<HTMLElement>('[data-focus-key]')].find(x => x.dataset.focusKey === focusKey)?.focus({ preventScroll: true });
     rendered = true;
