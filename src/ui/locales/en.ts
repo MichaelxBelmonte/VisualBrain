@@ -564,4 +564,8 @@ export const en: Record<string, string> = {
   "Agente ": "Agent ",
   "Modello ": "Model ",
   "Effort ": "Effort ",
+  "Anteprima del terminale": "Terminal preview",
+  "Nessuna anteprima disponibile": "No preview available",
+  "Nuova sessione con un altro modello": "New session with a different model",
+  "Nessun terminale disponibile": "No terminals available",
 };
