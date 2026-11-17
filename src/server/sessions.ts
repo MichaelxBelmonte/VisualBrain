@@ -233,6 +233,15 @@ async function startSquadNow(ctx: ApiCtx, detail: NodeDetail, request: SquadRequ
   }
 }
 
+/** The role card includes the short assignment. Keep a separate user prompt and all attachment paths intact. */
+function teamLaunchContext(detail: NodeDetail, cwd: string, prompt: string, assignment: string, english: boolean, leader: boolean): string[] {
+  const lines = [`Visual Brain · ${english ? 'Node' : 'Nodo'} ${detail.id} · ${detail.path}`];
+  if (cwd !== detail.path) lines.push(`${english ? 'Working directory' : 'Cartella di lavoro'}: ${cwd}`);
+  if (leader) for (const n of detail.notes.slice(0, 10)) lines.push(`[${n.origin}] ${n.text}`);
+  if (prompt && prompt !== assignment) lines.push(`${english ? 'Full request' : 'Richiesta completa'}: ${prompt}`);
+  return lines;
+}
+
 type Launched = { termId?: string; info?: TerminalInfo; opened?: boolean };
 async function startSessionNow(ctx: ApiCtx, detail: NodeDetail, request: LaunchRequest & { cols?: number; rows?: number }): Promise<Launched> {
   if (!['claude', 'codex', 'hermes', 'agy', 'shell'].includes(request.agent)) throw new TeamError(400, 'Agente sconosciuto');
@@ -268,26 +277,21 @@ async function startSessionNow(ctx: ApiCtx, detail: NodeDetail, request: LaunchR
     throw new TeamError(500, `Worktree Git non creato: ${String(error?.stderr || error?.message || error).trim().slice(0, 300)}`);
   }) : null;
   const workdir = worktree?.cwd ?? base;
-  const squadNote = squad.worktree && base !== cwd ? '\n\n' + (english
-    ? `Squad ${squad.name} works in its own Git worktree ${squad.worktree.path}, on branch ${squad.worktree.branch}, apart from the other squads of the node: commit there. The user decides when to merge it into the project folder.`
-    : `La squadra ${squad.name} lavora nel proprio worktree Git ${squad.worktree.path}, sul ramo ${squad.worktree.branch}, separata dalle altre squadre del nodo: fate commit lì. L’integrazione nella cartella del progetto la decide l’utente.`) : '';
-  const initial = role === 'orchestrator' ? buildContext(detail, ctx.cfg, prompt || task) + squadNote + (board.policy.worktrees ? '\n\n' + (english
-    ? 'Operators and reviewers each work in their own Git worktree, on the branch shown next to them on the board (field branch). Ask them to commit there; merge a branch into the project folder (git merge) only after checking its result.'
-    : 'Operatori e revisori lavorano ciascuno nel proprio worktree Git, sul ramo indicato accanto a loro nella bacheca (campo branch). Chiedi di fare commit lì; integra un ramo nella cartella del progetto (git merge) solo dopo averne verificato il risultato.') : '') : english ? [
-    `Visual Brain: ${detail.path}. Working directory: ${workdir}. Node ${detail.id}, ${detail.project?.description || detail.summary || detail.name}.`,
-    `Task: ${task || prompt || 'Read the node board and wait for an assignment.'}`,
-    'Read only files relevant to your task. Do not repeat a full project analysis.',
-  ].join('\n') + squadNote : [
-    `Visual Brain: ${detail.path}. Cartella di lavoro: ${workdir}. Nodo ${detail.id}, ${detail.project?.description || detail.summary || detail.name}.`,
-    `Incarico: ${task || prompt || 'Consulta la bacheca del nodo e attendi un incarico.'}`,
-    'Leggi solo i file utili al tuo incarico. Non ripetere l’analisi completa del progetto.',
-  ].join('\n') + squadNote + (worktree ? '\n' + (english
-    ? `You work in your own Git worktree on branch ${worktree.branch}: other agents do not see your edits until they are merged. Commit there when a task is done and name the commit in your result; do not merge, rebase or push.`
-    : `Lavori in un worktree Git tutto tuo, sul ramo ${worktree.branch}: gli altri agenti non vedono le tue modifiche finché non vengono integrate. A incarico finito fai commit lì e indica il commit nel risultato; non fare merge, rebase o push.`) : '');
+  const assignment = task || prompt.slice(0, 1000);
+  const initial = teamLaunchContext(detail, workdir, prompt, assignment, english, role === 'orchestrator');
+  if (squad.worktree && base !== cwd) initial.push(english
+    ? `Squad ${squad.name}, branch ${squad.worktree.branch}.${worktree ? '' : ' Commit here.'} The user decides integration into the project.`
+    : `Squadra ${squad.name}, ramo ${squad.worktree.branch}.${worktree ? '' : ' Fai commit qui.'} L’integrazione nel progetto spetta all’utente.`);
+  if (role === 'orchestrator' && board.policy.worktrees) initial.push(english
+    ? 'Workers have separate Git worktrees. Check their commits before integrating into the squad branch.'
+    : 'Operatori e revisori usano worktree Git separati. Verifica i commit prima di integrarli nel ramo di squadra.');
+  if (worktree) initial.push(english
+    ? `Commit on your branch ${worktree.branch} and report the SHA. Do not merge, rebase or push.`
+    : `Fai commit sul ramo ${worktree.branch} e comunica lo SHA. Non fare merge, rebase o push.`);
   let term;
   try {
-    term = await launchEmbedded(ctx.terms, request.agent as AgentName, ctx.cfg, detail, workdir, initial + (board.summary ? (english ? '\nShared summary: ' : '\nRiepilogo condiviso: ') + board.summary : ''), size, {
-      model: model || undefined, effort: effort || undefined, role, task: task || prompt.slice(0, 1000), parentId: request.parentId || (role !== 'orchestrator' ? sessions.find(s => s.role === 'orchestrator')?.id : undefined),
+    term = await launchEmbedded(ctx.terms, request.agent as AgentName, ctx.cfg, detail, workdir, initial.join('\n'), size, {
+      model: model || undefined, effort: effort || undefined, role, task: assignment, parentId: request.parentId || (role !== 'orchestrator' ? sessions.find(s => s.role === 'orchestrator')?.id : undefined),
       seenMessage: board.messages.at(-1)?.id ?? 0, code, branch: worktree?.branch, squad: ctx.teams.teams(detail.id).length > 1 ? squad.name : undefined,
       memory: memoryFor(board.policy, role, ctx.cfg.dataDir, detail.id, team),
     });
@@ -316,10 +320,10 @@ async function startBrain(ctx: ApiCtx, detail: NodeDetail, cwd: string, size: { 
   const english = ctx.cfg.language === 'en';
   const code = ctx.teams.reserveCode(detail.id, 'brain');
   const board = ctx.teams.get(detail.id, BRAIN_TEAM);
-  const squads = ctx.teams.teams(detail.id).filter(t => !t.archived).map(t => `${t.name}${t.objective ? ': ' + t.objective.slice(0, 200) : ''}`).join('; ');
-  const initial = buildContext(detail, ctx.cfg, objective) + (squads ? '\n' + (english ? 'Squads of the node: ' : 'Squadre del nodo: ') + squads : '') + (board.summary ? (english ? '\nYour previous summary: ' : '\nIl tuo riepilogo precedente: ') + board.summary : '');
+  const assignment = objective.slice(0, 1000);
+  const initial = teamLaunchContext(detail, cwd, objective, assignment, english, true).join('\n');
   const term = await launchEmbedded(ctx.terms, agent, ctx.cfg, detail, cwd, initial, size, {
-    model: model || undefined, effort: effort || undefined, role: 'brain', task: objective.slice(0, 1000), seenMessage: board.messages.at(-1)?.id ?? 0, code,
+    model: model || undefined, effort: effort || undefined, role: 'brain', task: assignment, seenMessage: board.messages.at(-1)?.id ?? 0, code,
     memory: memoryFor(board.policy, 'brain', ctx.cfg.dataDir, detail.id, BRAIN_TEAM),
   });
   ctx.teams.bindCode(detail.id, term.info.id, code);

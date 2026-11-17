@@ -22,7 +22,7 @@ try {
   const first = checkIdle(ctx, IDLE_AFTER_MS, reminded);
   assert.deepEqual(first.reported, ['op1'], 'idle operator is reported to the orchestrator');
   assert.equal(inbox('orc').length, 1);
-  assert.match(inbox('orc')[0].text, /op1/);
+  assert.match(inbox('orc')[0].text, /OP1/);
   assert.equal(inbox('orc')[0].from, 'visual-brain');
   assert.ok(written.some(([id]) => id === 'orc'), 'the idle orchestrator is woken');
   assert.deepEqual(checkIdle(ctx, IDLE_AFTER_MS + 1000, reminded), { nudged: [], reported: [] }, 'no repeated reminder inside the window');

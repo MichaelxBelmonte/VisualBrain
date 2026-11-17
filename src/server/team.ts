@@ -227,6 +227,7 @@ export class Teams {
     const b = structuredClone(this.get(nodeId, team));
     const task = b.tasks.find(t => t.id === taskId);
     if (!task) throw new TeamError(404, 'Incarico non trovato');
+    const prior = { ...task };
     const manages = actor === 'user' || role === 'orchestrator';
     if (!manages && task.assignedTo !== null && task.assignedTo !== actor) throw new TeamError(409, 'Incarico già assegnato a un altro agente');
     if (!manages && task.status === 'done') throw new TeamError(409, 'Incarico già completato');
@@ -242,6 +243,7 @@ export class Teams {
     }
     if (body.result !== undefined) task.result = boundedText(body.result, 2000);
     if (body.held !== undefined) { if (body.held) task.held = true; else delete task.held; }
+    if (task.status === prior.status && task.result === prior.result && task.assignedTo === prior.assignedTo && task.held === prior.held) return task;
     task.updatedAt = Date.now(); this.save(nodeId, b, team); return task;
   }
   release(nodeId: number, sessionId: string, team?: string): void {
@@ -391,59 +393,50 @@ export class Teams {
   }
 }
 
-/** What an orchestrator and its workers are told about squads, the Main Brain and the sorting board. */
-function squadNote(role: AgentRole, language: 'it' | 'en', squad?: string): string {
-  if (language === 'en') return role === 'orchestrator'
-    ? `${squad ? `You lead squad ${squad}. ` : ''}Other squads may work in this node, separate from yours: you see and lead only your own. If the board lists a Main Brain (field brain), message it by its code when you close a milestone, when you are blocked and when the objective is reached, and follow its priorities. With manual delivery, what operators report goes to the user first: you see the status (delivered, being sorted) but not the content until the user forwards it; still hand out the next task at once and do not ask operators to repeat it.\n`
-    : 'If a message you send comes back held (being sorted by the user), do not repeat it: the user decides whether to forward it to the orchestrator.\n';
-  return role === 'orchestrator'
-    ? `${squad ? `Guidi la squadra ${squad}. ` : ''}Nel nodo possono lavorare altre squadre, separate dalla tua: vedi e guidi solo la tua. Se la bacheca indica un Main Brain (campo brain), scrivigli al suo codice quando chiudi una tappa, quando sei bloccato e quando l’obiettivo è raggiunto, e segui le sue priorità. Con la consegna manuale ciò che riportano gli operatori passa prima dall’utente: vedi lo stato (consegnato, in smistamento) ma non il contenuto finché l’utente non lo inoltra; assegna comunque subito il prossimo incarico e non chiedere agli operatori di ripeterlo.\n`
-    : 'Se un tuo messaggio torna con held (in smistamento dall’utente), non ripeterlo: l’utente decide se inoltrarlo all’orchestratore.\n';
+/** Role-specific startup card. The full HTTP reference ships beside the server in development and in packaged runtimes. */
+export function teamInstructions(base: string, id: string, _token: string, role: AgentRole, task?: string, language: 'it' | 'en' = 'it', persistentTerminals = false, localTools = false, code?: string, squad?: string): string {
+  const en = language === 'en';
+  const words = (it: string, english: string) => en ? english : it;
+  const lines = [
+    words('ruolo ', 'role ') + role + (code ? words(', codice ', ', code ') + code : '') + words(', sessione ', ', session ') + id,
+  ];
+  if (role === 'brain') {
+    lines[0] = words('Main Brain del nodo: ', 'Main Brain of the node: ') + lines[0];
+    lines.push(words(
+      'Coordina gli orchestratori del nodo. Leggi obiettivi e squadre, affida il lavoro agli orchestratori, aggiorna il riepilogo con decisioni e prossimi passi. Per un obiettivo distinto proponi una squadra (un orchestratore, massimo 8 agenti): la avvia l’utente. Non modificare file né assegnare incarichi agli operatori.',
+      'Coordinate the node’s orchestrators. Read squad objectives, give work to orchestrators and record decisions and next steps in the summary. For a distinct objective propose a squad (one orchestrator, up to 8 agents); the user starts it. Do not edit files or assign tasks to operators.'));
+  } else if (role === 'orchestrator') {
+    if (squad) lines.push(words('Guidi la squadra ', 'You lead squad ') + squad + '.');
+    lines.push(words(
+      'Leggi l’obiettivo e assegna agli operatori della tua squadra incarichi indipendenti con scope e risultato atteso. Controlla le consegne, sblocca o riassegna, distribuisci il lavoro rimasto. Riusa le sessioni; spawn solo se autoSpawn e limite lo consentono. Aggiorna il riepilogo; riferisci tappe, blocchi e fine al Main Brain indicato nella bacheca.',
+      'Read the objective and assign independent tasks to your squad’s operators with scope and expected result. Verify handoffs, unblock or reassign, then distribute remaining work. Reuse sessions; spawn only within autoSpawn and capacity limits. Update the summary and report milestones, blocks and completion to the Main Brain listed on the board.'));
+  } else {
+    lines.push(words(
+      'Rispondi al tuo orchestratore. Rivendica l’incarico (working) prima di modificare file; resta nel suo scope. Se bloccato, indica cosa manca e chi può sbloccare. Alla consegna indica verifiche, percorsi, residuo e responsabile. Poi controlla la bacheca: rivendica un incarico libero adatto o segna idle. Non avviare altri agenti.',
+      'Report to your orchestrator. Claim the task (working) before editing; stay within scope. If blocked, say what is missing and who can unblock it. At handoff give checks, paths, remaining work and its owner. Then check the board: claim suitable pending work or mark idle. Do not spawn agents.'));
+    if (role === 'reviewer') lines.push(words('Revisione in sola lettura salvo incarico esplicito di modifica.', 'Review read-only unless explicitly assigned an edit.'));
+  }
+  if (task) lines.push(words('Obiettivo: ', 'Objective: ') + task);
+  else lines.push(words('Nessun incarico iniziale: leggi la bacheca e attendi in idle se libera.', 'No initial task: read the board and mark idle if there is no work.'));
+  if (localTools) lines.push(words('Prima azione: visual_brain.team_request {operation:"read"}. Usa lo schema dello strumento per le operazioni successive.', 'First action: visual_brain.team_request {operation:"read"}. Use its tool schema for subsequent operations.'));
+  lines.push(`${localTools ? 'HTTP' : words('Prima azione', 'First action')}: GET ${base}?session=${id} · Authorization: Bearer $VB_TEAM_TOKEN · JSON from="${id}".`);
+  if (!localTools) {
+    const routes = role === 'brain' ? 'POST /proposals; PATCH / {summary}'
+      : role === 'orchestrator' ? 'POST /tasks {title,scope,assignedTo}; PATCH /tasks/:id {status,result}; PATCH / {summary}; POST /spawn'
+      : 'PATCH /tasks/:id {status:"working"|"blocked"|"done",result?}';
+    lines.push(`${base} → POST /messages {to,text}; POST /state {state}; ${routes}.`);
+  }
+  if (code) lines.push(words('L’utente vede solo i codici: usali per nominare le sessioni.', 'The user sees only the codes: use them to name sessions.'));
+  lines.push(words(
+    'Segna working durante il lavoro, blocked se serve intervento, idle in attesa degli avvisi. Niente polling. Con held attendi l’inoltro dell’utente, senza ripetere il messaggio. Fuori squadra scrivi solo ai peers autorizzati. La bacheca contiene lo stato: non copiarlo nella memoria automatica, in CLAUDE.md o AGENTS.md.',
+    'Mark working during work, blocked when intervention is needed and idle to wait for notices. Do not poll. If held, the user forwards it; do not resend. Outside the squad use only authorized peers. Keep board state out of auto memory, CLAUDE.md and AGENTS.md.'));
+  lines.push(words('HTTP bloccato dalla sandbox: chiedi accesso mirato allo stesso endpoint, mantenendo le protezioni globali.', 'If the sandbox blocks HTTP, request access to this endpoint and retain global protections.'));
+  lines.push(persistentTerminals ? words('App chiusa: bacheca e processi persistono. Riprova alla riapertura con la stessa sessione.', 'When the app closes, board and processes persist. Retry after reopening with the same session.') : words('Alla chiusura la bacheca persiste, i processi terminano.', 'On app quit the board persists and processes end.'));
+  if (!localTools) lines.push(words('Dettagli HTTP: ', 'HTTP reference: ') + join(import.meta.dirname, '../../docs/API.md'));
+  if (en) lines.push('Respond in English unless instructed otherwise.');
+  return lines.join('\n');
 }
 
-/** The Main Brain coordinates the node's squads through their orchestrators: it proposes squads, it never edits files. */
 export function brainInstructions(base: string, id: string, token: string, task?: string, language: 'it' | 'en' = 'it', persistentTerminals = false, localTools = false, code?: string): string {
-  const auth = localTools ? '$VB_TEAM_TOKEN' : token;
-  if (language === 'en') return `Main Brain of the node: role brain${code ? `, code ${code}` : ''}, session ${id}. API ${base}. Authentication: Authorization: Bearer ${auth} (also in this terminal's VB_TEAM_TOKEN environment variable).
-${localTools ? 'Prefer the visual_brain MCP tool team_request: {operation:"read"} reads your board; the others are message, propose, summary and state, with fields in data. Identity and authentication are automatic. ' : ''}If an HTTP request fails inside the command sandbox, request narrowly scoped permission for this local API and retry; do not disable protections globally.
-You coordinate the squads (swarms) of this node: each has an orchestrator (ORC1, ORC2…) and its operators. You do not edit files and do not work on tasks: you decide what is needed, ask the orchestrators for it and keep track of progress.
-GET ${base}?session=${id} returns the squads (objective, summary, orchestrator, open and finished tasks, items waiting for the user), your new messages and your proposals.
-POST ${base}/messages {from,to:"ORC2",text} writes to a squad's orchestrator (at most 1200 characters). You talk only to orchestrators, never to operators.
-To start a new swarm POST ${base}/proposals {from,name,objective,members:[{agent:"claude"|"codex"|"hermes"|"agy",role:"orchestrator",model?,effort?},{agent,role:"operator"}…]}: it is a proposal, the user starts it with one click or discards it; you get a message when it starts. One orchestrator per proposal, at most 8 agents. Propose a squad only for an objective distinct from those already running; otherwise ask the existing orchestrator.
-PATCH ${base} {from,summary} keeps your summary (at most 4000 characters): state of the swarms, decisions, next steps.
-POST ${base}/state {from,state:"working"|"idle"|"blocked"}. Mark idle when you wait: messages from orchestrators are announced to you. Do not poll. ${persistentTerminals ? 'Board and terminals survive an app restart.' : 'The board persists; processes end when the app quits.'} Respond in English unless instructed otherwise.
-The state of the swarms lives on their boards and in your summary: do not copy it into auto memory, CLAUDE.md or AGENTS.md.
-${task ? 'Objective: ' + task + '\nIn your first turn read the board, then split the objective into proposals for new squads or requests to the running orchestrators.' : 'No initial objective: read the board, write the summary, then mark idle and wait.'}`;
-  return `Main Brain del nodo: ruolo brain${code ? `, codice ${code}` : ''}, sessione ${id}. API ${base}. Autenticazione: header Authorization: Bearer ${auth} (anche nella variabile d’ambiente VB_TEAM_TOKEN di questo terminale).
-${localTools ? 'Usa prima lo strumento MCP team_request del server visual_brain: {operation:"read"} legge la tua bacheca; le altre operazioni sono message, propose, summary e state, con i campi in data. Identità e autenticazione sono automatiche. ' : ''}Se una richiesta HTTP fallisce nella sandbox dei comandi, chiedi il permesso mirato per questa API locale e riprova; non disattivare le protezioni globali.
-Coordini le squadre (sciami) di questo nodo: ognuna ha un orchestratore (ORC1, ORC2…) e i suoi operatori. Non modifichi file e non lavori sugli incarichi: decidi cosa serve, lo chiedi agli orchestratori e tieni traccia dell’avanzamento.
-GET ${base}?session=${id} restituisce le squadre (obiettivo, riepilogo, orchestratore, incarichi aperti e chiusi, elementi in attesa dell’utente), i tuoi messaggi nuovi e le tue proposte.
-POST ${base}/messages {from,to:"ORC2",text} scrive all’orchestratore di una squadra (massimo 1200 caratteri). Parli solo con gli orchestratori, mai con gli operatori.
-Per avviare un nuovo sciame POST ${base}/proposals {from,name,objective,members:[{agent:"claude"|"codex"|"hermes"|"agy",role:"orchestrator",model?,effort?},{agent,role:"operator"}…]}: è una proposta, l’utente la avvia con un clic o la scarta; ricevi un messaggio quando parte. Un solo orchestratore per proposta, al massimo 8 agenti. Proponi una squadra solo per un obiettivo diverso da quelli già in corso; altrimenti chiedi all’orchestratore esistente.
-PATCH ${base} {from,summary} mantiene il tuo riepilogo (massimo 4000 caratteri): stato degli sciami, decisioni, prossimi passi.
-POST ${base}/state {from,state:"working"|"idle"|"blocked"}. Segna idle quando aspetti: i messaggi degli orchestratori ti vengono annunciati. Niente polling. ${persistentTerminals ? 'Bacheca e terminali sopravvivono al riavvio dell’app.' : 'La bacheca persiste; i processi terminano alla chiusura dell’app.'}
-Lo stato degli sciami sta nelle loro bacheche e nel tuo riepilogo: non copiarlo nella memoria automatica, in CLAUDE.md o in AGENTS.md.
-${task ? 'Obiettivo: ' + task + '\nNel primo turno leggi la bacheca, poi dividi l’obiettivo in proposte di nuove squadre o in richieste agli orchestratori già attivi.' : 'Nessun obiettivo iniziale: leggi la bacheca, scrivi il riepilogo, poi segna idle e attendi.'}`;
-}
-
-export function teamInstructions(base: string, id: string, token: string, role: AgentRole, task?: string, language: 'it' | 'en' = 'it', persistentTerminals = false, localTools = false, code?: string, squad?: string): string {
-  if (role === 'brain') return brainInstructions(base, id, token, task, language, persistentTerminals, localTools, code);
-  if (language === 'en') return `Node team: role ${role}${code ? `, code ${code}` : ''}, session ${id}. API ${base}. Authentication: Authorization: Bearer ${localTools ? '$VB_TEAM_TOKEN' : token} (also in this terminal's VB_TEAM_TOKEN environment variable).
-${localTools ? 'Prefer the visual_brain MCP tool team_request for team communication: {operation:"read"} reads this board; other operations are state, message, create_task, update_task, summary and spawn, with fields in data and taskId for an update. The tool supplies your identity and authentication. No shell network access is needed. ' : ''}For HTTP requests, a connection failure inside the command sandbox is not proof the app is down: request narrowly scoped permission to access this local API and retry outside that sandbox before reporting it unreachable. Do not disable sandbox protections globally or change host/port at random.
-Use JSON requests with from="${id}". Start with GET ${base}?session=${id}; this returns relevant tasks and messages, not other terminals' transcripts.
-${code ? 'Every session has a code (ORC1, OP3, REV1…) listed on the board next to its id. The user sees only the codes: use them whenever you name a session in messages, the summary and your answers. to and assignedTo accept either the id or the code.\n' : ''}${squadNote(role, 'en', squad)}${role === 'orchestrator' ? 'You keep every operator busy: this is your main job. In your first turn read the board and the objective, split it into at least one independent task per operator (explicit scope, no overlapping files) and assign them all at once with POST ' + base + '/tasks and assignedTo, before doing anything yourself. When an operator reports done or blocked, hand it the next task immediately; queue extra tasks unassigned so idle operators can claim them. If real work runs out, assign verification, tests, review or documentation of what is already done instead of leaving a session idle. Prefer small tasks (minutes, not hours) with a stated result to report. Keep the shared summary current and reuse existing sessions. Only spawn more operators when autoSpawn permits it, via POST ' + base + '/spawn {from,agent,model?,effort?,role:"operator"|"reviewer",task}. Choose models and effort for the task without assuming availability. Do not duplicate operators’ work. Visual Brain tells you when a session has been idle for a while: act on it at once.' : 'Work only on your assignment, claim it before editing and respect its scope. Do not explore the whole project. When you finish, report the result with paths and checks, then read the board: if there is an unassigned pending task that fits, claim it and continue; otherwise mark idle so the orchestrator can assign you more. Reviewers report findings without edits unless explicitly assigned. Do not launch other agents.'}
-POST ${base}/tasks {from,title,scope:["path"],assignedTo?:"session"}; PATCH ${base}/tasks/:id {from,status:"working"|"done"|"blocked",result?:"summary and paths"}. Each working task has one assignee; do not take over others’ tasks.
-POST ${base}/messages {from,to:"session"|null,text:"maximum 1200 characters"}. A null recipient means the team. Cross-node recipients must be listed in peers: the user creates these channels in Workspace. Send concise results with paths and checks, not full logs. Only the orchestrator may PATCH ${base} {from,summary:"decisions and status, maximum 4000 characters"}.
-POST ${base}/state {from,state:"working"|"idle"|"blocked"}. Mark working before starting; read your inbox at handoffs and before stopping. Mark idle only when finished: queued messages notify idle terminals. Do not poll or call an LLM while waiting. ${persistentTerminals ? "The board and terminal processes survive an app restart. The API is unavailable while the app is closed; retry after it reopens, without recreating the session." : "The board persists; processes end when the app quits."} Respond in English unless instructed otherwise.
-Squad state (tasks, results, messages, summary) lives on this board: do not copy it into auto memory, CLAUDE.md or AGENTS.md.
-${task ? 'Initial task: ' + task : 'No initial task: read the board; if nothing is assigned, mark idle and wait: you will be notified when work arrives.'}`;
-  return `Squadra del nodo: ruolo ${role}${code ? `, codice ${code}` : ''}, sessione ${id}. API ${base}. Autenticazione: header Authorization: Bearer ${localTools ? '$VB_TEAM_TOKEN' : token} (anche nella variabile d’ambiente VB_TEAM_TOKEN di questo terminale).
-${localTools ? 'Per comunicare usa prima lo strumento MCP team_request del server visual_brain: {operation:"read"} legge questa bacheca; le altre operazioni sono state, message, create_task, update_task, summary e spawn, con i campi in data e taskId per aggiornare un incarico. Identità e autenticazione sono automatiche; non serve accesso alla rete dalla shell. ' : ''}Se usi HTTP e la connessione fallisce nella sandbox dei comandi, non significa che l’app sia spenta: richiedi il permesso mirato di accedere a questa API locale e riprova fuori da quella sandbox prima di dichiararla irraggiungibile. Non disattivare le protezioni globali e non cambiare host o porta a caso.
-Usa richieste JSON con from="${id}". Inizia leggendo GET ${base}?session=${id}; ricevi solo incarichi e messaggi utili, non i transcript degli altri terminali.
-${code ? 'Ogni sessione ha un codice (ORC1, OP3, REV1…), elencato nella bacheca accanto al suo id. L’utente vede solo i codici: usali ogni volta che nomini una sessione nei messaggi, nel riepilogo e nelle risposte. to e assignedTo accettano sia l’id sia il codice.\n' : ''}${squadNote(role, 'it', squad)}${role === 'orchestrator' ? 'Il tuo compito principale è non lasciare nessun operatore fermo. Nel primo turno leggi bacheca e obiettivo, dividilo in almeno un incarico indipendente per operatore (scope esplicito, nessun file in comune) e assegnali tutti subito con POST ' + base + '/tasks e assignedTo, prima di lavorare tu. Quando un operatore segnala completato o bloccato, dagli subito l’incarico successivo; metti in coda incarichi non assegnati perché gli operatori liberi possano rivendicarli. Se il lavoro vero finisce, affida verifica, test, revisione o documentazione di quanto già fatto invece di lasciare una sessione ferma. Preferisci incarichi piccoli (minuti, non ore) con un risultato da riportare. Mantieni il riepilogo condiviso e riusa le sessioni esistenti; avvia altri agenti solo se la policy autoSpawn lo consente, tramite POST ' + base + '/spawn {from,agent,model?,effort?,role:"operator"|"reviewer",task}. Scegli modello ed effort in base alla difficoltà, senza presumere disponibilità. Non duplicare il lavoro degli operatori. Visual Brain ti avvisa quando una sessione resta ferma: agisci subito.' : 'Esegui solo l’incarico ricevuto. Non esplorare l’intero progetto. Prima di modificare file, rivendica il tuo incarico; rispetta lo scope. Quando finisci, riporta risultato con percorsi e verifiche, poi rileggi la bacheca: se c’è un incarico non assegnato adatto a te rivendicalo e prosegui; altrimenti segna idle così l’orchestratore può darti altro lavoro. Se sei revisore, verifica e riferisci, senza modificare file salvo incarico esplicito. Non avviare altri agenti.'}
-POST ${base}/tasks {from,title,scope:["percorso"],assignedTo?:"sessione"}; PATCH ${base}/tasks/:id {from,status:"working"|"done"|"blocked",result?:"sintesi e percorsi"}. Un incarico working ha un solo assegnatario: non lavorare su incarichi altrui.
-POST ${base}/messages {from,to:"sessione"|null,text:"massimo 1200 caratteri"}. to=null comunica alla squadra. Per un altro nodo usa solo una sessione elencata in peers: i canali espliciti vengono creati dall’utente in Operativa. Risultati brevi con percorsi e verifiche; niente log completi. PATCH ${base} {from,summary:"decisioni e stato, massimo 4000 caratteri"} riservato all’orchestratore.
-POST ${base}/state {from,state:"working"|"idle"|"blocked"}. Segna working prima del lavoro; rileggi la casella ai passaggi di incarico e prima di fermarti. Segna idle solo alla fine: i messaggi in coda vengono notificati al terminale quando è idle. Non usare cicli di polling o chiamate LLM in attesa. ${persistentTerminals ? "Bacheca e processi dei terminali sopravvivono al riavvio dell’app. L’API non è disponibile mentre l’app è chiusa: riprova dopo la riapertura, senza ricreare la sessione." : "Il riepilogo e la bacheca persistono; i processi terminano al riavvio."}
-Lo stato della squadra (incarichi, risultati, messaggi, riepilogo) sta in questa bacheca: non copiarlo nella memoria automatica, in CLAUDE.md o in AGENTS.md.
-${task ? 'Incarico iniziale: ' + task : 'Nessun incarico iniziale: controlla la bacheca; se non c’è lavoro assegnato segna idle e attendi: sarai avvisato quando arriva.'}`;
+  return teamInstructions(base, id, token, 'brain', task, language, persistentTerminals, localTools, code);
 }

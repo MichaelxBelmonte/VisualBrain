@@ -678,27 +678,32 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         if (!canManage || isBrain) throw new HttpError(403, 'Solo l’orchestratore crea incarichi');
         const assignedTo = recipient(b.assignedTo);
         const task = ctx.teams.createTask(nodeId, actor, { title: b.title, scope: b.scope, assignedTo }, team);
-        ctx.teams.message(nodeId, actor, assignedTo, `Incarico ${task.id}: ${task.title}`, team);
+        ctx.teams.message(nodeId, actor, assignedTo, `${english ? 'Task' : 'Incarico'} ${task.id}: ${task.title}`, team);
         notify(); return send(res, 201, task);
       }
       if (action === 'tasks' && taskId && method === 'PATCH') {
         if (isBrain) throw new HttpError(403, 'Il Main Brain non ha incarichi');
         const finishing = b.status === 'done' || b.status === 'blocked';
         const manual = finishing && board.policy.delivery === 'manual' && (member?.info.role === 'operator' || member?.info.role === 'reviewer');
-        const task = ctx.teams.changeTask(nodeId, taskId, actor, member?.info.role, { status: b.status, result: b.result, ...(b.assignedTo !== undefined ? { assignedTo: recipient(b.assignedTo) } : {}), ...(manual ? { held: true } : {}) }, team);
-        if (task.status === 'done' && board.tasks.find(t => t.id === task.id)?.status !== 'done')
+        const before = board.tasks.find(t => t.id === taskId);
+        const assignedTo = b.assignedTo === undefined ? undefined : recipient(b.assignedTo);
+        const changed = !before || (b.status !== undefined && b.status !== before.status)
+          || (b.result !== undefined && (typeof b.result !== 'string' || b.result.trim() !== before.result))
+          || (assignedTo !== undefined && assignedTo !== before.assignedTo);
+        // Always validate ownership and the transition, including repeat requests.
+        const task = ctx.teams.changeTask(nodeId, taskId, actor, member?.info.role, { status: b.status, result: b.result, ...(assignedTo !== undefined ? { assignedTo } : {}), ...(manual && changed ? { held: true } : {}) }, team);
+        if (task.status === 'done' && before?.status !== 'done')
           ctx.stats?.done(nodeId,team,task.assignedTo,task.id);
+        if (!changed && task.assignedTo === before?.assignedTo) return send(res, 200, task);
         if (manual) ctx.teams.hold(nodeId, team, { kind: task.status === 'done' ? 'result' : 'blocked', from: actor, text: task.result || task.title, taskId: task.id, taskTitle: task.title });
         const target = sessions.find(s => s.alive && s.role === 'orchestrator' && s.id !== actor);
         if (target && (task.status === 'done' || task.status === 'blocked')) {
-          const stillBusy = ctx.teams.get(nodeId, team).tasks.some(t => t.assignedTo === actor && t.status !== 'done' && t.id !== task.id);
-          const next = stillBusy ? '' : ' Sessione libera: assegna subito il prossimo incarico.';
-          const word = task.status === 'done' ? 'Completato' : 'Bloccato';
-          ctx.teams.message(nodeId, actor, target.id, manual && english
-            ? `${task.status === 'done' ? 'Done' : 'Blocked'} ${task.id} (${task.title.slice(0, 300)}): ${task.status === 'done' ? 'result' : 'details'} being sorted by the user; you will receive them if forwarded.${stillBusy ? '' : ' Session free: assign the next task now.'}`
-            : manual
-            ? `${word} ${task.id} (${task.title.slice(0, 300)}): ${task.status === 'done' ? 'risultato' : 'dettagli'} in smistamento dall’utente, ti arriveranno se li inoltra.${next}`
-            : `${word} ${task.id}: ${(task.result.slice(0, 1100 - next.length) || task.title)}${next}`, team);
+          const done = task.status === 'done';
+          const word = done ? (english ? 'Done' : 'Completato') : (english ? 'Blocked' : 'Bloccato');
+          const next = task.held ? (english ? 'held for the user to forward' : 'in smistamento dall’utente')
+            : done ? (english ? 'review the result on the board' : 'verifica il risultato in bacheca')
+            : (english ? 'check the blocker and decide who acts next' : 'verifica il blocco e decidi chi interviene');
+          ctx.teams.message(nodeId, actor, target.id, `${word} ${task.id} · ${codeOf(task.assignedTo ?? actor)} · ${next}.`, team);
           wake(target.id);
         }
         return send(res, 200, task);

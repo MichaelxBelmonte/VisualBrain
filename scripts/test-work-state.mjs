@@ -201,9 +201,9 @@ try {
   const first = checkIdle(ctx, t0, reminded);
   assert.deepEqual(first.reported.sort(), ['op1', 'op2', 'op3'], 'op3 is a hook turn interrupted with Esc (no Stop hook); op4 recent input, op5 too recent, op6 visibly busy are left alone');
   const msg = inbox().at(-1).text;
-  assert.match(msg, /OP1 \(op1\) aspetta una risposta dell'utente nel suo terminale da 2 min/);
-  assert.match(msg, /OP2 \(op2\) dichiara al lavoro ma è fermo da 10 min/);
-  assert.match(msg, /OP3 \(op3\) dichiara al lavoro ma è fermo da \d+ min/);
+  assert.match(msg, /OP1 · 2 min · serve risposta utente nel terminale/);
+  assert.match(msg, /OP2 · 10 min · nessuna attività/);
+  assert.match(msg, /OP3 · \d+ min · nessuna attività/);
   assert.equal(inbox().length, 1, 'one message for the whole node');
   assert.deepEqual(checkIdle(ctx, t0 + 60_000, reminded).reported, [], 'rate limited like the idle reminders');
   assert.deepEqual(checkIdle(ctx, t0 + REMIND_EVERY_MS, reminded).reported.sort(), ['op1', 'op2', 'op3', 'op6'], 'again after the window; op6 is quiet now, hence free');

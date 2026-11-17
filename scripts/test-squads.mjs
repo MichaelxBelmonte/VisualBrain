@@ -83,7 +83,7 @@ try {
   const brain = ok(await call('POST', '/api/launch', { id: 1, agent: 'claude', mode: 'embedded', role: 'brain', prompt: 'Coordina' }), 201).info;
   assert.equal(brain.code, 'BRAIN1'); assert.equal(brain.teamId, 'brain');
   assert.match(terms.get(brain.id).args.at(-1), /Main Brain del nodo: ruolo brain, codice BRAIN1/);
-  assert.match(terms.get(brain.id).args.at(-1), /Squadre del nodo: Alfa: Rifai la UI; Beta: Scrivi i test/);
+  assert.doesNotMatch(terms.get(brain.id).args.at(-1), /Beta: Scrivi i test/, 'squad objectives are available on the first board read');
   assert.equal((await call('POST', '/api/launch', { id: 1, agent: 'claude', mode: 'embedded', role: 'brain' })).status, 409);
   assert.ok(ctx.teams.get(1).messages.some(m => m.to === orc1 && /BRAIN1 è attivo/.test(m.text)) && ctx.teams.get(1, '2').messages.some(m => m.to === orc2 && /BRAIN1/.test(m.text)), 'orchestrators learn about the Main Brain');
   const brainView = ok(await call('GET', `/api/work/1?session=${brain.id}`, undefined, brain.id));
@@ -116,7 +116,7 @@ try {
   const inbox = ctx.teams.get(1).inbox;
   assert.equal(inbox.length, 1); assert.equal(inbox[0].kind, 'result'); assert.equal(inbox[0].column, 'new'); assert.equal(inbox[0].taskTitle, 'Header nuovo');
   const notice = ctx.teams.get(1).messages.at(-1);
-  assert.equal(notice.to, orc1); assert.match(notice.text, /Completato .* in smistamento dall’utente.*Sessione libera/); assert.doesNotMatch(notice.text, /header\.ts/);
+  assert.equal(notice.to, orc1); assert.match(notice.text, /Completato .* · OP1 · in smistamento dall’utente/); assert.doesNotMatch(notice.text, /header\.ts/);
   const orcView = ok(await call('GET', `/api/work/1?session=${orc1}`, undefined, orc1));
   assert.equal(orcView.tasks.find(t => t.id === task.id).status, 'done');
   assert.equal(orcView.tasks.find(t => t.id === task.id).result, '(consegnato, in smistamento dall’utente)');
@@ -139,6 +139,13 @@ try {
   const t2 = ok(await call('POST', '/api/work/1/tasks', { title: 'Footer', assignedTo: 'OP2' }, orc1), 201);
   ok(await call('PATCH', `/api/work/1/tasks/${t2.id}`, { status: 'blocked', result: 'manca il design' }, op2));
   assert.equal(ctx.teams.get(1).inbox.at(-1).kind, 'blocked');
+  const heldCount = ctx.teams.get(1).inbox.length, noticeCount = ctx.teams.get(1).messages.length;
+  ok(await call('PATCH', `/api/work/1/tasks/${t2.id}`, { status: 'blocked', result: 'manca il design' }, op2));
+  assert.equal(ctx.teams.get(1).inbox.length, heldCount, 'identical blocked report is held once');
+  assert.equal(ctx.teams.get(1).messages.length, noticeCount, 'no second handoff for the same blocker');
+  assert.equal((await call('PATCH', `/api/work/1/tasks/${t2.id}`, { status: 'blocked', result: 'manca il design' }, op1)).status, 409, 'another worker cannot replay an identical update');
+  ok(await call('PATCH', `/api/work/1/tasks/${t2.id}`, { status: 'blocked', result: 'manca il design aggiornato' }, op2));
+  assert.equal(ctx.teams.get(1).inbox.length, heldCount + 1, 'a changed blocker gets its own handoff');
   ok(await call('POST', '/api/work/1/forward', { team: '1', items: [ctx.teams.get(1).inbox.at(-1).id], to: 'BRAIN1' }), 201);
   assert.ok(ctx.teams.get(1, 'brain').messages.at(-1).text.includes('manca il design'));
   assert.ok(ctx.teams.get(1).tasks.find(t => t.id === t2.id).held);
