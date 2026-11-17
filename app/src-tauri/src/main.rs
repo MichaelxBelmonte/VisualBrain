@@ -398,6 +398,18 @@ fn main() {
 mod tests {
     use super::*;
     fn scratch(tag: &str) -> PathBuf { let d = std::env::temp_dir().join(format!("vb-move-test-{tag}-{}", std::process::id())); let _ = fs::remove_dir_all(&d); fs::create_dir_all(&d).unwrap(); d }
+    /// Removes a scratch folder; its synthetic apps leave Launch Services first, or Launchpad shows them as "forbidden" icons.
+    fn discard(root: &Path) {
+        fn apps(dir: &Path, out: &mut Vec<PathBuf>) {
+            for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+                let path = entry.path();
+                if path.extension().is_some_and(|e| e == "app") { out.push(path); } else if path.is_dir() { apps(&path, out); }
+            }
+        }
+        let mut found = Vec::new(); apps(root, &mut found);
+        for app in found { sh("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", &[&"-u", &app], 10); }
+        let _ = fs::remove_dir_all(root);
+    }
     fn fake_app(at: &Path, version: &str) {
         fs::create_dir_all(at.join("Contents/MacOS")).unwrap();
         fs::write(at.join("Contents/Info.plist"), format!(r#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.jethr.visualbrain</string><key>CFBundleShortVersionString</key><string>{version}</string></dict></plist>"#)).unwrap();
@@ -413,7 +425,7 @@ mod tests {
         assert!(server_listener(port, None).is_ok(), "fresh profile can still choose a free port");
         fs::write(root.join("terminal-service/host.json"), r#"{"pid":0,"apiPort":49321}"#).unwrap();
         assert_eq!(terminal_api_port(&root), None);
-        fs::remove_dir_all(root).unwrap();
+        discard(&root);
     }
     #[test] fn translocation() {
         assert!(is_translocated(Path::new("/private/var/folders/xy/abc/T/AppTranslocation/1234-5678/d/Visual Brain.app")));
@@ -462,7 +474,7 @@ mod tests {
         assert!(sh("/usr/bin/xattr", &[&"-w", &"com.apple.quarantine", &"0081;00000000;Test;", &app], 10));
         assert!(quarantined(&app));
         assert!(sh("/usr/bin/xattr", &[&"-dr", &"com.apple.quarantine", &app], 10) && !quarantined(&app));
-        fs::remove_dir_all(&root).unwrap();
+        discard(&root);
     }
     #[test] fn install_replaces_and_keeps_backup() {
         let root = scratch("ok");
@@ -477,7 +489,7 @@ mod tests {
         assert!(backups[0].path().join("Visual Brain.app/old-marker").is_file());
         assert_eq!(fs::read_dir(root.join("Apps")).unwrap().count(), 1, "no staging leftovers");
         assert!(src.join("Contents/Info.plist").is_file(), "source untouched");
-        fs::remove_dir_all(&root).unwrap();
+        discard(&root);
     }
     #[test] fn install_into_new_folder() {
         let root = scratch("new");
@@ -486,7 +498,7 @@ mod tests {
         install(&src, &dest, &root.join("backups"), false).unwrap();
         assert_eq!(plist(&dest, "CFBundleShortVersionString").as_deref(), Some("0.2.11"));
         assert!(!root.join("backups").exists());
-        fs::remove_dir_all(&root).unwrap();
+        discard(&root);
     }
     #[test] fn install_verifies_signed_bundle_and_drops_quarantine() {
         let root = scratch("signed");
@@ -499,7 +511,7 @@ mod tests {
         install(&src, &dest, &root.join("backups"), true).unwrap();
         assert!(sh("/usr/bin/codesign", &[&"--verify", &"--deep", &"--strict", &dest], 30));
         assert!(!sh("/usr/bin/xattr", &[&"-p", &"com.apple.quarantine", &dest], 10), "quarantine removed");
-        fs::remove_dir_all(&root).unwrap();
+        discard(&root);
     }
     #[test] fn failed_install_leaves_destination() {
         let root = scratch("fail");
@@ -512,6 +524,6 @@ mod tests {
         assert_eq!(plist(&dest, "CFBundleShortVersionString").as_deref(), Some("0.2.9"));
         assert_eq!(fs::read_dir(root.join("Apps")).unwrap().count(), 1, "no staging leftovers");
         assert!(!aside.exists());
-        fs::remove_dir_all(&root).unwrap();
+        discard(&root);
     }
 }

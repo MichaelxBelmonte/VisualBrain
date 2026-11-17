@@ -107,9 +107,9 @@ function bundlesIn(dir: string, depth = 3): string[] {
   try { return readdirSync(dir, { withFileTypes: true }).filter(e => e.isDirectory()).flatMap(e => bundlesIn(join(dir, e.name), depth - 1)); } catch { return []; }
 }
 
-/** Removes the bundles under `dir` from Launch Services, then the folder itself. */
-export async function forget(dir: string): Promise<void> {
-  for (const app of bundlesIn(dir)) await run(LSREGISTER, ['-u', app]).catch(() => {});
+/** Removes the bundles under `dir` (down to `depth` folders) from Launch Services, then the folder itself. */
+export async function forget(dir: string, depth = 3): Promise<void> {
+  for (const app of bundlesIn(dir, depth)) await run(LSREGISTER, ['-u', app]).catch(() => {});
   rmSync(dir, { recursive: true, force: true });
 }
 

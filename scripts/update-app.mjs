@@ -59,7 +59,7 @@ if (running.size) {
   run('ditto', [bundle, app]);
   run('codesign', ['--verify', '--deep', '--strict', app]);
   console.log(`App in esecuzione (${running.size} processi): sessioni intatte. Premi ⌘R nella finestra per la nuova interfaccia.`);
-  console.log(serverChanged ? 'Il backend è cambiato: sarà attivo al prossimo avvio completo, che chiude i terminali. Non riavviare finché lavori.' : 'Il backend è identico: nessun riavvio necessario.');
+  console.log(serverChanged ? 'Il backend è cambiato: sarà attivo dopo ⌘Q e riapertura. I terminali restano attivi sul servizio persistente e li ritrovi alla riapertura.' : 'Il backend è identico: nessun riavvio necessario.');
 } else {
   mkdirSync(resolve(app, '..'), { recursive: true });
   rmSync(app, { recursive: true, force: true });

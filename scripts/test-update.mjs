@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand } from '../src/server/updater.ts';
+import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand } from '../src/server/updater.ts';
 import { bannerFor } from '../src/ui/updates.ts';
 import { UPDATE_PUBLIC_KEY } from '../src/server/update-key.ts';
 
@@ -246,7 +246,7 @@ if (process.platform === 'darwin') {
     const old = new Date(Date.now() - 60 * 60 * 1000); utimesSync(stale, old, old);
     await t5.cleanup();
     eq([existsSync(stale), existsSync(fresh)], [false, true], 'an old unpacked package is removed, a recent one is kept');
-  } finally { rmSync(temp, { recursive: true, force: true }); }
+  } finally { await forget(temp, 8); } // the synthetic apps leave Launch Services too: no "forbidden" icons after a test run
 }
 
 // --- wiring -------------------------------------------------------------------------------------------------------------
