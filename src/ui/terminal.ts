@@ -4,6 +4,7 @@ import { Terminal, type ILink } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { mountDevView } from './dev-view.ts';
 import { openWorkLauncher } from './work-launcher.ts';
+import { openTerminalQuickMenu } from './terminal-quick-menu.ts';
 import { openHarnessLauncher } from './harness-launcher.ts';
 import { icon } from './icons.ts';
 import { bindRailResize, bindRailVisibility, bindRailSearch } from './work-rail.ts';
@@ -105,6 +106,7 @@ export class Terminals {
   private updateGit: ((node: number | null, visible: boolean) => void) | null = null;
   private collapsedNodes = new Set<number>((() => { try { const v = JSON.parse(localStorage.getItem('vb:collapsed-nodes') || '[]'); return Array.isArray(v) ? v.filter(Number.isInteger) : []; } catch { return []; } })());
   private dismissLauncher: (() => void) | null = null;
+  private dismissQuickMenu?: () => void;
   private syncing = false;
 
   private control<T extends Element = HTMLElement>(selector: string): T | null { return this.root.querySelector<T>(selector) ?? document.querySelector<T>(selector); }
@@ -158,6 +160,7 @@ export class Terminals {
     window.addEventListener('vb-file-drop', e => this.fileDrop((e as CustomEvent).detail));
     this.control('#work-brain')!.addEventListener('click', () => { if (this.selectedNode !== null) { this.show(false); this.cb.reveal(this.selectedNode); } });
     bindRailSearch(this.control<HTMLInputElement>('#work-filter')!);
+    this.control('#work-quick-menu')!.addEventListener('click', () => this.toggleQuickMenu());
     this.control<HTMLInputElement>('#work-filter')!.addEventListener('input', e => {
       this.filter = (e.target as HTMLInputElement).value.toLowerCase(); this.renderList();
     });
@@ -222,6 +225,7 @@ export class Terminals {
   }
 
   show(open: boolean): void {
+    if (!open) this.dismissQuickMenu?.();
     this.root.classList.toggle('hidden', !open);
     document.getElementById('app')!.classList.toggle('operative', open);
     for (const [id, selected] of [['btn-brain', !open], ['btn-workspace', open]] as const) {
@@ -554,11 +558,61 @@ export class Terminals {
   /** ⌘J: the "+ Agent" dialog for the node on screen (a plain terminal is one of its choices). */
   private shortcutKey(e: KeyboardEvent): void {
     if (!this.isOpen() || (e.target instanceof HTMLElement && e.target.closest('#overlay'))) return;
+    if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'Space' && document.getElementById('overlay')!.classList.contains('hidden')) {
+      e.preventDefault(); e.stopPropagation();
+      if (!e.repeat) this.toggleQuickMenu();
+      return;
+    }
     // ⌘⇧J: a plain terminal at once, in the node on screen (free when none is selected).
     if (isPlainTerminalKey(e)) { e.preventDefault(); e.stopPropagation(); void this.openShell(this.selectedNode); return; }
     if (!isNewTerminalKey(e)) return;   // also from Lavoro and Codice: the launcher opens over them
     e.preventDefault(); e.stopPropagation();
     this.openLauncher();
+  }
+
+  private toggleQuickMenu(): void {
+    const anchor = this.control<HTMLButtonElement>('#work-quick-menu')!;
+    if (anchor.getAttribute('aria-expanded') === 'true') { this.dismissQuickMenu?.(); return; }
+    if (this.root.classList.contains('rail-collapsed')) this.control<HTMLElement>('#work-toggle-rail')!.click();
+    const agents = this.cb.agents();
+    const items = [...this.tabs.values()].map(tab => ({
+      id: tab.info.id,
+      label: [tab.info.code ?? tab.info.id, tab.info.name || labels[tab.info.agent], this.nodeLabel(tab.info.nodeId ?? null)].join(' · '),
+      model: tab.info.model,
+      canChangeModel: tab.info.agent !== 'shell' && tab.info.nodeId != null && agents[tab.info.agent],
+      nativeModel: tab.info.alive && tab.info.agent !== 'shell',
+      preview: () => this.quickPreview(tab),
+    }));
+    this.dismissQuickMenu = openTerminalQuickMenu({ anchor, items, selectedId: this.active,
+      onOpen: id => this.activate(id),
+      onNativeModel: id => {
+        this.activate(id);
+        void navigator.clipboard?.writeText('/model').catch(() => {});
+        this.message(tr('Usa /model nel terminale per scegliere il modello.'));
+      },
+      onModel: id => {
+        const info = this.tabs.get(id)?.info;
+        if (!info || info.agent === 'shell' || info.nodeId == null) return;
+        this.openLauncher(info.agent, 'embedded', '', false, info.nodeId, {
+          teamId: info.role === 'brain' ? 'new' : info.teamId,
+          initialModel: info.model ?? '', initialEffort: info.effort,
+        });
+      },
+    });
+  }
+
+  /** Reading an xterm buffer has no effect on the active pane, its selection or its PTY. */
+  private async quickPreview(tab: Tab): Promise<string> {
+    const buffer = tab.term?.buffer.active;
+    if (buffer) {
+      const lines: string[] = [];
+      for (let i = buffer.length - 1; i >= 0 && lines.length < 6; i--) {
+        const line = buffer.getLine(i)?.translateToString(true) ?? '';
+        if (line || lines.length) lines.unshift(line.slice(-240));
+      }
+      if (lines.length) return lines.join('\n');
+    }
+    return (await api.terminalPreview(tab.info.id)).text;
   }
 
   /** Files dropped on the window (the desktop shell reports their paths): they are typed, escaped, into the terminal under the pointer. */
@@ -1204,7 +1258,7 @@ export class Terminals {
 
   private message(text: string): void { this.control('#work-message')!.textContent = text; }
 
-  private openLauncher(initialAgent?: TerminalInfo['agent'], mode: 'embedded' | 'external' = 'embedded', initialPrompt = '', squad = false, nodeId = this.selectedNode, extra: { teamId?: string; proposal?: SwarmProposal; role?: AgentRole } = {}): void {
+  private openLauncher(initialAgent?: TerminalInfo['agent'], mode: 'embedded' | 'external' = 'embedded', initialPrompt = '', squad = false, nodeId = this.selectedNode, extra: { teamId?: string; proposal?: SwarmProposal; role?: AgentRole; initialModel?: string; initialEffort?: string } = {}): void {
     if (nodeId === null) { this.cb.pickNode(); return; }
     const node = this.nodes.get(nodeId);
     if (!node) { this.message(tr('Nodo non disponibile.')); return; }
@@ -1212,11 +1266,12 @@ export class Terminals {
     this.dismissLauncher = openWorkLauncher({
       node, agents: this.cb.agents(), sessions: [...this.tabs.values()].filter(t => t.info.nodeId === node.id).map(t => t.info),
       squad, initialAgent, mode, prompt: extra.proposal?.objective ?? initialPrompt, teamId: extra.teamId, proposal: extra.proposal, initialRole: extra.role,
+      initialModel: extra.initialModel, initialEffort: extra.initialEffort,
       dismissed: () => { this.dismissLauncher = null; },
       launched: (sessions, group, external, warning) => {
         for (const info of sessions) this.attach(info, false);
         this.message(warning ?? (external ? tr('Sessione avviata in Terminal.app.') : ''));
-        if (this.boardOpen && this.sideOpen) { this.renderList(); this.renderBody(); return; }
+        if (this.boardOpen && this.sideOpen && extra.initialModel === undefined) { this.renderList(); this.renderBody(); return; }
         // Started from the terminals: stay there (the orchestrator is shown), only the map goes back to the map.
         if (sessions[0]) this.activate(sessions[0].id);
       },

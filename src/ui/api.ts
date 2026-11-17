@@ -60,6 +60,7 @@ export const api = {
   launch: (req: LaunchRequest & { cols?: number; rows?: number }) => call<{ termId?: string; info?: TerminalInfo; opened?: boolean; teamId?: string; warning?: string }>('POST', '/api/launch', req),
   open: (id: number, app: 'finder' | 'default' | 'editor') => call<{ ok: boolean }>('POST', '/api/open', { id, app }),
   terminals: () => call<TerminalInfo[]>('GET', '/api/terminals'),
+  terminalPreview: (id: string) => call<{ text: string }>('GET', `/api/terminals/${encodeURIComponent(id)}/preview`),
   killTerminal: (id: string) => call<{ ok: boolean }>('DELETE', ui`/api/terminals/${id}`),
   models: () => call<Record<AgentName, ModelChoice[]>>('GET', '/api/models'),
   harnesses: () => call<Array<{ id: string; label: string; installed: boolean; canInstall: boolean; install: { state: 'installing' | 'ready' | 'error'; step: string; error?: string } | null; version?: string | null; latest?: string; outdated?: boolean }>>('GET', '/api/harnesses'),

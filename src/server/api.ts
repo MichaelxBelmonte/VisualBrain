@@ -29,7 +29,7 @@ import { notifyTeam, setWorkState, wakeSession } from './team-delivery.ts';
 import { normalizePath, getOrCreateExternal, lazyIndex, resolveExisting } from './graph.ts';
 import { handleReminderBoard, defaultReminderFolder } from './reminder-board.ts';
 import { apiWrite } from './api-write.ts';
-import { setAttention } from './activity.ts';
+import { setAttention, stripAnsi } from './activity.ts';
 import { SEARCH_SQL, isSearchFilter, type SearchFilter } from '../shared/search-filter.ts';
 import { connectGithub, githubRepositories } from './github-connect.ts';
 import { gitEnv } from './git.ts';
@@ -876,6 +876,15 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       throw new HttpError(405, 'metodo non consentito');
     }
     if (path === '/api/terminals' && method === 'GET') return send(res, 200, ctx.teams.withCodes(ctx.terms.list()));
+    m = /^\/api\/terminals\/([a-z0-9-]+)\/preview$/.exec(path);
+    if (m && method === 'GET') {
+      if (req.headers.authorization || req.headers['sec-fetch-site'] !== 'same-origin') throw new HttpError(403, 'Anteprima disponibile dalla vista Operativa');
+      const term = ctx.terms.get(m[1]);
+      if (!term) throw new HttpError(404, 'Sessione non trovata');
+      // Read the retained output without attaching to or resizing an unseen PTY.
+      const lines = stripAnsi(term.buffer.join('')).trimEnd().split('\n').slice(-6);
+      return sendJson(res, 200, { text: lines.map(line => line.slice(-240)).join('\n') });
+    }
     m = /^\/api\/terminals\/([a-z0-9-]+)\/resume$/.exec(path);
     if (m && method === 'POST') {
       if (req.headers.authorization) throw new HttpError(403, 'Le sessioni si riprendono dall’interfaccia');

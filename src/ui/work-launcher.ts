@@ -29,6 +29,7 @@ export function openWorkLauncher(options: {
   squad: boolean; initialAgent?: TerminalInfo['agent']; mode: 'embedded' | 'external'; prompt: string;
   /** The squad to join ("new" for a new one); absent: the squad at work, otherwise the first. A Main Brain proposal fills the form. */
   teamId?: string; proposal?: SwarmProposal; initialRole?: AgentRole;
+  initialModel?: string; initialEffort?: string;
   launched(sessions: TerminalInfo[], squad: boolean, external: boolean, warning?: string): void;
   dismissed(): void;
 }): () => void {
@@ -61,6 +62,10 @@ export function openWorkLauncher(options: {
       if (saved && saved.agent !== 'shell' && options.agents[saved.agent] && !options.initialAgent) choices[i] = { agent: saved.agent, model: saved.model, effort: saved.effort };
       else choices[i].model = localStorage.getItem(ui`vb:model:${defaultAgent}`) || '';
     } catch { /* keep defaults */ }
+  }
+  if (options.initialModel !== undefined) {
+    choices[0].model = options.initialModel;
+    choices[0].effort = options.initialEffort ?? '';
   }
   if (options.proposal) options.proposal.members.forEach((m, i) => { if (i < choices.length) choices[i] = { agent: m.agent, model: m.model ?? '', effort: m.effort ?? '', role: m.role }; });
   const total = () => squad && restored ? restored.members.length : squad ? Math.min(HARD_MAX, extra + (addOnly ? 0 : 1)) : 1;
@@ -322,7 +327,8 @@ export function openWorkLauncher(options: {
   renderRows(); renderTeams();
   void api.models().then(models => { if (!form.isConnected) return; catalog = models; roster.querySelectorAll<HTMLElement>('.launch-agent-row').forEach(row => updateModels(row, choices[Number(row.dataset.row)])); }).catch(() => { if (form.isConnected) error.textContent = tr('Catalogo non disponibile. Usa Auto o inserisci l’ID del modello.'); });
   prompt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); } });
-  if (prompt.disabled) form.querySelector<HTMLSelectElement>('[data-agent]')?.focus();
+  if (options.initialModel !== undefined) form.querySelector<HTMLInputElement>('[data-model]')?.focus();
+  else if (prompt.disabled) form.querySelector<HTMLSelectElement>('[data-agent]')?.focus();
   else prompt.focus();
   form.onsubmit = async e => {
     e.preventDefault(); if (busy || submit.disabled) return;

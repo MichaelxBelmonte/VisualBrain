@@ -38,6 +38,7 @@ Base: `http://127.0.0.1:4747`. Tutte le risposte sono JSON. I tipi sono in `src/
 | POST | `/api/reminders` | `{nodeId, title, status?: 'pending' \| 'working' \| 'done', notes?}` | `NodeReminder`; nodo richiesto, titolo massimo 1000, appunti massimo 10000 caratteri |
 | PATCH | `/api/reminders/:id` | `{nodeId?, title?, status?, notes?}` | `NodeReminder`; aggiorna, riassegna, completa o riapre |
 | GET | `/api/terminals` | – | `TerminalInfo[]` |
+| GET | `/api/terminals/:id/preview` | – | `{ text }` con al massimo sei righe di output recente. Disponibile alla UI sulla stessa origine. La lettura lascia intatti focus, dimensioni e input del terminale. |
 | DELETE | `/api/terminals/:id` | – | `{ ok: true }` |
 | POST | `/api/terminals/:id/resume` | `{cols?, rows?}` | `{ termId, info }` |
 | GET | `/api/git/:nodeId` | – | `{ repo: GitOverview \| null, agents }`: repository del nodo (cartella o file), rami, worktree, ultimi 300 commit; `agents` = ramo → sessione |

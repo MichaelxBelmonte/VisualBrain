@@ -120,6 +120,16 @@ try {
   await waitFor('index', async () => (await request('/api/status')).data.stats.nodes > 0);
   const node = (await request('/api/path?p=' + encodeURIComponent(files))).data;
   assert.equal(node.id, 1, 'fixture terminal belongs to indexed root');
+  const previewUrl = base + '/api/terminals/' + term.info.id + '/preview';
+  const uiHeaders = { 'sec-fetch-site': 'same-origin' };
+  assert.equal((await fetch(previewUrl)).status, 403);
+  assert.equal((await fetch(previewUrl, { headers: { ...uiHeaders, authorization: 'Bearer fixture-token' } })).status, 403);
+  const preview = await fetch(previewUrl, { headers: uiHeaders });
+  assert.equal(preview.status, 200);
+  const { text: recent } = await preview.json();
+  assert.match(recent, /delivery-across-detach/);
+  assert.ok(recent.split('\n').length <= 6 && recent.split('\n').every(line => line.length <= 240));
+  console.log('PASS bounded preview of a detached terminal before the UI attaches');
   let output = await attach(term.info.id);
   await waitFor('replay', () => output().includes(`START:${pid}`));
   let board = await request('/api/work/1?session=persist-fixture', 'GET', undefined, 'fixture-token');
