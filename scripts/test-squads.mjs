@@ -52,6 +52,7 @@ try {
   const alfa = ok(await call('POST', '/api/launch-squad', { id: 1, prompt: 'Rifai la UI', members: [claude(), claude(), claude()] }), 201);
   assert.equal(alfa.teamId, '1');
   assert.deepEqual(alfa.sessions.map(s => s.code), ['ORC1', 'OP1', 'OP2']);
+  assert.ok(alfa.sessions.slice(1).every(s => s.parentId === alfa.sessions[0].id), 'the launch response already links each operator to its orchestrator');
   assert.ok(alfa.sessions.every(s => s.cwd === project && s.teamId === '1'));
   const beta = ok(await call('POST', '/api/launch-squad', { id: 1, teamId: 'new', teamName: 'Beta', prompt: 'Scrivi i test', members: [claude(), claude()] }), 201);
   assert.equal(beta.teamId, '2');

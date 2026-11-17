@@ -224,7 +224,9 @@ async function startSquadNow(ctx: ApiCtx, detail: NodeDetail, request: SquadRequ
     const leader = members.find(m => m.role === 'orchestrator');
     if (!leader) return { sessions: created };
     const orchestrator = await launch(leader, prompt);
-    return { sessions: [orchestrator, ...created.slice(0, -1)] };
+    // The workers' launch responses predate the leader. Return their current link on the first render.
+    const workers = created.slice(0, -1).map(worker => ({ ...worker, parentId: ctx.terms.get(worker.id)?.info.parentId }));
+    return { sessions: [orchestrator, ...workers] };
   } catch (error) {
     await discardCreated(ctx, detail.id, created);
     throw error;
