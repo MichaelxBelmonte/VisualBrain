@@ -110,7 +110,7 @@ const termTs = readFileSync(new URL('../src/ui/terminal.ts', import.meta.url), '
 assert.match(css, /\.term-pane\.renaming \.session-heading > \.session-label \{ display: inline-flex;/);
 assert.match(css, /\.term-pane\.renaming \.session-head \.term-tabs \{ display: none; \}/);
 assert.match(termTs, /tabStrip\.addEventListener\('dblclick'[^\n]*startRename/);
-assert.match(termTs, /if \(!t\.pane\?\.classList\.contains\('renaming'\)\) t\.term\?\.focus\(\)/);
+assert.match(termTs, /if \(focusTerminal && !t\.pane\?\.classList\.contains\('renaming'\)\) t\.term\?\.focus\(\)/);
 console.log('PASS Lucide icons and map glyphs, glass on the shell and, denser, behind the terminals, indexing only as the corner dot, local-only window permissions, renaming a session shown in tabs');
 
 // The node menu says which node it is for and what closing it stops; the app menu is grouped, the theme a two-way switch.

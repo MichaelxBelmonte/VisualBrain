@@ -143,3 +143,17 @@ export function bindRailSearch(field: HTMLInputElement): () => void {
   field.addEventListener('keydown', key);
   return () => field.removeEventListener('keydown', key);
 }
+
+/** Where ↑/↓/Home/End take the keyboard highlight among `count` visible sessions. `at` is the highlighted one (-1: the
+ *  keyboard is on a node row, and `below` is the first session under it, -1 when there is none). ↑ on the first session goes
+ *  back to the search field; ↓ on the last one stays there. Pure, so it can be tested. */
+export function railStep(count: number, at: number, key: string, below = -1): number | 'search' | null {
+  if (!count) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (key === 'ArrowDown') return at >= 0 ? (at + 1 < count ? at + 1 : null) : below >= 0 ? below : null;
+  if (key !== 'ArrowUp') return null;
+  if (at >= 0) return at > 0 ? at - 1 : 'search';
+  const above = below < 0 ? count - 1 : below - 1;
+  return above >= 0 ? above : 'search';
+}

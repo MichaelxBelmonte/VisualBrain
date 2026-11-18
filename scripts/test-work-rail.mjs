@@ -1,6 +1,7 @@
 // Disposable DOM/storage stubs: no browser, server, PTY, or user settings are touched.
 import assert from 'node:assert/strict';
-import { bindRailResize, railWidthLimits } from '../src/ui/work-rail.ts';
+import { readFileSync } from 'node:fs';
+import { bindRailResize, railStep, railWidthLimits } from '../src/ui/work-rail.ts';
 
 const classes = () => {
   const names = new Set();
@@ -39,6 +40,24 @@ const fixture = () => {
   return { root, handle, cleanup, width: () => Number.parseInt(root.properties.get('--work-rail-width')), observer: Observer.instances.at(-1) };
 };
 try {
+  // ↑/↓/Home/End in the rail: the highlight moves across the visible sessions and never wraps.
+  assert.deepEqual([railStep(3, 0, 'ArrowDown'), railStep(3, 1, 'ArrowDown'), railStep(3, 2, 'ArrowDown')], [1, 2, null], '↓ stops on the last session');
+  assert.deepEqual([railStep(3, 2, 'ArrowUp'), railStep(3, 1, 'ArrowUp'), railStep(3, 0, 'ArrowUp')], [1, 0, 'search'], '↑ on the first session goes back to the search field');
+  assert.deepEqual([railStep(3, 1, 'Home'), railStep(3, 1, 'End'), railStep(0, -1, 'ArrowDown'), railStep(3, 1, 'Enter')], [0, 2, null, null]);
+  // From a node row (no session highlighted): the first session under it, or the last one above it.
+  assert.deepEqual([railStep(4, -1, 'ArrowDown', 2), railStep(4, -1, 'ArrowUp', 2), railStep(4, -1, 'ArrowUp', 0), railStep(4, -1, 'ArrowDown', -1), railStep(4, -1, 'ArrowUp', -1)], [2, 1, 'search', null, 3]);
+  {
+    const source = readFileSync(new URL('../src/ui/terminal.ts', import.meta.url), 'utf8');
+    const key = source.slice(source.indexOf('private railKey('), source.indexOf('markExit(id: string)'));
+    assert.match(key, /if \(e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.isComposing\) return;/, 'Alt+arrows stay with the explicit reorder, shortcuts are left alone');
+    assert.doesNotMatch(key, /this\.activate\(/, 'moving the highlight never opens a session: the open terminal stays the same');
+    assert.match(key, /rows\[at\]\.focus\(\{ preventScroll: true \}\); rows\[at\]\.scrollIntoView\(\{ block: 'nearest' \}\)/);
+    assert.match(key, /t\.term!\.focus\(\); t\.term!\.input\(e\.key, true\)/, 'a character typed on the open session row reaches its terminal');
+    assert.match(source, /const id = el\.dataset\.session!, stay = e\.detail > 0 && !window\.matchMedia\('\(max-width: 760px\)'\)\.matches;\n\s+this\.activate\(id, !stay\);/, 'a pointer click keeps the keyboard in the list; Enter gives it to the terminal');
+    assert.match(source, /\?\? rows\[Math\.min\(focusedAt, rows\.length - 1\)\]\)\?\.focus\(\{ preventScroll: true \}\)/, 'the highlight keeps its place when its session leaves the list');
+    const css = readFileSync(new URL('../src/ui/style.css', import.meta.url), 'utf8');
+    assert.match(css, /\.work-session > button\[data-session\]:focus-visible \{ outline: 2px solid var\(--fg\); outline-offset: -2px;/, 'the highlight is drawn inside the clipped row');
+  }
   assert.deepEqual(railWidthLimits(1200), { min: 180, max: 360 });
   assert.deepEqual(railWidthLimits(500), { min: 180, max: 260 });
   assert.deepEqual(railWidthLimits(400), { min: 160, max: 160 });

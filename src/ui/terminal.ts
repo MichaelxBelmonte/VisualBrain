@@ -7,7 +7,7 @@ import { openWorkLauncher } from './work-launcher.ts';
 import { openTerminalQuickMenu } from './terminal-quick-menu.ts';
 import { openHarnessLauncher } from './harness-launcher.ts';
 import { icon } from './icons.ts';
-import { bindRailResize, bindRailVisibility, bindRailSearch } from './work-rail.ts';
+import { bindRailResize, bindRailVisibility, bindRailSearch, railStep } from './work-rail.ts';
 import { bindReorder } from './work-reorder.ts';
 import { connectionGroups, linkBetween, linkRequest, moveNode, orderNodes, type LinkSide } from './work-links.ts';
 import { WorkChannel } from './work-channel.ts';
@@ -167,6 +167,17 @@ export class Terminals {
     window.addEventListener('vb-file-drop', e => this.fileDrop((e as CustomEvent).detail));
     this.control('#work-brain')!.addEventListener('click', () => { if (this.selectedNode !== null) { this.show(false); this.cb.reveal(this.selectedNode); } });
     bindRailSearch(this.control<HTMLInputElement>('#work-filter')!);
+    this.listEl.addEventListener('keydown', e => this.railKey(e));
+    this.listEl.addEventListener('paste', e => {
+      const t = this.railOpenRow(e.target), text = e.clipboardData?.getData('text');
+      if (!t || !text) return;
+      e.preventDefault(); t.term!.focus(); t.term!.paste(text);
+    });
+    this.control<HTMLInputElement>('#work-filter')!.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowDown' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return;
+      const first = this.listEl.querySelector<HTMLElement>('button[data-session]');
+      if (first) { e.preventDefault(); first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); }
+    });
     this.control('#work-quick-menu')!.addEventListener('click', () => this.toggleQuickMenu());
     this.control<HTMLInputElement>('#work-filter')!.addEventListener('input', e => {
       this.filter = (e.target as HTMLInputElement).value.toLowerCase(); this.renderList();
@@ -333,7 +344,8 @@ export class Terminals {
     if (activate) { this.activate(info.id); this.show(true); }
   }
 
-  activate(id: string): void {
+  /** `focusTerminal: false` opens the session and leaves the keyboard where it is (a pointer click in the rail). */
+  activate(id: string, focusTerminal = true): void {
     this.sideOpen = false;
     const t = this.tabs.get(id); if (!t) return;
 
@@ -353,8 +365,39 @@ export class Terminals {
       this.listEl.querySelector('.work-session.selected')?.scrollIntoView({ block: 'nearest' });
       t.pane?.scrollIntoView({ block: 'nearest' });
       // a double click on the tab renames: the second click activates it again, and must not take the field's focus
-      this.fitVisible(); if (!t.pane?.classList.contains('renaming')) t.term?.focus();
+      this.fitVisible(); if (focusTerminal && !t.pane?.classList.contains('renaming')) t.term?.focus();
     });
+  }
+
+  /** The tab whose rail row holds the keyboard, when that session is the open one and can take input. */
+  private railOpenRow(target: EventTarget | null): Tab | null {
+    const id = target instanceof HTMLElement ? target.closest<HTMLElement>('button[data-session]')?.dataset.session : undefined;
+    const t = id && id === this.active ? this.tabs.get(id) : undefined;
+    return t?.term && t.info.alive ? t : null;
+  }
+
+  /** ↑/↓ and Home/End move the keyboard highlight across the visible sessions of the rail without opening any; Enter opens
+   *  the highlighted one and gives it the keyboard. A character typed on the row of the open session goes to its terminal,
+   *  so "click a session, then type" still works. Alt+arrows keep reordering (see bindNodeDrag). */
+  private railKey(e: KeyboardEvent): void {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+    const from = e.target instanceof HTMLElement ? e.target : null;
+    if (!from || from.closest('input, textarea, select, #work-rail-links')) return;
+    if (!e.shiftKey && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+      const rows = [...this.listEl.querySelectorAll<HTMLElement>('button[data-session]')];
+      if (!rows.length) return;
+      const own = from.closest('.work-session')?.querySelector<HTMLElement>('button[data-session]');
+      const at = railStep(rows.length, own ? rows.indexOf(own) : -1, e.key,
+        // From a node row: the nearest session below it, or above it.
+        rows.findIndex(row => from.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING));
+      e.preventDefault(); // the list never scrolls by itself under the highlight
+      if (at === 'search') { this.control<HTMLInputElement>('#work-filter')?.focus(); return; }
+      if (at === null) return;
+      rows[at].focus({ preventScroll: true }); rows[at].scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const t = e.key.length === 1 ? this.railOpenRow(from) : null;
+    if (t) { e.preventDefault(); t.term!.focus(); t.term!.input(e.key, true); }
   }
 
   markExit(id: string): void {
@@ -805,6 +848,8 @@ export class Terminals {
       const focused = this.listEl.contains(document.activeElement) && document.activeElement instanceof HTMLElement ? document.activeElement : null;
       const actionKey = ['addAgent', 'nodeLink', 'sessionLink'].find(key => focused?.dataset[key]);
       const focusKey = actionKey ? `[${actionKey.replace(/[A-Z]/g, c => '-' + c.toLowerCase()).replace(/^/, 'data-')}="${focused!.dataset[actionKey]}"]` : focused?.dataset.nodeGrip ? `[data-node-grip="${focused.dataset.nodeGrip}"]` : focused?.dataset.sessionGrip ? `[data-session-grip="${focused.dataset.sessionGrip}"]` : focused?.dataset.fold ? `[data-fold="${focused.dataset.fold}"]` : focused?.dataset.node ? `[data-node="${focused.dataset.node}"]` : focused?.dataset.session ? `[data-session="${focused.dataset.session}"]` : null;
+      // The highlighted session may leave the list (closed, filtered out): the highlight stays at the same place.
+      const focusedAt = focused?.dataset.session ? [...this.listEl.querySelectorAll('button[data-session]')].indexOf(focused) : -1;
       this.railDragCleanup.forEach(cleanup => cleanup()); this.railDragCleanup = [];
       this.listEl.innerHTML = html; this.listEl.dataset.signature = html;
       this.listEl.querySelectorAll<HTMLElement>('[data-node]').forEach(el => el.onclick = () => {
@@ -824,10 +869,19 @@ export class Terminals {
       this.listEl.querySelectorAll<HTMLButtonElement>('[data-group]').forEach(b => b.onclick = () => this.groupLinked(Number(b.dataset.group)));
       this.listEl.querySelectorAll<HTMLButtonElement>('[data-session-link]').forEach(b => b.onclick = () => this.toggleRailLinks(`session:${b.dataset.sessionLink}`));
       this.bindNodeDrag();
-      this.listEl.querySelectorAll<HTMLElement>('[data-session]').forEach(el => el.onclick = () => this.activate(el.dataset.session!));
+      // A pointer click opens the session and leaves the keyboard on its row, so ↑/↓ go on from there; Enter (a click
+      // without a pointer) opens it and moves the keyboard to the terminal. In the narrow drawer the rail closes instead.
+      this.listEl.querySelectorAll<HTMLElement>('[data-session]').forEach(el => el.onclick = e => {
+        const id = el.dataset.session!, stay = e.detail > 0 && !window.matchMedia('(max-width: 760px)').matches;
+        this.activate(id, !stay);
+        if (stay) this.listEl.querySelector<HTMLElement>(`button[data-session="${id}"]`)?.focus({ preventScroll: true });
+      });
       this.listEl.querySelectorAll<HTMLElement>('[data-close]').forEach(el => el.onclick = () => void this.close(el.dataset.close!));
       this.listEl.querySelectorAll<HTMLElement>('[data-remove]').forEach(el => el.onclick = () => this.confirmCloseNode(Number(el.dataset.remove)));
-      if (focusKey) this.listEl.querySelector<HTMLElement>(focusKey)?.focus({ preventScroll: true });
+      if (focusKey) {
+        const rows = focusedAt < 0 ? [] : this.listEl.querySelectorAll<HTMLElement>('button[data-session]');
+        (this.listEl.querySelector<HTMLElement>(focusKey) ?? rows[Math.min(focusedAt, rows.length - 1)])?.focus({ preventScroll: true });
+      }
     }
     this.renderRailLinks();
     this.renderNodeMenu();
