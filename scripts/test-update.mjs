@@ -7,8 +7,8 @@ import { execFileSync, spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand, restartCommand } from '../src/server/updater.ts';
-import { RESTART_SLOW_MS, bannerFor, noteLines, settingsRow } from '../src/ui/updates.ts';
+import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand, reopenProfile, restartCommand } from '../src/server/updater.ts';
+import { RESTART_SLOW_MS, bannerFor, noteLines, restartKey, settingsRow } from '../src/ui/updates.ts';
 import { setLanguage } from '../src/ui/i18n.ts';
 import { UPDATE_PUBLIC_KEY } from '../src/server/update-key.ts';
 
@@ -36,6 +36,18 @@ const cmd = reopenCommand(4242, '/Applications/Visual Brain.app');
 eq(cmd.slice(2), ['4242', '/Applications/Visual Brain.app'], 'the reopen watcher gets the shell pid and the app as arguments, never quoted into the script');
 ok(/kill -0 "\$0"/.test(cmd[1]) && /\/usr\/bin\/open "\$1"/.test(cmd[1]), 'it waits for the shell to exit, then opens the app');
 execFileSync('/bin/sh', ['-n', '-c', cmd[1]]); checks++;
+// The reopened app gets this server's profile only when it is not the default one: `open` does not pass the environment on.
+eq([reopenProfile('', '/Users/x'), reopenProfile('/Users/x/Library/Application Support/Visual Brain', '/Users/x'), reopenProfile('/tmp/P', '/Users/x')], [null, null, '/tmp/P'], 'only a profile other than the default is passed to the reopened app');
+eq(reopenCommand(4242, '/Applications/Visual Brain.app', null), cmd, 'without one the reopen command is exactly the one of today');
+const reopenP = reopenCommand(4242, '/A/Visual Brain.app', '/tmp/P');
+ok(reopenP[1].includes('exec /usr/bin/open --env "VISUAL_BRAIN_DATA_DIR=$2" "$1"') && eq(reopenP.slice(2), ['4242', '/A/Visual Brain.app', '/tmp/P'], 'with one it reopens on that profile, passed as an argument') === undefined, 'reopen with a profile uses open --env');
+execFileSync('/bin/sh', ['-n', '-c', reopenP[1]]); checks++;
+eq(restartCommand(11, 22, '/A/Visual Brain.app', undefined, null), restartCommand(11, 22, '/A/Visual Brain.app'), 'without a profile the restart command is unchanged');
+ok(!restartCommand(11, 22, '/A/Visual Brain.app')[1].includes('--env'), 'and it never passes an environment');
+const restartP = restartCommand(11, 22, '/A/Visual Brain.app', undefined, '/tmp/P');
+ok(restartP[1].includes('exec /usr/bin/open -n --env "VISUAL_BRAIN_DATA_DIR=$3" "$a"'), 'with a profile the restart reopens the app on it');
+eq(restartP.slice(2), ['11', '22', '/A/Visual Brain.app', '/tmp/P'], 'the profile is an argument, never quoted into the script');
+execFileSync('/bin/sh', ['-n', '-c', restartP[1]]); checks++;
 // "Riavvia": the watcher lets the server finish, ends the shell and opens the app; here two sleeping processes stand in for them
 const again = restartCommand(11, 22, '/Applications/Visual Brain.app');
 eq(again.slice(2), ['11', '22', '/Applications/Visual Brain.app'], 'the restart watcher gets server pid, shell pid and app as arguments');
@@ -152,6 +164,12 @@ ok(RESTART_SLOW_MS >= 10_000 && RESTART_SLOW_MS <= 30_000, 'the page waits long 
 const offer = bannerFor(view({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true, liveSessions: 3 }), null);
 ok(offer.restart === true && offer.text === row({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true }).text, 'the banner offers the same restart as the row, with the same words');
 ok(!bannerFor(view({ status: 'installed', latest: '0.2.6', persistentTerminals: true }), null).restart, 'without a restart the banner still says ⌘Q');
+const offerView = view({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true });
+eq(bannerFor(offerView, restartKey(offerView)), null, '«Chiudi» keeps the restart banner closed for the whole session');
+ok(bannerFor(offerView, '0.2.6')?.restart === true, '«Più tardi» given to the ready banner does not hide the restart offer');
+ok(bannerFor(view({ status: 'installed', latest: '0.2.7', canRestart: true, persistentTerminals: true }), restartKey(offerView))?.restart === true, 'a later installed version is offered again');
+eq(settingsRow(offerView).action.id, 'restart', 'the row in Impostazioni keeps offering it');
+ok(/restartKey\(this\.state\)/.test(readFileSync(new URL('../src/ui/updates.ts', import.meta.url), 'utf8')), '«Chiudi» stores the restart key in the session');
 ok(/data-update-restart/.test(readFileSync(new URL('../src/ui/updates.ts', import.meta.url), 'utf8')), 'the banner button is wired to the restart');
 eq([row({ enabled: false }).action, row({ enabled: false }).tone], [null, 'quiet'], 'a development run has no button');
 ok(/solo nell’app installata/.test(row({ enabled: false }).text), 'and says why');
@@ -191,7 +209,7 @@ if (process.platform === 'darwin') {
       if (String(url).endsWith('.zip')) return new Response(overrides.zip ?? zipBytes, { status: overrides.zipStatus ?? 200 });
       return new Response('?', { status: 404 });
     };
-    const make = (name, fetchImpl, extra = {}) => new Updater({ dataDir: join(temp, name), version: '0.2.5', bundle: installed, enabled: true, publicKey: pub, feedUrl: 'https://feed.test/latest.json', fetchImpl, liveSessions: () => 2, applicationFolders: [installedDir], ...extra });
+    const make = (name, fetchImpl, extra = {}) => new Updater({ dataDir: join(temp, name), version: '0.2.5', bundle: installed, enabled: true, publicKey: pub, feedUrl: 'https://feed.test/latest.json', fetchImpl, liveSessions: () => 2, applicationFolders: [installedDir], profile: null, ...extra });
     const settle = async (u, status) => { for (let i = 0; i < 200 && u.state.status !== status; i++) await new Promise(r => setTimeout(r, 25)); return u.state.status; };
 
     // not enabled: nothing happens, nothing is fetched
@@ -272,6 +290,37 @@ if (process.platform === 'darwin') {
       return w;
     };
     const marker = app => readFileSync(join(app, 'Contents/Resources/marker.txt'), 'utf8');
+
+    // --- a version waiting in "ready" does not hide the ones published after it -----------------------------------------
+    {
+      let net = network();
+      const w = make('ready-recheck', url => net(url));
+      await w.check(); eq(await settle(w, 'ready'), 'ready', 'recheck: 0.2.6 ready');
+      const dir = join(temp, 'ready-recheck/updates'), zipOf = v => join(dir, `Visual-Brain-${v}-mac-universal.zip`);
+      // same version: nothing to download, nothing changes
+      await w.check();
+      eq([w.state.status, w.state.latest, w.replacing, existsSync(zipOf('0.2.6'))], ['ready', '0.2.6', null, true], 'the same version again: still ready, nothing downloaded');
+      // feed down: the verified one stays ready, without an error
+      net = network({ feed: 'down', sig: 'down' }); const down = async url => String(url).includes('latest.json') ? new Response('x', { status: 503 }) : net(url);
+      const keep = net; net = down;
+      await w.check();
+      eq([w.state.status, w.state.error, w.state.latest], ['ready', '', '0.2.6'], 'a feed that does not answer leaves the ready version on offer, without an error');
+      // newer version: downloaded behind the one on offer, swapped once verified, the superseded package removed
+      const bytes7 = Buffer.from('package 0.2.7'), feed7 = JSON.stringify(feedFor('0.2.7', createHash('sha256').update(bytes7).digest('hex'), bytes7.length, { notes: 'Novità 0.2.7' }));
+      net = network({ feed: feed7, zip: bytes7 });
+      await w.check();
+      eq([w.state.status, w.state.latest], ['ready', '0.2.6'], 'while the newer one downloads, the verified one stays on offer');
+      ok(w.replacing instanceof Promise, 'a newer version is fetched'); await w.replacing;
+      eq([w.state.status, w.state.latest, w.state.notes, w.state.error], ['ready', '0.2.7', 'Novità 0.2.7', ''], 'a newer version replaces the one waiting, with its notes');
+      eq([existsSync(zipOf('0.2.6')), existsSync(zipOf('0.2.7'))], [false, true], 'and the superseded package is deleted');
+      // newer still, but its download fails: 0.2.7 stays ready, nothing half-written is kept
+      const bytes8 = Buffer.from('package 0.2.8'), feed8 = JSON.stringify(feedFor('0.2.8', createHash('sha256').update(bytes8).digest('hex'), bytes8.length));
+      net = network({ feed: feed8, zipStatus: 500 });
+      await w.check(); await w.replacing;
+      eq([w.state.status, w.state.latest, w.state.error], ['ready', '0.2.7', ''], 'a failed download of a newer version keeps the verified one ready, without an error');
+      eq([existsSync(zipOf('0.2.7')), existsSync(zipOf('0.2.8')), existsSync(`${zipOf('0.2.8')}.part`)], [true, false, false], 'and leaves nothing of the failed one');
+      void keep;
+    }
     const translocatedDir = join(temp, 'T/AppTranslocation/0236/d'); mkdirSync(translocatedDir, { recursive: true });
     const translocated = makeApp(translocatedDir, '0.2.5', 'translocated');
     const appsA = join(temp, 'appsA'), appsB = join(temp, 'appsB'); mkdirSync(appsA);
@@ -300,6 +349,16 @@ if (process.platform === 'darwin') {
     eq(startedR, [['/bin/sh', restartCommand(process.pid, 4242, appR)]], 'restart: one watcher that waits for this server, ends the shell and opens the installed app');
     eq(quits, 0, 'the server stays until the answer is out'); r1.quit(); eq(quits, 1, 'then it closes cleanly');
     await r1.restart(); eq(startedR.length, 1, 'a second request starts nothing more');
+    { const before = calls.length; await r1.check(); eq([calls.length, r1.state.status], [before, 'installed'], 'an installed update is never checked again over it'); }
+    // two requests while the watcher is still starting: the second waits for the same outcome, and a failure quits nobody
+    const appsCC = join(temp, 'appsCC'); mkdirSync(appsCC);
+    let failSpawn; const spawning = new Promise((_resolve, reject) => { failSpawn = reject; }); let quitsCC = 0;
+    const rc = await ready('restart-concurrent', makeApp(appsCC, '0.2.5', 'concurrent'), { applicationFolders: [appsCC], spawnImpl: () => spawning, shellPid: 4242, persistentTerminals: true, quit: () => { quitsCC++; } });
+    await rc.install();
+    const firstAsk = rc.restart(), secondAsk = rc.restart();
+    failSpawn(new Error('spawn EAGAIN'));
+    await Promise.all([rejects(firstAsk, /Riavvio non riuscito/, 'the first request fails with its watcher'), rejects(secondAsk, /Riavvio non riuscito/, 'the second waits for the same watcher and fails with it')]);
+    rc.quit(); eq(quitsCC, 0, 'so the server never quits without a watcher to reopen the app');
     // a watcher that cannot start: refused with what to do, nothing quits, and the next request may try again
     const appsSF = join(temp, 'appsSF'); mkdirSync(appsSF);
     let failing = true, quitsF = 0;
@@ -377,8 +436,22 @@ if (process.platform === 'darwin') {
     const stale = join(updates, 'stage-1'), fresh = join(updates, 'stage-2');
     makeApp(stale, '0.2.6', 'stale'); makeApp(fresh, '0.2.6', 'fresh');
     const old = new Date(Date.now() - 60 * 60 * 1000); utimesSync(stale, old, old);
+    // install() above already started a cleanup in the background (void this.cleanup()): passes are queued, never overlap
     await t5.cleanup();
     eq([existsSync(stale), existsSync(fresh)], [false, true], 'an old unpacked package is removed, a recent one is kept');
+    // two passes started together: the second runs after the first, and when it ends everything old is gone
+    const stale2 = join(updates, 'stage-3'); makeApp(stale2, '0.2.6', 'stale2'); utimesSync(stale2, old, old);
+    const together = [t5.cleanup(), t5.cleanup()];
+    await together[1];
+    eq([existsSync(stale2), existsSync(fresh)], [false, true], 'two cleanups started together leave it clean when the second ends');
+    await together[0];
+    // a pass that throws does not stop the next one, and nothing rejects
+    const unreadable = join(temp, 'build/running-app-backups'); mkdirSync(unreadable, { recursive: true }); chmodSync(unreadable, 0o000);
+    const stale3 = join(updates, 'stage-4'); makeApp(stale3, '0.2.6', 'stale3'); utimesSync(stale3, old, old);
+    await t5.cleanup(); chmodSync(unreadable, 0o700);
+    eq(existsSync(stale3), true, 'the pass that could not read running-app-backups stopped there (resolved, not rejected)');
+    await t5.cleanup();
+    eq(existsSync(stale3), false, 'a pass that failed (unreadable folder) never blocks the next, and never rejects');
   } finally { await forget(temp, 8); } // the synthetic apps leave Launch Services too: no "forbidden" icons after a test run
 }
 

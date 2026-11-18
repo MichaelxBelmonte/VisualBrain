@@ -22,8 +22,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt
 /** What the banner says for a state, or null when there is nothing to show. Pure, so the wording is testable. */
 export function bannerFor(s: UpdateView, dismissed: string | null, locationDismissed = false): { kind: 'ready' | 'installed' | 'error' | 'busy' | 'location'; text: string; restart?: true } | null {
   if (!s.enabled) return null;
-  // the same offer as the Aggiornamenti row: one click, the terminals stay
-  if (s.status === 'installed' && s.canRestart && s.persistentTerminals === true) return { kind: 'installed', restart: true, text: restartText(s) };
+  // the same offer as the Aggiornamenti row: one click, the terminals stay. «Chiudi» hides it for the session (the row stays).
+  if (s.status === 'installed' && s.canRestart && s.persistentTerminals === true) return dismissed === restartKey(s) ? null : { kind: 'installed', restart: true, text: restartText(s) };
   if (s.status === 'ready' && s.latest && dismissed !== s.latest) return { kind: 'ready', text: ui`La versione ${s.latest} è pronta. Installarla non chiude nessun terminale.` };
   if (s.status === 'installing') return { kind: 'busy', text: tr('Installazione in corso…') };
   if (s.status === 'installed' && s.persistentTerminals === true) return { kind: 'installed', text: s.relocated
@@ -42,6 +42,8 @@ export function bannerFor(s: UpdateView, dismissed: string | null, locationDismi
 
 const READ_ONLY = /EROFS|read-only file system|AppTranslocation/i;
 const fill = (text: string, values: Record<string, string | number>) => text.replace(/\{(\w+)\}/g, (_m, key: string) => String(values[key] ?? ''));
+/** What «Chiudi» on the restart banner remembers: kept apart from «Più tardi» on a ready version. */
+export const restartKey = (s: Pick<UpdateView, 'latest'>) => `restart:${s.latest ?? ''}`;
 function restartText(s: UpdateView): string {
   return fill(tr(s.relocated ? 'Versione {v} installata in Applicazioni. Riavvia per usarla: i terminali restano attivi.' : 'Versione {v} installata. Riavvia per usarla: i terminali restano attivi.'), { v: s.latest ?? '' });
 }
@@ -235,7 +237,7 @@ export class Updates {
         this.banner.classList.add('hidden');
         return;
       }
-      this.dismissed = this.state?.latest ?? 'error';
+      this.dismissed = view.restart && this.state ? restartKey(this.state) : this.state?.latest ?? 'error';
       try { sessionStorage.setItem('vb:update-dismissed', this.dismissed); } catch { /* storage unavailable */ }
       this.banner.classList.add('hidden');
     });
