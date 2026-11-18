@@ -135,9 +135,21 @@ export function applicationsTarget(folders: string[]): string {
   throw new Error('Nessuna cartella Applicazioni scrivibile.');
 }
 
-/** Waits for the desktop shell `pid` to exit, then opens `app`. Arguments for /bin/sh; values are positional, never quoted in. */
-export function reopenCommand(pid: number, app: string): string[] {
-  return ['-c', 'while kill -0 "$0" 2>/dev/null; do sleep 1; done; exec /usr/bin/open "$1"', String(pid), app];
+/**
+ * The profile the reopened app must use, or null for the default one. `open` goes through Launch Services, which does not
+ * pass this server's environment on: without `--env` a copy started on its own profile would come back on the real one.
+ * The shell always sets VISUAL_BRAIN_DATA_DIR for the server, so only a folder other than the default counts: the installed
+ * app keeps exactly the command it always had.
+ */
+export function reopenProfile(dir: string | undefined = process.env.VISUAL_BRAIN_DATA_DIR, home = homedir()): string | null {
+  if (!dir) return null;
+  return resolve(dir) === join(home, 'Library/Application Support', APP_NAME.replace(/\.app$/, '')) ? null : resolve(dir);
+}
+
+/** Waits for the desktop shell `pid` to exit, then opens `app` (on `profile`, when given). Arguments for /bin/sh; values are positional, never quoted in. */
+export function reopenCommand(pid: number, app: string, profile: string | null = null): string[] {
+  if (!profile) return ['-c', 'while kill -0 "$0" 2>/dev/null; do sleep 1; done; exec /usr/bin/open "$1"', String(pid), app];
+  return ['-c', 'while kill -0 "$0" 2>/dev/null; do sleep 1; done; exec /usr/bin/open --env "VISUAL_BRAIN_DATA_DIR=$2" "$1"', String(pid), app, profile];
 }
 
 /**
@@ -152,11 +164,13 @@ export function reopenCommand(pid: number, app: string): string[] {
  * "Gone" is read from the process state, not from `kill -0`: the shell starts the server and never waits on it, so the
  * server that has exited stays a zombie, which still answers `kill -0`, for as long as the shell lives.
  */
-export function restartCommand(serverPid: number, shellPid: number, app: string | null, ticks = { server: 150, shell: 50 }): string[] {
+export function restartCommand(serverPid: number, shellPid: number, app: string | null, ticks = { server: 150, shell: 50 }, profile: string | null = null): string[] {
   // gone PID TICKS: true once PID has exited (absent, or a zombie nobody reaps), false after TICKS × 0.2 s
   const gone = 'gone() { n=0; while /bin/ps -o stat= -p "$1" 2>/dev/null | /usr/bin/grep -qv \'^ *Z\'; do n=$((n+1)); [ "$n" -gt "$2" ] && return 1; sleep 0.2; done; return 0; }';
   const end = (arg: string, ticks: number) => `gone "${arg}" ${ticks} || { kill -KILL "${arg}" 2>/dev/null; gone "${arg}" 25 || exit 1; }`;
-  return ['-c', `${gone}; s="$0"; w="$1"; a="$2"; ${end('$s', ticks.server)}; kill -TERM "$w" 2>/dev/null; ${end('$w', ticks.shell)}; [ -n "$a" ] && exec /usr/bin/open -n "$a"; exit 0`, String(serverPid), String(shellPid), app ?? ''];
+  const head = `${gone}; s="$0"; w="$1"; a="$2"; ${end('$s', ticks.server)}; kill -TERM "$w" 2>/dev/null; ${end('$w', ticks.shell)}; `;
+  if (!profile) return ['-c', `${head}[ -n "$a" ] && exec /usr/bin/open -n "$a"; exit 0`, String(serverPid), String(shellPid), app ?? ''];
+  return ['-c', `${head}[ -n "$a" ] && exec /usr/bin/open -n --env "VISUAL_BRAIN_DATA_DIR=$3" "$a"; exit 0`, String(serverPid), String(shellPid), app ?? '', profile];
 }
 
 /**
@@ -199,6 +213,8 @@ export interface UpdaterOptions {
   spawnImpl?: ((command: string, args: string[]) => void | Promise<void>) | null;
   /** Clean shutdown of this server, for "Riavvia". Without it the user quits with ⌘Q as before. */
   quit?: (() => void) | null;
+  /** Profile the reopened app must use (see reopenProfile); null for the default one. */
+  profile?: string | null;
 }
 
 /** Resolves once the process runs; a failure to start (EAGAIN, missing /bin/sh) rejects instead of being an unhandled 'error'. */
@@ -215,7 +231,14 @@ export class Updater {
   private busy = false;
   /** A watcher already opens the installed app when the shell exits. */
   private reopening = false;
+  /** True once the restart watcher runs: only then may the server quit. */
   private restarting = false;
+  /** The restart being started; a second request waits for the same outcome. */
+  private restartAsked: Promise<void> | null = null;
+  /** The last cleanup pass queued: the next one starts after it. */
+  private cleaning: Promise<void> = Promise.resolve();
+  /** A newer version downloading behind the one that is ready (exposed for tests). */
+  replacing: Promise<void> | null = null;
   private timer: NodeJS.Timeout | null = null;
   state: UpdateState;
 
@@ -223,7 +246,7 @@ export class Updater {
     this.o = {
       execPath: process.execPath, enabled: process.env.VISUAL_BRAIN_UPDATES === '1', feedUrl: FEED_URL, publicKey: UPDATE_PUBLIC_KEY, fetchImpl: fetch, persistentTerminals: false,
       applicationFolders: ['/Applications', join(homedir(), 'Applications')], shellPid: process.ppid,
-      spawnImpl: process.env.VISUAL_BRAIN_UPDATES === '1' ? spawnDetached : null,
+      spawnImpl: process.env.VISUAL_BRAIN_UPDATES === '1' ? spawnDetached : null, profile: reopenProfile(),
       ...options,
     };
     const given = options.bundle ?? process.env.VISUAL_BRAIN_APP ?? appBundleOf(this.o.execPath);
@@ -259,9 +282,12 @@ export class Updater {
 
   async check(): Promise<UpdateState> {
     if (!this.state.enabled) throw new Error('Gli aggiornamenti sono disponibili solo nell’app installata.');
-    if (this.busy || ['downloading', 'installing', 'ready', 'installed'].includes(this.state.status)) return this.state;
+    if (this.busy || ['downloading', 'installing', 'installed'].includes(this.state.status)) return this.state;
+    // A version waiting in "ready" stays offered while the feed is read again: a newer one replaces it only once verified.
+    const waiting = this.state.status === 'ready' ? this.feed : null;
     this.busy = true;
-    this.state = { ...this.state, status: 'checking', error: '' };
+    if (!waiting) this.state = { ...this.state, status: 'checking', error: '' };
+    let feed: Feed;
     try {
       const get = async (url: string) => {
         const response = await this.o.fetchImpl(url, { signal: AbortSignal.timeout(20_000), headers: { 'user-agent': `visual-brain/${this.o.version}` } });
@@ -269,23 +295,30 @@ export class Updater {
         return response.text();
       };
       const [text, sig] = await Promise.all([get(this.o.feedUrl), get(`${this.o.feedUrl}.sig`)]);
-      const feed = parseFeed(text, sig, this.o.publicKey);
-      this.state = { ...this.state, checkedAt: Date.now() };
-      if (!(compareVersions(feed.version, this.o.version) > 0)) { this.state = { ...this.state, status: 'idle', latest: null, notes: '' }; this.busy = false; return this.state; } // no update: the next check must be allowed to run
-      this.feed = feed;
-      this.state = { ...this.state, status: 'available', latest: feed.version, notes: feed.notes };
-    } catch (error) { this.busy = false; this.fail(error); }
+      feed = parseFeed(text, sig, this.o.publicKey);
+    } catch (error) {
+      this.busy = false;
+      if (waiting) return this.state; // the verified package stays ready, without an error to show
+      this.fail(error);
+    }
     this.busy = false;
+    this.state = { ...this.state, checkedAt: Date.now() };
+    if (waiting) {
+      if (compareVersions(feed.version, waiting.version) > 0) void this.replaceWaiting(waiting, feed);
+      return this.state;
+    }
+    if (!(compareVersions(feed.version, this.o.version) > 0)) { this.state = { ...this.state, status: 'idle', latest: null, notes: '' }; return this.state; } // no update: the next check must be allowed to run
+    this.feed = feed;
+    this.state = { ...this.state, status: 'available', latest: feed.version, notes: feed.notes };
     void this.download().catch(() => {});
     return this.state;
   }
 
-  /** Downloads to a partial file, checks size and SHA256 against the signed feed, and only then keeps it. */
-  async download(): Promise<UpdateState> {
-    const feed = this.feed;
-    if (!feed || this.busy) return this.state;
-    this.busy = true;
-    this.state = { ...this.state, status: 'downloading', error: '', progress: { received: 0, total: feed.archive.size } };
+  /**
+   * Downloads `feed`'s package to a partial file, checks size and SHA256 against the signed feed, and only then keeps it.
+   * Returns its path; on any failure nothing is left behind.
+   */
+  private async fetchPackage(feed: Feed, onBytes?: (received: number) => void): Promise<string> {
     const target = join(this.updatesDir, feed.archive.name), part = `${target}.part`;
     try {
       mkdirSync(this.updatesDir, { recursive: true, mode: 0o700 });
@@ -297,15 +330,45 @@ export class Updater {
       source.on('data', (chunk: Buffer) => {
         bytes += chunk.length; hash.update(chunk);
         if (bytes > feed.archive.size) source.destroy(new Error('Il pacchetto è più grande del previsto.'));
-        else this.state.progress = { received: bytes, total: feed.archive.size };
+        else onBytes?.(bytes);
       });
       await pipeline(source, createWriteStream(part, { mode: 0o600 }));
-      if (bytes !== feed.archive.size || hash.digest('hex') !== feed.archive.sha256) { rmSync(part, { force: true }); throw new Error('Il pacchetto scaricato non corrisponde al checksum firmato.'); }
+      if (bytes !== feed.archive.size || hash.digest('hex') !== feed.archive.sha256) throw new Error('Il pacchetto scaricato non corrisponde al checksum firmato.');
       renameSync(part, target);
+      return target;
+    } catch (error) { rmSync(part, { force: true }); throw error; }
+  }
+
+  /** Downloads the package of the feed found by check(), showing the bytes received. */
+  async download(): Promise<UpdateState> {
+    const feed = this.feed;
+    if (!feed || this.busy) return this.state;
+    this.busy = true;
+    this.state = { ...this.state, status: 'downloading', error: '', progress: { received: 0, total: feed.archive.size } };
+    try {
+      await this.fetchPackage(feed, received => { this.state.progress = { received, total: feed.archive.size }; });
       this.state = { ...this.state, status: 'ready', progress: null };
-    } catch (error) { rmSync(part, { force: true }); this.busy = false; this.fail(error); }
+    } catch (error) { this.busy = false; this.fail(error); }
     this.busy = false;
     return this.state;
+  }
+
+  /**
+   * A newer version came out while `waiting` was ready: download it quietly behind the one on offer and swap only once it is
+   * verified, removing the superseded package. Any failure keeps the verified one ready, without an error; an installation
+   * that started meanwhile wins and the new package is dropped.
+   */
+  private replaceWaiting(waiting: Feed, feed: Feed): Promise<void> {
+    if (this.replacing) return this.replacing;
+    this.replacing = (async () => {
+      let path: string;
+      try { path = await this.fetchPackage(feed); } catch { return; }
+      if (this.state.status !== 'ready' || this.feed !== waiting) { if (feed.archive.name !== waiting.archive.name) rmSync(path, { force: true }); return; }
+      this.feed = feed;
+      this.state = { ...this.state, latest: feed.version, notes: feed.notes };
+      if (feed.archive.name !== waiting.archive.name) rmSync(join(this.updatesDir, waiting.archive.name), { force: true });
+    })().finally(() => { this.replacing = null; });
+    return this.replacing;
   }
 
   /**
@@ -378,7 +441,7 @@ export class Updater {
     if (!this.o.spawnImpl || !Number.isInteger(pid) || pid <= 1) return;
     // the user can open it from Applications when the watcher cannot start; "Riavvia" then opens it itself
     this.reopening = true;
-    try { void Promise.resolve(this.o.spawnImpl('/bin/sh', reopenCommand(pid, dest))).catch(() => { this.reopening = false; }); } catch { this.reopening = false; }
+    try { void Promise.resolve(this.o.spawnImpl('/bin/sh', reopenCommand(pid, dest, this.o.profile))).catch(() => { this.reopening = false; }); } catch { this.reopening = false; }
   }
 
   /**
@@ -390,14 +453,18 @@ export class Updater {
     const dest = this.state.installedTo;
     if (this.state.status !== 'installed' || !dest) throw new Error('Nessun aggiornamento installato da avviare.');
     if (!this.canRestart) throw new Error('Riavvio non disponibile: chiudi Visual Brain con ⌘Q e riaprila.');
-    if (this.restarting) return;
+    // a second request while the first waits for its watcher gets the same outcome: never a quit without a watcher
+    if (this.restartAsked) return this.restartAsked;
     const live = this.o.liveSessions?.() ?? 0;
     if (!this.o.persistentTerminals && live > 0) throw new Error(`Ci sono ${live} terminali attivi che si chiuderebbero: chiudi Visual Brain con ⌘Q quando hai finito.`);
-    this.restarting = true;
-    try { await this.o.spawnImpl!('/bin/sh', restartCommand(process.pid, this.o.shellPid, this.reopening ? null : dest)); } catch (error) {
-      this.restarting = false;
-      throw new Error(`Riavvio non riuscito (${error instanceof Error ? error.message : String(error)}): chiudi Visual Brain con ⌘Q e riaprila.`);
-    }
+    this.restartAsked = (async () => {
+      try { await this.o.spawnImpl!('/bin/sh', restartCommand(process.pid, this.o.shellPid, this.reopening ? null : dest, undefined, this.o.profile)); } catch (error) {
+        this.restartAsked = null;
+        throw new Error(`Riavvio non riuscito (${error instanceof Error ? error.message : String(error)}): chiudi Visual Brain con ⌘Q e riaprila.`);
+      }
+      this.restarting = true;
+    })();
+    return this.restartAsked;
   }
 
   /** Ends this server cleanly once the answer to "Riavvia" is out. */
@@ -406,8 +473,18 @@ export class Updater {
   /**
    * Removes what installations leave behind: moved-aside apps that no process uses any more (one that a running server still
    * lives in is kept) and unpacked packages of an installation that never finished. Each one also leaves Launch Services.
+   *
+   * Calls never overlap: each one is a full pass that starts when the previous one has ended. Two passes at once saw each
+   * other's lsof/lsregister on the same folder as "in use" and both left it for later. A pass that fails never blocks the
+   * next one and never rejects, so `void this.cleanup()` cannot become an unhandled rejection.
    */
-  async cleanup(): Promise<void> {
+  cleanup(): Promise<void> {
+    const pass = this.cleaning.then(() => this.sweep()).catch(() => { /* what is left is retried by the next pass */ });
+    this.cleaning = pass;
+    return pass;
+  }
+
+  private async sweep(): Promise<void> {
     if (existsSync(this.asideDir)) for (const name of readdirSync(this.asideDir)) {
       const dir = join(this.asideDir, name);
       try { if (statSync(dir).isDirectory() && await unused(dir)) await forget(dir); } catch { /* leave it for the next time */ }
