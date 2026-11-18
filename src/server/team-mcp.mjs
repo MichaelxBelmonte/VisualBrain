@@ -5,9 +5,9 @@ import { createInterface } from 'node:readline';
 
 const tool = {
   name: 'team_request',
-  description: 'Visual Brain team board for this session only. read gets relevant tasks/messages and connected peers. state sets working/idle/blocked. message sends {to:session|null,text}. create_task uses {title,scope,assignedTo?}. update_task needs taskId and {status,result?,assignedTo?}. summary uses {summary}. spawn uses {agent,model?,effort?,role,task}, only when the orchestrator policy allows it. propose (Main Brain only) uses {name,objective,members:[{agent,role,model?,effort?}]} and asks the user to start a new squad. handoff(taskId) needs {handoffId,verified,next,safeToResume:true} at a verified safe checkpoint. quota reports an explicit provider limit with {limited:true,windows:[],retryAfter?} (seconds or HTTP date). A message answered with held is waiting on the user\'s sorting board: do not repeat it. data contains those fields; session identity and authentication are automatic. Never use a different node URL or from identity.',
+  description: 'Visual Brain team board for this session only. read gets relevant tasks/messages and connected peers. Plain read consumes messages as before. Opt in with read data {consumer}: process the returned page, then explicitly ack {consumer,through:delivery.next}. Until ACK the page is redelivered. read {consumer,after:N} replays retained messages without advancing the cursor. The board keeps 500 messages. A normal read with delivery.gap returns no messages. Reconcile from current board state, then explicitly ack {consumer,through:gap.to,acceptGapThrough:gap.to} before continuing. The first forward consumer drives this terminal’s notices; other cursors are independent. records {before?} lists the project register; record {entryId,kind,decision,nextOwner,taskId?,sha?,artifact?} adds a decision or publication. state sets working/idle/blocked. message sends {to:session|null,text}. create_task uses {title,scope,assignedTo?}. update_task needs taskId and {status,result?,assignedTo?}. summary uses {summary}. spawn uses {agent,model?,effort?,role,task}, only when the orchestrator policy allows it. propose (Main Brain only) uses {name,objective,members:[{agent,role,model?,effort?}]} and asks the user to start a new squad. handoff(taskId) needs {handoffId,verified,next,safeToResume:true} at a verified safe checkpoint. quota reports an explicit provider limit with {limited:true,windows:[],retryAfter?} (seconds or HTTP date). A message answered with held is waiting on the user\'s sorting board: do not repeat it. data contains those fields; session identity and authentication are automatic. Never use a different node URL or from identity.',
   inputSchema: { type: 'object', properties: {
-    operation: { type: 'string', enum: ['read', 'state', 'message', 'create_task', 'update_task', 'summary', 'spawn', 'propose', 'handoff', 'quota'] },
+    operation: { type: 'string', enum: ['read', 'state', 'message', 'create_task', 'update_task', 'summary', 'spawn', 'propose', 'handoff', 'quota', 'ack', 'records', 'record'] },
     taskId: { type: 'string' }, data: { type: 'object', additionalProperties: true },
   }, required: ['operation'], additionalProperties: false },
 };
@@ -47,7 +47,7 @@ async function request(args) {
   const session = process.env.VB_SESSION_ID, token = process.env.VB_TEAM_TOKEN;
   if (!session || !token) throw Error('Visual Brain: missing session identity. Launch the agent from its node.');
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw Error('Invalid arguments');
-  const routes = { read: ['GET', ''], state: ['POST', '/state'], message: ['POST', '/messages'], create_task: ['POST', '/tasks'], update_task: ['PATCH', '/tasks'], summary: ['PATCH', ''], spawn: ['POST', '/spawn'], propose: ['POST', '/proposals'], handoff:['POST','/handoff'], quota:['POST','/quota'] };
+  const routes = { read: ['GET', ''], state: ['POST', '/state'], message: ['POST', '/messages'], create_task: ['POST', '/tasks'], update_task: ['PATCH', '/tasks'], summary: ['PATCH', ''], spawn: ['POST', '/spawn'], propose: ['POST', '/proposals'], handoff:['POST','/handoff'], quota:['POST','/quota'], ack:['POST','/ack'], records:['GET','/records'], record:['POST','/records'] };
   if (!Object.hasOwn(routes, args.operation)) throw Error('Unknown team operation');
   const [method, suffix] = routes[args.operation];
   const data = args.data ?? {};
@@ -57,7 +57,20 @@ async function request(args) {
     if (typeof args.taskId !== 'string' || !/^[a-z0-9-]{1,80}$/.test(args.taskId)) throw Error('A valid taskId is required');
     state.pathname += '/' + args.taskId;
   }
-  if (method === 'GET') state.searchParams.set('session', session);
+  if (method === 'GET') {
+    state.searchParams.set('session', session);
+    if (args.operation === 'records' && data.before !== undefined) state.searchParams.set('before', String(data.before));
+    if (args.operation === 'read') {
+      if (data.consumer !== undefined) {
+        if (typeof data.consumer !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(data.consumer)) throw Error('Invalid consumer name');
+        state.searchParams.set('consumer', data.consumer);
+      }
+      if (data.after !== undefined) {
+        if (data.consumer === undefined || !Number.isSafeInteger(data.after) || data.after < 0) throw Error('Replay needs a consumer and a nonnegative integer offset');
+        state.searchParams.set('after', String(data.after));
+      }
+    }
+  }
   const body = method === 'GET' ? undefined : JSON.stringify({ ...data, from: session });
   if (body && body.length > 64_000) throw Error('Team request too large');
   let response;
