@@ -1,6 +1,7 @@
 // Impostazioni: one window for everything that is not daily work. The first run keeps the short welcome form.
 import { api, type AgentCli } from './api.ts';
 import { getLanguage, setLanguage, t as tr, ui, type Language } from './i18n.ts';
+import { sectionViews } from './section-views.ts';
 import { glassEnabled, nativeMac, setGlass, syncWindowTheme } from './window-chrome.ts';
 import type { TerminalInfo } from '../shared/types.ts';
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -36,32 +37,36 @@ const SECTIONS: Array<[SettingsSection, string]> = [
   ['general', 'Generale'], ['folders', 'Cartelle mappate'], ['agents', 'Agenti'], ['github', 'GitHub'], ['updates', 'Aggiornamenti'], ['shortcuts', 'Scorciatoie'],
 ];
 let lastSection: SettingsSection = 'general';
+/** Takes down the window that is open now: opening Impostazioni again must not leave the old Esc handler behind. */
+let dismantle: (() => void) | null = null;
 
 export async function openSettings(firstRun = false, section?: SettingsSection): Promise<void> {
   if (firstRun) return openWelcome();
   const overlay = document.getElementById('overlay')!;
+  dismantle?.();
   overlay.dataset.mode = 'settings'; overlay.classList.remove('hidden');
-  let current: SettingsSection = section ?? lastSection;
-  let busy = false, timer: ReturnType<typeof setTimeout> | undefined;
+  let busy = false;
   overlay.innerHTML = ui`<div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><nav class="settings-nav" aria-label="Sezioni"><h2 id="settings-title">Impostazioni</h2>${SECTIONS.map(([id, label]) => `<button type="button" data-section="${id}">${esc(tr(label))}<span class="settings-badge" data-badge="${id}" hidden></span></button>`).join('')}</nav><div class="settings-main"><div class="settings-head"><h3 data-heading></h3><button class="plain-icon" data-close aria-label="Chiudi">×</button></div><div class="settings-body" data-body></div></div></div>`;
-  const body = overlay.querySelector<HTMLElement>('[data-body]')!;
-  const close = () => { if (busy) return; clearTimeout(timer); overlay.classList.add('hidden'); overlay.innerHTML = ''; delete overlay.dataset.mode; document.removeEventListener('keydown', onKey, true); };
+  const views = sectionViews(overlay.querySelector<HTMLElement>('[data-body]')!);
+  const leave = () => { views.close(); document.removeEventListener('keydown', onKey, true); if (dismantle === leave) dismantle = null; };
+  const close = () => { if (busy) return; leave(); overlay.classList.add('hidden'); overlay.innerHTML = ''; delete overlay.dataset.mode; };
+  dismantle = leave;
   const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && overlay.dataset.mode === 'settings') { e.preventDefault(); e.stopPropagation(); close(); } };
   document.addEventListener('keydown', onKey, true);
   overlay.querySelector('[data-close]')!.addEventListener('click', close);
   overlay.onmousedown = e => { if (e.target === overlay) close(); };
   const terminal = (info: TerminalInfo) => { close(); hooks?.openTerminal(info); };
   const show = (id: SettingsSection) => {
-    current = lastSection = id; clearTimeout(timer);
+    lastSection = id;
     overlay.querySelectorAll<HTMLElement>('[data-section]').forEach(b => b.setAttribute('aria-current', String(b.dataset.section === id)));
     overlay.querySelector('[data-heading]')!.textContent = tr(SECTIONS.find(s => s[0] === id)![1]);
-    body.innerHTML = '';
     const render = { general, folders, agents, github, updates, shortcuts }[id];
-    void render(body, { terminal, setBusy: v => { busy = v; }, schedule: fn => { clearTimeout(timer); timer = setTimeout(fn, 1500); }, badge }).catch(e => { if (current === id) body.innerHTML = `<p role="alert">${esc(String(e))}</p>`; });
+    // each section in a root of its own: a slow answer of the section just left cannot write over this one
+    views.show((root, schedule) => render(root, { terminal, setBusy: v => { busy = v; }, schedule, badge }), (root, e) => { root.innerHTML = `<p role="alert">${esc(String(e))}</p>`; });
   };
   const badge = (id: SettingsSection, count: number) => { const el = overlay.querySelector<HTMLElement>(`[data-badge="${id}"]`); if (el) { el.hidden = !count; el.textContent = String(count); } };
   overlay.querySelectorAll<HTMLElement>('[data-section]').forEach(b => b.addEventListener('click', () => show(b.dataset.section as SettingsSection)));
-  show(current);
+  show(section ?? lastSection);
   // The Agenti badge counts what needs the user (missing or signed-out CLIs) even when another section is open.
   void api.agents().then(r => badge('agents', r.clis.filter(needsUser).length)).catch(() => {});
 }
