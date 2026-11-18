@@ -16,6 +16,8 @@ interface TerminalQuickMenuOptions {
 }
 
 let dismissCurrent: (() => void) | undefined;
+/** Whether the quick menu is on screen now. */
+export const terminalQuickMenuOpen = (): boolean => dismissCurrent !== undefined;
 
 /** A non-modal terminal picker. Selecting a row previews it; activating it opens the terminal. */
 export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen }: TerminalQuickMenuOptions): () => void {
@@ -78,19 +80,24 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen }: Ter
   if (items.length) menu.append(list, preview);
   else menu.textContent = t('Nessun terminale disponibile');
   document.body.append(menu);
+  // The anchor says where the menu opens. Only a button is told that it has a menu open; under a plain container the
+  // focus goes back to its first field or button.
+  const button = anchor.matches('button, [role="button"]');
+  const focusBack = button ? anchor : anchor.querySelector<HTMLElement>('input, button') ?? anchor;
   const oldControls = anchor.getAttribute('aria-controls');
-  anchor.setAttribute('aria-expanded', 'true');
-  anchor.setAttribute('aria-controls', menu.id);
+  if (button) { anchor.setAttribute('aria-expanded', 'true'); anchor.setAttribute('aria-controls', menu.id); }
   const events = new AbortController();
   const { signal } = events;
-  function close(focusTarget: HTMLElement = anchor) {
+  function close(focusTarget: HTMLElement = focusBack) {
     if (signal.aborted) return;
     const restoreFocus = menu.contains(document.activeElement);
     events.abort();
     menu.remove();
-    anchor.setAttribute('aria-expanded', 'false');
-    if (oldControls === null) anchor.removeAttribute('aria-controls');
-    else anchor.setAttribute('aria-controls', oldControls);
+    if (button) {
+      anchor.setAttribute('aria-expanded', 'false');
+      if (oldControls === null) anchor.removeAttribute('aria-controls');
+      else anchor.setAttribute('aria-controls', oldControls);
+    }
     if (restoreFocus && focusTarget.isConnected) focusTarget.focus({ preventScroll: true });
     dismissCurrent = undefined;
   }
@@ -118,9 +125,9 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen }: Ter
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      const origin = previousFocus instanceof HTMLElement && previousFocus !== document.body && previousFocus.isConnected ? previousFocus : anchor;
+      const origin = previousFocus instanceof HTMLElement && previousFocus !== document.body && previousFocus.isConnected ? previousFocus : focusBack;
       close(origin);
-      if (document.activeElement === document.body && anchor.isConnected) anchor.focus({ preventScroll: true });
+      if (document.activeElement === document.body && focusBack.isConnected) focusBack.focus({ preventScroll: true });
       return;
     }
     if (e.key === 'Tab') {

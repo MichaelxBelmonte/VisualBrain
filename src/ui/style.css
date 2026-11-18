@@ -1385,15 +1385,28 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 #work-node-rail .work-rail-head { display: flex; align-items: center; gap: 4px; padding: 10px 8px 6px 10px; border: 0; }
 #work-node-rail .work-rail-head .icon-btn { width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border-radius: 7px; color: var(--g4); }
 #work-node-rail .work-rail-head .icon-btn:hover { color: var(--fg); background: var(--rail-hover); }
-.rail-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border-radius: 8px; background: var(--rail-hover); color: var(--g4); }
-.rail-search:focus-within { background: var(--bg); box-shadow: 0 0 0 1px var(--g3); }
+/* At rest the search is its lens: the field opens when it takes the focus (a click on the lens, Tab, ↑ from the first
+   session) and stays open while it holds a query. */
+.rail-search { flex: 0 0 28px; min-width: 0; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0; border-radius: 7px; color: var(--g4); cursor: pointer; }
+.rail-search:hover { color: var(--fg); background: var(--rail-hover); }
 .rail-search svg { width: 14px; height: 14px; flex: none; }
-.rail-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font: inherit; font-size: 12.5px; padding: 0; }
+.rail-search input { flex: 0 0 0; width: 0; min-width: 0; opacity: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font: inherit; font-size: 12.5px; padding: 0; }
+.rail-search:focus-within, .rail-search.has-query { flex: 1 1 auto; justify-content: flex-start; padding: 0 9px; border-radius: 8px; background: var(--rail-hover); color: var(--g4); cursor: text; }
+.rail-search:focus-within { background: var(--bg); box-shadow: 0 0 0 1px var(--g4); }
+.rail-search:focus-within input, .rail-search.has-query input { flex: 1; width: auto; margin-left: 6px; opacity: 1; }
+#work-node-rail .work-rail-head #work-add { margin-left: auto; }
 .rail-search input::-webkit-search-cancel-button { display: none; }
-.rail-states { display: flex; gap: 2px; padding: 2px 10px 8px; flex-wrap: wrap; }
-.rail-states button { border: 0; background: none; color: var(--g4); font: inherit; font-size: 11.5px; padding: 3px 8px; border-radius: 999px; cursor: pointer; }
-.rail-states button:hover { color: var(--fg); background: var(--rail-hover); }
-.rail-states button[aria-checked="true"] { color: var(--fg); background: var(--rail-selected); font-weight: 500; }
+/* The four state filters are dots: neutral for all, the colours of the session states for the others, a hollow one for
+   the ended. The chosen one has a ring round the dot and a plate behind; names are in the tooltip and for the reader. */
+.rail-states { display: flex; gap: 2px; padding: 0 10px 6px; flex-wrap: wrap; }
+.rail-states button { --dot: var(--g5); display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 28px; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; background: none; font: inherit; cursor: pointer; }
+.rail-states button::before { content: ''; box-sizing: border-box; flex: none; width: 15px; height: 15px; padding: 2px; border: 1.5px solid transparent; border-radius: 50%; background: var(--dot) content-box; }
+.rail-states button[data-state="active"] { --dot: var(--role-active); }
+.rail-states button[data-state="needs"] { --dot: var(--role-attention); }
+.rail-states button[data-state="ended"]::before { background: radial-gradient(circle closest-side, transparent 52%, var(--role-idle) 58%) content-box; }
+.rail-states button:hover { background: var(--rail-hover); }
+.rail-states button[aria-checked="true"] { background: var(--rail-selected); }
+.rail-states button[aria-checked="true"]::before { border-color: var(--fg); }
 .rail-states button:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
 #work-node-rail .work-list { padding: 0 6px 12px; gap: 0; }
 #work-node-rail .work-cluster { display: flex; align-items: center; gap: 6px; margin: 10px 6px 2px; padding: 0; border: 0; font-size: 10.5px; letter-spacing: .03em; color: var(--g4); text-transform: uppercase; }
@@ -1432,7 +1445,7 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 #work-node-rail .work-session > button[data-session]:has(.tone-flag) .work-session-name { min-width: 4.5em; }
 #work-node-rail .work-session .tone-flag { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* "Serve te" in the rail filter: the number of sessions waiting on the person. */
-.rail-states button[data-count]::after { content: attr(data-count); margin-left: 5px; padding: 0 5px; border-radius: 8px; background: var(--role-attention); color: var(--bg); font-size: 10px; font-weight: 600; line-height: 15px; display: inline-block; }
+.rail-states button[data-count]::after { content: attr(data-count); padding: 0 5px; border-radius: 8px; background: var(--role-attention); color: var(--bg); font-size: 10px; font-weight: 600; line-height: 15px; display: inline-block; }
 #work-node-rail :is(.work-rail-action, .work-remove, .work-close):hover { color: var(--fg); background: var(--rail-selected); }
 #work-node-rail .work-remove:hover, #work-node-rail .work-close:hover { color: var(--role-blocked); }
 #work-node-rail .work-session { position: relative; display: flex; align-items: center; min-height: 28px; margin: 1px 0 0; padding: 0 4px 0 16px; border: 0; border-radius: 7px; background: none; box-shadow: none; }

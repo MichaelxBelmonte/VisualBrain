@@ -86,6 +86,26 @@ try {
     assert.match(css, /\.work-session-detail \{ order: 3; flex: 0 0 100%;/, 'the detail takes its own line under the row, after the row’s actions');
     assert.match(css, /\.work-session-preview \{ display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;/, 'the last words never take more than two lines');
     assert.doesNotMatch(css, /work-rail-preview|terminal-quick-actions/);
+    // The head of the rail at rest: the lens and +. The quick menu keeps its keyboard shortcut and has no button there.
+    const page = readFileSync(new URL('../src/ui/index.html', import.meta.url), 'utf8');
+    const head = /<div class="work-rail-head">(.*?)<\/div>/.exec(page)[1];
+    assert.deepEqual([...head.matchAll(/<(?:button|input) id="([^"]+)"/g)].map(m => m[1]), ['work-filter', 'work-add', 'work-rail-dismiss'], 'search, add, and the close button of the narrow window');
+    assert.doesNotMatch(page + source, /work-quick-menu/, 'no terminal button in the head');
+    assert.match(source, /const anchor = this\.control<HTMLElement>\('\.work-rail-head'\)!;\n\s+if \(terminalQuickMenuOpen\(\)\) \{ this\.dismissQuickMenu\?\.\(\); return; \}/, 'the shortcut opens the quick menu under the head and closes it again');
+    assert.match(quick, /const button = anchor\.matches\('button, \[role="button"\]'\);/, 'a plain container is not told it has a menu open');
+    assert.match(css, /\.rail-search input \{ flex: 0 0 0; width: 0; min-width: 0; opacity: 0;/, 'at rest the field is closed: only the lens shows, and it can still take the focus');
+    assert.match(css, /\.rail-search:focus-within, \.rail-search\.has-query \{ flex: 1 1 auto;/, 'the field opens with the focus and stays open while it holds a query');
+    assert.match(source, /field\.parentElement\?\.classList\.toggle\('has-query', !!field\.value\);/);
+    // Four state filters as dots, same order and values as the text filters they replace, each with a name and a tooltip.
+    const states = /<div id="work-state-filter" class="rail-states" role="radiogroup" aria-label="Filtra per stato">(.*?)<\/div>/.exec(page)[1];
+    assert.deepEqual([...states.matchAll(/<button type="button" role="radio" data-state="(\w+)" aria-label="([^"]+)" title="([^"]+)"><\/button>/g)].map(m => m.slice(1)),
+      [['all', 'Tutti', 'Tutti'], ['active', 'In corso', 'In corso: agenti al lavoro'], ['needs', 'Serve te', 'Serve te: permessi, domande e bloccati'], ['ended', 'Terminati', 'Terminati: processi chiusi']]);
+    assert.match(css, /\.rail-states button \{[^}]*min-width: 28px; height: 26px;/, 'a comfortable target round a small dot');
+    assert.match(css, /\.rail-states button\[aria-checked="true"\]::before \{ border-color: var\(--fg\); \}/, 'the chosen filter has a ring round its dot');
+    assert.match(css, /\.rail-states button\[data-state="ended"\]::before \{ background: radial-gradient/, 'the ended filter is a hollow dot, not only another colour');
+    assert.match(css, /\.rail-states button:focus-visible \{ outline: 2px solid var\(--fg\); outline-offset: 1px; \}/);
+    assert.match(source, /needsFilter\.setAttribute\('aria-label', said \|\| tr\('Serve te'\)\);/, 'the count on the dot is said, not only drawn');
+    for (const text of ['"In corso: agenti al lavoro": "In progress: agents working"', '"Serve te: permessi, domande e bloccati"', '"Terminati: processi chiusi": "Ended: closed processes"']) assert.ok(english.includes(text), text);
   }
   assert.deepEqual(railWidthLimits(1200), { min: 180, max: 360 });
   assert.deepEqual(railWidthLimits(500), { min: 180, max: 260 });

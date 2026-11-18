@@ -4,7 +4,7 @@ import { Terminal, type ILink } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { mountDevView } from './dev-view.ts';
 import { openWorkLauncher } from './work-launcher.ts';
-import { openTerminalQuickMenu } from './terminal-quick-menu.ts';
+import { openTerminalQuickMenu, terminalQuickMenuOpen } from './terminal-quick-menu.ts';
 import { openHarnessLauncher } from './harness-launcher.ts';
 import { icon } from './icons.ts';
 import { bindRailResize, bindRailVisibility, bindRailSearch, railStep } from './work-rail.ts';
@@ -209,9 +209,10 @@ export class Terminals {
       const first = this.listEl.querySelector<HTMLElement>('button[data-session]');
       if (first) { e.preventDefault(); first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); }
     });
-    this.control('#work-quick-menu')!.addEventListener('click', () => this.toggleQuickMenu());
     this.control<HTMLInputElement>('#work-filter')!.addEventListener('input', e => {
-      this.filter = (e.target as HTMLInputElement).value.toLowerCase(); this.renderList();
+      const field = e.target as HTMLInputElement;
+      field.parentElement?.classList.toggle('has-query', !!field.value); // the field stays open while it filters the list
+      this.filter = field.value.toLowerCase(); this.renderList();
     });
     const states = this.control('#work-state-filter')!;
     const paintStates = () => states.querySelectorAll<HTMLElement>('[data-state]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.state === this.stateFilter)));
@@ -704,8 +705,9 @@ export class Terminals {
   }
 
   private toggleQuickMenu(): void {
-    const anchor = this.control<HTMLButtonElement>('#work-quick-menu')!;
-    if (anchor.getAttribute('aria-expanded') === 'true') { this.dismissQuickMenu?.(); return; }
+    // No button of its own in the rail head: the menu opens from the keyboard (Ctrl+Shift+Space), under the head.
+    const anchor = this.control<HTMLElement>('.work-rail-head')!;
+    if (terminalQuickMenuOpen()) { this.dismissQuickMenu?.(); return; }
     if (this.root.classList.contains('rail-collapsed')) this.control<HTMLElement>('#work-toggle-rail')!.click();
     const items = [...this.tabs.values()].map(tab => this.quickItem(tab));
     this.dismissQuickMenu = openTerminalQuickMenu({ anchor, items, selectedId: this.active,
@@ -935,7 +937,13 @@ export class Terminals {
     if (badge) { badge.hidden = !needs; badge.textContent = String(needs); badge.title = needs === 1 ? tr('1 sessione aspetta te') : ui`${needs} sessioni aspettano te`; }
     // The rail's "Serve te" filter carries the same count, so what waits on the person is visible without filtering.
     const needsFilter = this.control('#work-state-filter [data-state="needs"]');
-    if (needsFilter?.dataset) { if (needs) needsFilter.dataset.count = String(needs); else delete needsFilter.dataset.count; }
+    if (needsFilter?.dataset) {
+      if (needs) needsFilter.dataset.count = String(needs); else delete needsFilter.dataset.count;
+      // the dot has no text of its own: its name carries the count for the tooltip and the screen reader
+      const said = needs ? `${tr('Serve te')}: ${needs === 1 ? tr('1 sessione aspetta te') : ui`${needs} sessioni aspettano te`}` : '';
+      needsFilter.title = said || tr('Serve te: permessi, domande e bloccati');
+      needsFilter.setAttribute('aria-label', said || tr('Serve te'));
+    }
     this.syncSel();
     this.renderTabs();
     const sessionsInfo = [...this.tabs.values()].map(t => ({ ...t.info }));
