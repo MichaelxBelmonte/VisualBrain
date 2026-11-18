@@ -217,6 +217,8 @@ fn run(window: &WebviewWindow, handle: &tauri::AppHandle, dir: &Path, lang: &str
     let mut command = Command::new(node);
     command.env("VISUAL_BRAIN_VERSION", env!("CARGO_PKG_VERSION"));
     if let (true, Some(bundle)) = (updates, bundle) { command.env("VISUAL_BRAIN_UPDATES", "1").env("VISUAL_BRAIN_APP", bundle); }
+    // An app opened from a terminal inherits that terminal's environment: never the update switch of another installation.
+    else { command.env_remove("VISUAL_BRAIN_UPDATES").env_remove("VISUAL_BRAIN_APP"); }
     let child = command.args(["src/cli.ts", "serve", "--port", &port.to_string()]).current_dir(&server_dir)
         .env("PATH", path).env("VISUAL_BRAIN_DATA_DIR", dir).env("VISUAL_BRAIN_LANGUAGE", lang).env("VISUAL_BRAIN_INSTANCE", &instance)
         .env_remove("CLAUDECODE").env_remove("CLAUDE_CODE_ENTRYPOINT").env_remove("CLAUDE_CODE_CHILD_SESSION")

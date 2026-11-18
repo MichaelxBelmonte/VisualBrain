@@ -1,7 +1,7 @@
 // Operator status lights: what the terminal shows (busy spinners, real output, prompts for the person) and what the agent or
 // its Claude Code hooks report must be recorded faithfully. Fake data and fake PTYs only, no real agent is started.
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { appendOutput, attentionIn, busyMarker, busyTitle, newActivity, noteInjected, noteInput, noteResize, scanOutput, setAttention, stripAnsi, QUIET_AFTER_RESIZE_MS } from '../src/server/activity.ts';
@@ -309,4 +309,19 @@ console.log('PASS Claude hooks only for team sessions, with port, session and to
   await until(() => t.info.lastOutputAt !== undefined, 'the spinner printed after the input is seen as activity');
   terms.kill(t.info.id);
 }
-console.log('PASS PTY sessions carry the hook environment and record input and busy output');
+{
+  // The update switch belongs to the desktop shell and its server: a terminal must not hand it to whatever is started from it.
+  const saved = { updates: process.env.VISUAL_BRAIN_UPDATES, app: process.env.VISUAL_BRAIN_APP, data: process.env.VISUAL_BRAIN_DATA_DIR };
+  Object.assign(process.env, { VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_APP: '/Applications/Visual Brain.app', VISUAL_BRAIN_DATA_DIR: '/tmp/vb-profile' });
+  try {
+    const env = new Terminals(() => {}).env({ VB_SESSION_ID: 'x' });
+    assert.deepEqual([env.VISUAL_BRAIN_UPDATES, env.VISUAL_BRAIN_APP], [undefined, undefined], 'a terminal does not inherit the update switch nor the installed app path');
+    assert.deepEqual([env.VISUAL_BRAIN_DATA_DIR, env.VB_SESSION_ID, env.TERM], ['/tmp/vb-profile', 'x', 'xterm-256color'], 'the rest of the environment is unchanged');
+    assert.equal(process.env.VISUAL_BRAIN_UPDATES, '1', 'the server keeps its own switch');
+  } finally {
+    for (const [key, value] of [['VISUAL_BRAIN_UPDATES', saved.updates], ['VISUAL_BRAIN_APP', saved.app], ['VISUAL_BRAIN_DATA_DIR', saved.data]]) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+  const shell = readFileSync(new URL('../app/src-tauri/src/main.rs', import.meta.url), 'utf8');
+  assert.match(shell, /else \{ command\.env_remove\("VISUAL_BRAIN_UPDATES"\)\.env_remove\("VISUAL_BRAIN_APP"\); \}/, 'a shell without updates drops an inherited update switch');
+}
+console.log('PASS PTY sessions carry the hook environment, never the update switch, and record input and busy output');

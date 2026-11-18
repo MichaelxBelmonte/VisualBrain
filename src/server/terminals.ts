@@ -85,7 +85,10 @@ export class Terminals {
     const extra = [`${home}/.local/bin`, `${home}/.local/node/bin`, '/opt/homebrew/bin', '/usr/local/bin'];
     const path = (process.env.PATH ?? '/usr/bin:/bin').split(delimiter);
     for (const p of extra) if (!path.includes(p)) path.unshift(p);
-    return { ...process.env, PATH: path.join(delimiter), TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: process.env.LANG ?? 'it_IT.UTF-8', ...vars };
+    // Private to the desktop shell and its server. A terminal that inherited them would switch on the updater of any other
+    // Visual Brain started from it (a development server, a trial build) and point it at the installed app.
+    const { VISUAL_BRAIN_UPDATES: _updates, VISUAL_BRAIN_APP: _app, ...inherited } = process.env;
+    return { ...inherited, PATH: path.join(delimiter), TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: process.env.LANG ?? 'it_IT.UTF-8', ...vars };
   }
 
   spawn(opts: SpawnOptions): Term {
