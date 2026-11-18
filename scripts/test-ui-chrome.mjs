@@ -40,7 +40,9 @@ const html = readFileSync(new URL('../src/ui/index.html', import.meta.url), 'utf
 assert.match(html, /<header id="top" data-tauri-drag-region="deep">/, 'the top bar moves the window; its buttons stay clickable');
 const css = readFileSync(new URL('../src/ui/style.css', import.meta.url), 'utf8');
 assert.match(css, /:root\.vb-glass \.term-body \.terminal-surface \{ background: var\(--glass-term\); \}/, 'terminals let the glass through');
-assert.match(css, /:root\.vb-glass \.term-body \.xterm \.xterm-viewport \{ background-color: transparent; \}/, 'xterm.css does not cover the glass with its black scroll layer');
+assert.match(css, /^\.term-body \.xterm \.xterm-viewport \{ background-color: transparent; \}/m, 'xterm.css does not cover the glass, nor frame the terminal in black in light, with its scroll layer');
+assert.match(css, /\.update-banner \.btn\.ghost \{ color: var\(--bg\); \}/, '«Più tardi» and «Chiudi» stay readable on the inverted banner');
+assert.match(css, /#app\.operative \.banners \{[^}]*z-index: auto;/, 'in Operativa the banner row does not cover menus opened from the top bar');
 assert.match(css, /--glass-term: color-mix\(in srgb, var\(--bg\) 62%, transparent\)/, 'denser than the chrome, for the text');
 assert.match(css, /prefers-reduced-transparency: reduce\)[^\n]*\.terminal-surface \{ background: var\(--bg\)/, 'solid again when the system asks for less transparency');
 assert.match(css, /--stage-alpha: 0\.42/, 'the map lets the glass through');
@@ -54,6 +56,20 @@ assert.match(mainTs, /indexDot\(store\.status\.indexing/, 'a pass already runnin
 // Renaming with tabs: the heading hides the name (the tab shows it), so the field takes the tabs' place while it is open,
 // a double click on a tab renames it, and the click that activates the tab does not move the focus into the terminal.
 const termTs = readFileSync(new URL('../src/ui/terminal.ts', import.meta.url), 'utf8');
+// Terminal colours follow the theme: every ANSI text colour reads at 4.5:1 on its theme's background; the background-like
+// slot (white in light, black in dark) is left to minimumContrastRatio, which must be on.
+{
+  const palette = name => Object.fromEntries([...termTs.match(new RegExp(`const ${name} = \\{([^}]*)\\}`))[1].matchAll(/(\w+): '(#[0-9a-f]{6})'/gi)].map(m => [m[1], m[2]]));
+  const lum = hex => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  for (const [name, bg, skip] of [['ANSI_LIGHT', '#ffffff', ['white', 'brightWhite']], ['ANSI_DARK', '#000000', ['black']]]) {
+    const colours = palette(name);
+    assert.equal(Object.keys(colours).length, 16, `${name} defines the 16 ANSI colours`);
+    for (const [key, hex] of Object.entries(colours)) if (!skip.includes(key)) assert.ok(ratio(hex, bg) >= 4.5, `${name}.${key} ${hex} reads on ${bg}`);
+  }
+  assert.match(termTs, /new Terminal\(\{[^}]*minimumContrastRatio: 4\.5/, 'xterm lifts any colour still below 4.5:1, truecolor included');
+  assert.match(termTs, /\.\.\.\(dark \? ANSI_DARK : ANSI_LIGHT\)/, 'the palette is chosen again on every theme change');
+}
 assert.match(css, /\.term-pane\.renaming \.session-heading > \.session-label \{ display: inline-flex;/);
 assert.match(css, /\.term-pane\.renaming \.session-head \.term-tabs \{ display: none; \}/);
 assert.match(termTs, /tabStrip\.addEventListener\('dblclick'[^\n]*startRename/);

@@ -44,6 +44,11 @@ interface Callbacks {
 }
 const labels = { claude: 'Claude Code', codex: 'Codex', hermes: 'Hermes', agy: 'Antigravity', shell: tr('Terminale') };
 const roles = ROLE_WORDS;
+// ANSI colours per theme: xterm's default (Tango) is a dark-background palette, so in light yellow, bright green and cyan sat
+// at 1.2-1.6:1 on white. Every text colour here is >= 4.5:1 on the theme's --bg; the background-like slots (white in
+// light, black in dark) stay close to the background and minimumContrastRatio lifts them when they are used as text.
+const ANSI_LIGHT = { black: '#000000', red: '#b42318', green: '#1a7f37', yellow: '#8a5d00', blue: '#1f5fbf', magenta: '#8b3fa8', cyan: '#0b6f80', white: '#e5e5e5', brightBlack: '#595959', brightRed: '#c4281c', brightGreen: '#1f7a34', brightYellow: '#7a5300', brightBlue: '#1a56b0', brightMagenta: '#9330a8', brightCyan: '#08707e', brightWhite: '#f5f5f5' };
+const ANSI_DARK = { black: '#3a3a3a', red: '#f2655c', green: '#5fc977', yellow: '#e3c04d', blue: '#6aa4f2', magenta: '#cf86e8', cyan: '#4fc8d6', white: '#d4d4d4', brightBlack: '#8c8c8c', brightRed: '#ff7b72', brightGreen: '#7ee08f', brightYellow: '#f0d36a', brightBlue: '#8cbaff', brightMagenta: '#dda0f0', brightCyan: '#73dde8', brightWhite: '#ffffff' };
 /** Escaped message text with the codes of the node's sessions (OP3) turned into buttons that open the session. */
 const withCodeLinks = (html: string, sessions: TerminalInfo[]) => html.replace(CODE_IN_TEXT, code => {
   const session = sessions.find(s => s.code === code);
@@ -241,9 +246,13 @@ export class Terminals {
   private theme() {
     const cs = getComputedStyle(document.documentElement);
     const fg = cs.getPropertyValue('--fg').trim();
-    // with the window glass the terminal draws no background of its own: the surface behind it is translucent (style.css)
+    const bg = cs.getPropertyValue('--bg').trim();
+    // with the window glass the terminal draws no background of its own: the surface behind it is translucent (style.css).
+    // The transparent colour keeps the theme's RGB, because minimumContrastRatio measures text against it.
     const glass = document.documentElement.classList.contains('vb-glass') && !matchMedia('(prefers-reduced-transparency: reduce)').matches;
-    return { background: glass ? '#00000000' : cs.getPropertyValue('--bg').trim(), foreground: fg, cursor: fg, selectionBackground: cs.getPropertyValue('--g3').trim() };
+    const hex = /^#[0-9a-f]{6}$/i.test(bg);
+    const dark = !hex || parseInt(bg.slice(1, 3), 16) + parseInt(bg.slice(3, 5), 16) + parseInt(bg.slice(5, 7), 16) < 384;
+    return { background: glass ? (hex ? bg + '00' : '#00000000') : bg, foreground: fg, cursor: fg, selectionBackground: cs.getPropertyValue('--g3').trim(), ...(dark ? ANSI_DARK : ANSI_LIGHT) };
   }
   retheme(): void { for (const t of this.tabs.values()) if (t.term) t.term.options.theme = this.theme(); }
 
@@ -901,7 +910,7 @@ export class Terminals {
     pane.querySelector('[data-reconnect]')!.addEventListener('click', () => { this.connect(t); });
     pane.querySelector('[data-resume]')!.addEventListener('click', () => void this.resume(t));
     const surface = pane.querySelector<HTMLElement>('.terminal-surface')!;
-    t.term = new Terminal({ fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--mono').trim(), fontSize: this.fontSize, lineHeight: 1.2, theme: this.theme(), allowTransparency: true, scrollback: 5000 });
+    t.term = new Terminal({ fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--mono').trim(), fontSize: this.fontSize, lineHeight: 1.2, theme: this.theme(), minimumContrastRatio: 4.5, allowTransparency: true, scrollback: 5000 });
     t.fit = new FitAddon(); t.term.loadAddon(t.fit); t.term.open(surface);
     t.term.registerLinkProvider({ provideLinks: (y, done) => done(this.sessionLinks(t, y)) });
     t.term.attachCustomKeyEventHandler(e => !(this.tiled && tileKeyAction(e)));
