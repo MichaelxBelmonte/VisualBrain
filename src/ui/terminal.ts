@@ -27,6 +27,8 @@ interface Tab {
   ws?: WebSocket;
   observer?: ResizeObserver;
   connected?: boolean;
+  /** Keys typed while the session is still connecting: sent as soon as the connection opens. */
+  early?: string;
 }
 /** Contract of src/ui/work-channel.ts (root): a read-only board of the messages exchanged between linked sessions. */
 interface WorkChannelLike {
@@ -1093,7 +1095,10 @@ export class Terminals {
     t.fit = new FitAddon(); t.term.loadAddon(t.fit); t.term.open(surface);
     t.term.registerLinkProvider({ provideLinks: (y, done) => done(this.sessionLinks(t, y)) });
     t.term.attachCustomKeyEventHandler(e => !(this.tiled && tileKeyAction(e)));
-    t.term.onData(data => { if (t.ws?.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'input', data })); });
+    t.term.onData(data => {
+      if (t.ws?.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'input', data }));
+      else if (t.ws?.readyState === WebSocket.CONNECTING) t.early = ((t.early ?? '') + data).slice(0, 4096);
+    });
     t.term.onResize(({ cols, rows }) => { if (t.ws?.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'resize', cols, rows })); });
     t.observer = new ResizeObserver(() => { if (!pane.classList.contains('hidden') && this.isOpen()) this.fitTab(t); }); t.observer.observe(surface);
     if (t.info.nodeId != null) void this.renderContext(pane.querySelector('.session-context')!, t.info.nodeId);
@@ -1122,15 +1127,17 @@ export class Terminals {
   private connect(t: Tab): void {
     t.ws?.close(); t.term?.reset();
     const ws = new WebSocket(ui`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/term?id=${encodeURIComponent(t.info.id)}`);
-    t.ws = ws; t.connected = false;
+    t.ws = ws; t.connected = false; t.early = '';
     ws.onopen = () => {
       if (t.ws !== ws) return;
       t.connected = true; this.updateCard(t); this.renderList(); this.fitTab(t);
       // fit may preserve the dimensions; always send them on a new connection.
       ws.send(JSON.stringify({ type: 'resize', cols: t.term!.cols, rows: t.term!.rows }));
+      if (t.early) ws.send(JSON.stringify({ type: 'input', data: t.early }));
+      t.early = '';
     };
     ws.onmessage = e => { if (t.ws === ws) t.term?.write(e.data); };
-    ws.onclose = () => { if (t.ws !== ws || !this.tabs.has(t.info.id)) return; t.connected = false; this.updateCard(t); this.renderList(); };
+    ws.onclose = () => { if (t.ws !== ws || !this.tabs.has(t.info.id)) return; t.connected = false; t.early = ''; this.updateCard(t); this.renderList(); };
   }
 
   /** An ended Claude, Codex or shell session starts again under the same id; the server says why when it cannot. */

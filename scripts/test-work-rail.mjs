@@ -58,6 +58,9 @@ try {
     // The preview of the highlighted session lives in the rail and reuses what the quick menu already supports.
     assert.match(source, /this\.listEl\.insertAdjacentElement\('afterend', preview\);/, 'the preview is part of the rail, not a popup');
     assert.match(source, /new ResizeObserver\(\(\) => this\.listEl\.querySelector<HTMLElement>\('\.work-session\.previewed'\)\?\.scrollIntoView\(\{ block: 'nearest' \}\)\)\.observe\(this\.listEl\);/, 'the highlighted row stays in view when the preview takes room from the list');
+    assert.match(source, /else if \(t\.ws\?\.readyState === WebSocket\.CONNECTING\) t\.early = \(\(t\.early \?\? ''\) \+ data\)\.slice\(0, 4096\);/, 'keys typed while a session is still connecting are kept');
+    assert.match(source, /if \(t\.early\) ws\.send\(JSON\.stringify\(\{ type: 'input', data: t\.early \}\)\);\n      t\.early = '';/, 'and sent once, when the connection opens');
+    assert.match(source, /t\.ws = ws; t\.connected = false; t\.early = '';/, 'a new connection never inherits keys from the previous one');
     assert.match(source, /this\.listEl\.addEventListener\('focusin', e => this\.showRailPreview\(\(e\.target as HTMLElement\)\.closest<HTMLElement>\('\.work-session'\)\?\.dataset\.sid \?\? null\)\);/, 'the preview follows the keyboard highlight');
     assert.match(source, /const items = \[\.\.\.this\.tabs\.values\(\)\]\.map\(tab => this\.quickItem\(tab\)\);/, 'the quick menu and the rail preview describe a session the same way');
     assert.match(source, /onNativeModel: id => this\.nativeModel\(id\), onModel: id => this\.changeModel\(id\)/);
