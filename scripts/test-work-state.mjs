@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appendOutput, attentionIn, busyMarker, busyTitle, newActivity, noteInjected, noteInput, noteResize, scanOutput, setAttention, stripAnsi, QUIET_AFTER_RESIZE_MS } from '../src/server/activity.ts';
+import { appendOutput, attentionIn, busyMarker, busyTitle, confirmComposerReturn, noticeInputBlocked, newActivity, noteInjected, noteInput, noteResize, scanOutput, setAttention, stripAnsi, QUIET_AFTER_RESIZE_MS } from '../src/server/activity.ts';
 import { setWorkState, wakeSession, deliveryNotice, QUIET_AFTER_MS } from '../src/server/team-delivery.ts';
 import { checkIdle, ATTENTION_AFTER_MS, STALE_AFTER_MS, REMIND_EVERY_MS } from '../src/server/team-watch.ts';
 import { claudeHookSettings, launchEmbedded } from '../src/server/launch.ts';
@@ -36,7 +36,7 @@ const CLAUDE_TITLE_BUSY = '\x1b]0;◐ Visual Brain nodo 138 bacheca\x07';
 const CLAUDE_TITLE_IDLE = '\x1b]0;✳ Visual Brain nodo 138 bacheca\x07';
 const CODEX_TITLE_BUSY = '\x1b]0;⠇ Consulta bacheca e attendi | vm\x07\x1b[?2026h\x1b[39m\x1b[49m\x1b[0m\x1b[21;3H\x1b[?25h\x1b[?2026l';
 
-const fresh = () => ({ a: newActivity(), info: { id: 's1', role: 'operator', alive: true, workState: 'working' } });
+const fresh = () => ({ a: newActivity(), info: { id: 's1', role: 'operator', agent: 'codex', alive: true, workState: 'working' } });
 const feed = (a, info, chunks, now) => { for (const c of chunks) appendOutput(a, c); scanOutput(a, info, now); };
 
 // ANSI stripping keeps words apart where the cursor jumps, and drops colours, OSC titles and cursor moves.
@@ -89,6 +89,11 @@ console.log('PASS idle repaints, recaps, resize redraws and delivery echo do not
   assert.equal(a.quietUntil, 0, 'mouse moves and focus reports are not typing');
   noteInput(a, info, '\x1b[12;40R\x1b[?1;2c', 1500);
   assert.equal([a.quietUntil, info.lastInputAt].join(), '0,', 'the terminal\'s automatic replies are not typing');
+  for (const key of ['\x1b','\x1b[C','\x1b[B','\x1bOC','\x1bOB','\x1b[Z']) {
+    noteInput(a, info, key, 1600);
+    assert.equal(noticeInputBlocked(a,info),false, 'plain navigation in an empty composer leaves it empty');
+    assert.equal(info.lastInputAt,1600);
+  }
   noteInput(a, info, 'ciao', 2000);
   assert.equal(info.lastInputAt, 2000, 'any key: the person is there');
   assert.equal(a.draft, true, 'an unsent draft');
@@ -96,16 +101,53 @@ console.log('PASS idle repaints, recaps, resize redraws and delivery echo do not
   assert.equal(a.draft, true, 'a multi-line paste is not a submit');
   noteInput(a, info, '\x1b[D', 2700);
   assert.equal(a.draft, true, 'arrows keep the draft');
+  noteInput(a, info, '\x1b[Z', 2750);
+  noteInput(a, info, '\x1b', 2800);
+  assert.equal(a.draft,true,'backtab and Esc protect existing text');
   noteInput(a, info, '\r', 3000);
   assert.deepEqual([info.lastInputAt, a.draft], [3000, false], 'Enter sends it');
   noteInput(a, info, 'x', 3100); noteInput(a, info, '\x03', 3200);
   assert.equal(a.draft, false, 'Ctrl-C clears it');
   noteInput(a, info, '\x1b[A', 3300);
-  assert.equal(a.draft, true, 'Up may recall an unrelated history entry');
+  assert.equal(noticeInputBlocked(a,info), true, 'Up may recall an unrelated history entry');
   noteInput(a, info, '\rnext', 3400);
   assert.equal(a.draft, true, 'new input after an Enter is a draft');
+  noteInput(a, info, '\r\x1b[C\x1b[Z', 3500);
+  assert.equal(a.draft,false,'navigation after a submit does not start a new draft');
+  noteInput(a, info, '\x1b[Dtext\x1b[C', 3600);
+  assert.equal(a.draft,true,'navigation framing text does not hide an edit');
+  for (const edit of ['\t','\x19','\x1bq','\x1b[99~','\x1b[200~\x1b[D\r\x1b[201~']) {
+    noteInput(a, info, '\x03'+edit, 3700);
+    assert.equal(a.draft,true,'completion, yank, unknown keys and pasted input remain guarded');
+  }
 }
 console.log('PASS lastInputAt on every key from the person; drafts tracked until Enter or Ctrl-C');
+
+{
+  const { a, info } = fresh();
+  const empty = '\x1b[?2026h\x1b[16;3H\x1b[2mAsk Codex to do anything\x1b[19;3H\x1b[22m\x1b[16;3H\x1b[?25h\x1b[?2026l';
+  for (const [enter, back] of [['\x1b[D','\x1b'], ['\x1b[A','\x1b[B'], ['\x1b\x1b','\x1b']]) {
+    noteInput(a,info,enter);
+    assert.ok(noticeInputBlocked(a,info),'another view or history entry owns Enter');
+    assert.equal(confirmComposerReturn(a,info,empty),false,'a repaint without a return gesture cannot release the guard');
+    noteInput(a,info,back);
+    assert.equal(confirmComposerReturn(a,info,'› Ask Codex to do anything · ? for shortcuts'),false,'plain output is not the composer');
+    assert.ok(noticeInputBlocked(a,info));
+    assert.equal(confirmComposerReturn(a,info,empty.slice(0,20)),false);
+    assert.equal(confirmComposerReturn(a,info,empty.slice(20)),true,'split render restores the empty input and cursor');
+    assert.ok(!noticeInputBlocked(a,info));
+  }
+  noteInput(a,info,'UNSENT'); noteInput(a,info,'\x1b[A'); noteInput(a,info,'\x1b[B');
+  assert.equal(confirmComposerReturn(a,info,empty),false,'history navigation never releases a real draft');
+  assert.ok(noticeInputBlocked(a,info));
+  const other = fresh();
+  feed(other.a,other.info,[CLAUDE_QUESTION,empty],1000);
+  assert.equal(other.info.attention,undefined,'a fully repainted composer supersedes the earlier selector in the same scan');
+  feed(other.a,other.info,[empty,CODEX_APPROVAL],1500);
+  assert.equal(other.info.attention,'permission','a newer permission prompt wins over an earlier empty composer');
+  noteInput(other.a,other.info,'\x1b[A',1600);
+  assert.ok(noticeInputBlocked(other.a,other.info));
+}
 
 {
   assert.equal(attentionIn(stripAnsi(CLAUDE_PERMISSION)), 'permission');
@@ -120,6 +162,7 @@ console.log('PASS lastInputAt on every key from the person; drafts tracked until
   assert.equal(info.attention, 'permission', 'repaints keep the prompt');
   noteInput(a, info, '\x1b[B', 12_000);
   assert.equal(info.attention, 'permission', 'moving through the choices does not answer');
+  assert.ok(!a.draft,'selection inside a permission dialog is not composer text');
   noteInput(a, info, '\r', 13_000);
   assert.equal(info.attention, undefined, 'Enter answers the prompt');
   assert.equal(a.attentionAt, undefined);

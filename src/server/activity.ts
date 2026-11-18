@@ -17,10 +17,12 @@ export interface Activity {
   quietUntil: number;
   attentionAt?: number;      // since when info.attention is set
   draft?: boolean;           // the person typed something not sent yet: the server must not paste into it
+  navigation?: 'history' | 'menu' | 'return'; // a recalled entry or another view may own Enter
+  escapeArmed?: boolean;     // a second Esc can open the transcript/rewind view
   cliBusy?: boolean;         // last native CLI turn signal, independent of the board's reported state
 }
 
-export const newActivity = (): Activity => ({ pending: '', timer: null, quietUntil: 0 });
+export const newActivity = (): Activity => ({ pending: '', timer: null, quietUntil: 0, escapeArmed: false });
 
 const OSC = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
 const STRING_SEQ = /\x1b[P^_][^\x1b]*\x1b\\/g;
@@ -65,9 +67,9 @@ export function observedTurn(raw: string, agent: TerminalInfo['agent']): boolean
 }
 
 export function noticeInputBlocked(a: Activity | undefined, info: TerminalInfo): boolean {
-  if (info.attention || a?.draft) return true;
+  if (info.attention || a?.draft || a?.navigation) return true;
   const pending = a?.pending ?? '';
-  return !!((observedTurn(pending, info.agent) ?? a?.cliBusy) || attentionIn(stripAnsi(pending)));
+  return !!((observedTurn(pending, info.agent) ?? a?.cliBusy) || attentionIn(stripAnsi(pending.slice(composerEnd(pending, info.agent)))));
 }
 
 export function noticeInput(notice: string): string {
@@ -129,7 +131,10 @@ export function scanOutput(a: Activity, info: TerminalInfo, now = Date.now()): v
   const busy = CLAUDE_BUSY_TITLE.test(title) || BRAILLE_TITLE.test(title) || (!title.startsWith('✳') && busyMarker(text, quiet));
   const substantial = !quiet && !NOISE.test(text) && text.replace(FILLER, '').length >= SUBSTANTIAL_CHARS;
   if (busy || substantial) info.lastOutputAt = now;
-  const found = attentionIn(text);
+  // A fast Esc may close a selector inside this same scan. Only subsequent output can open a new one.
+  const restored = composerEnd(raw, info.agent);
+  if (restored && info.attention === 'input') setAttention(a, info, null, now);
+  const found = attentionIn(restored ? stripAnsi(raw.slice(restored)) : text);
   if (quiet && !found) return;
   // Answered elsewhere (e.g. a hook approved it): Claude's turn resumes, or new text replaces the prompt. Codex's
   // spinners alone do not clear it, in case they keep running under the approval.
@@ -141,19 +146,91 @@ export function scanOutput(a: Activity, info: TerminalInfo, now = Date.now()): v
 // Mouse reports, focus events and the terminal's automatic replies (cursor position, device attributes) are not keys.
 const NOT_KEYS = /\x1b\[<\d+;\d+;\d+[Mm]|\x1b\[M[\s\S]{3}|\x1b\[[IO]|\x1b\[\d+;\d+R|\x1b\[[?>][\d;]*c|\x1b\[\?[\d;]*\$y|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
 
-export function noteInput(a: Activity, info: TerminalInfo, data: string, now = Date.now()): void {
+const CURSOR_KEYS = /^(?:\x1b(?:\[[ABCDZ]|O[ABCD]))+$/;
+const returnFrames = new WeakMap<Activity, string>();
+
+// Only inspect a fresh repaint requested by a return gesture that started from an empty composer.
+// The Codex placeholder is dim, at column 3, with the caret restored to that very row, column 3.
+const CODEX_EMPTY = /\x1b\[(\d+);(?:3H|1H\x1b\[1m›\x1b\[22m )\x1b\[2mAsk Codex to do anything\x1b\[[\s\S]*?\x1b\[\1;3H\x1b\[\?25h$/;
+// Claude restores the blank inverse-video cursor and the main session's agents shortcut.
+const CLAUDE_EMPTY = /(?:\x1b\[7m \x1b\[27m\x1b\[K|❯\u00a0\x1b\[7m \r\x1b\[1B\x1b\[27m─)[^\n]*?←\x1b\[\d+Gfor\x1b\[\d+Gagents[^\n]*?\x1b\[\d+;3H$/;
+
+/** End of a synchronized Codex frame that explicitly restores its empty input, or zero. */
+function composerEnd(raw: string, agent: TerminalInfo['agent']): number {
+  if (agent !== 'codex') return 0;
+  const placeholder = raw.lastIndexOf('\x1b[2mAsk Codex to do anything');
+  if (placeholder < 0) return 0;
+  const start = Math.max(0, raw.lastIndexOf('\x1b[?2026h', placeholder));
+  const finish = '\x1b[?2026l', end = raw.indexOf(finish, placeholder);
+  return end >= 0 && CODEX_EMPTY.test(raw.slice(start, end)) ? end + finish.length : 0;
+}
+
+export function confirmComposerReturn(a: Activity, info: TerminalInfo, raw: string): boolean {
+  if (a.navigation !== 'return' || a.draft || info.attention === 'permission') return false;
+  const frame = ((returnFrames.get(a) ?? '') + raw).slice(-16_000);
+  const end = composerEnd(frame, info.agent);
+  const confirmed = info.agent === 'codex'
+    ? end > 0 && !stripAnsi(frame.slice(end)).trim()
+    : info.agent === 'claude' && CLAUDE_EMPTY.test(frame.slice(Math.max(0, frame.lastIndexOf('\x1b[H'))));
+  if (!confirmed) { returnFrames.set(a, frame); return false; }
+  returnFrames.delete(a);
+  delete a.navigation;
+  if (info.attention === 'input') setAttention(a, info, null);
+  return true;
+}
+
+function navigate(a: Activity, info: TerminalInfo, tail: string): boolean {
+  const armed = a.escapeArmed;
+  a.escapeArmed = false;
+  if (info.attention && CURSOR_KEYS.test(tail)) return true;
+  if (info.agent !== 'codex' && info.agent !== 'claude') return false;
+  if (tail === '\x1b' || tail === '\x1b\x1b') {
+    if (!a.draft) {
+      if (a.navigation || info.attention) a.navigation = 'return';
+      else if (armed || tail.length === 2) a.navigation = 'menu';
+      else a.escapeArmed = true;
+    }
+    return true;
+  }
+  if (!CURSOR_KEYS.test(tail)) return false;
+  if (!a.draft) for (const key of tail.match(/\x1b(?:\[|O)./g)!) {
+    const direction = key.at(-1);
+    if (direction === 'D' && !a.navigation) a.navigation = 'menu'; // Left opens the agents panel.
+    if (direction === 'A' && a.navigation !== 'menu') a.navigation = 'history';
+    if (direction === 'B' && a.navigation === 'history') a.navigation = 'return';
+  }
+  return true;
+}
+
+/** Returns true for a navigation-only suffix, so a backend can correct a pre-fix PTY host. */
+export function noteInput(a: Activity, info: TerminalInfo, data: string, now = Date.now()): boolean {
   const keys = data.replace(NOT_KEYS, '');
-  if (!keys) return;
+  if (!keys) return false;
   a.quietUntil = Math.max(a.quietUntil, now + QUIET_AFTER_KEY_MS);
   const typed = keys.replace(/\x1b\[200~[\s\S]*?\x1b\[201~/g, 'x');
+  if (!info.attention && a.pending) {
+    const prompt = attentionIn(stripAnsi(a.pending.slice(composerEnd(a.pending, info.agent))));
+    if (prompt) setAttention(a, info, prompt, now);
+  }
   info.lastInputAt = now; // any key: the person is there, the session is not quiet
   // History navigation, completion and yank can populate an empty composer too.
   // Respect the order in a single write such as Enter followed by the start of a new draft.
   const end = Math.max(typed.lastIndexOf('\r'), typed.lastIndexOf('\x03'));
-  a.draft = typed.length > end + 1;
+  const tail = typed.slice(end + 1);
+  returnFrames.delete(a);
+  if (end >= 0) {
+    a.draft = false; a.escapeArmed = false;
+    // Enter in a menu can restore an old prompt. A confirmed empty composer or explicit Ctrl-C releases it.
+    if (typed[end] === '\r' && (a.navigation === 'menu' || a.navigation === 'return')) a.navigation = 'return';
+    else delete a.navigation;
+    if (info.attention) setAttention(a, info, null, now);
+  }
+  const navigation = !!tail && navigate(a, info, tail);
+  if (tail && !navigation) { a.draft = true; delete a.navigation; }
   // Arrows move through the choices. Enter, Esc or Ctrl-C answer any prompt; a choice key (1-9, y, n, a) answers a
   // permission dialog only, since in a free answer box it is just the first letter of the reply.
-  if (info.attention && (/[\r\x03]/.test(typed) || typed === '\x1b' || (info.attention === 'permission' && /^[1-9ynaYNA]$/.test(typed)))) setAttention(a, info, null, now);
+  if (info.attention && (typed === '\x1b' || (info.attention === 'permission' && /^[1-9ynaYNA]$/.test(typed)))) setAttention(a, info, null, now);
+  return navigation;
 }
 
 export function noteResize(a: Activity, now = Date.now()): void {
@@ -162,5 +239,5 @@ export function noteResize(a: Activity, now = Date.now()): void {
 
 /** Text the server pastes itself (message delivery): its echo is not activity and not the person's input. */
 export function noteInjected(a: Activity | undefined, now = Date.now()): void {
-  if (a) a.quietUntil = Math.max(a.quietUntil, now + QUIET_AFTER_KEY_MS);
+  if (a) { a.quietUntil = Math.max(a.quietUntil, now + QUIET_AFTER_KEY_MS); a.escapeArmed = false; }
 }

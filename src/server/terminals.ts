@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { delimiter } from 'node:path';
 import pty from 'node-pty';
 import type { LaunchOptions, TerminalInfo } from '../shared/types.ts';
-import { appendOutput, newActivity, noteInput, noteResize, scanOutput, SCAN_EVERY_MS, type Activity } from './activity.ts';
+import { appendOutput, confirmComposerReturn, newActivity, noteInput, noteResize, scanOutput, SCAN_EVERY_MS, type Activity } from './activity.ts';
 
 export interface Term {
   info: TerminalInfo;
@@ -104,6 +104,7 @@ export class Terminals {
     };
     proc.onData((data) => {
       appendBuffer(term, data);
+      if (confirmComposerReturn(term.activity, term.info, data)) this.onTurnIdle?.(id);
       for (const l of term.listeners) l(data);
       const a = term.activity;
       if (appendOutput(a, data)) {
