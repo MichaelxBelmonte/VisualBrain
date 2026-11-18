@@ -1,7 +1,8 @@
 # Visual Brain 0.2.53
 
-- **Aggiornamenti dalle Impostazioni.** In **Impostazioni → Aggiornamenti** trovi la versione installata e un solo pulsante per verificare, scaricare e installare la nuova. Vedi l’avanzamento reale del download e le novità della versione. L’installazione non chiude nessun terminale.
+- **Aggiornamenti dalle Impostazioni.** In **Impostazioni → Aggiornamenti** trovi la versione installata e un solo pulsante per verificare, scaricare e installare la nuova. Vedi l’avanzamento reale del download e le novità della versione. L’installazione non chiude nessun terminale. Se mentre una versione è pronta ne esce una più recente, l’app passa da sola a quella.
 - **Riavvia ora.** A partire dal prossimo aggiornamento, a installazione finita puoi riavviare l’app con un clic dalla riga degli aggiornamenti o dall’avviso in alto: i terminali restano attivi e li ritrovi alla riapertura. Se il riavvio tarda, la pagina ti dice di chiudere con ⌘Q.
 - **Tema chiaro e scuro.** Nel tema chiaro i terminali non hanno più la cornice nera. I colori del testo nei terminali mantengono un contrasto leggibile in entrambi i temi e seguono il cambio di tema. Il menu rapido dei terminali resta sopra gli avvisi, e i pulsanti degli avvisi sono leggibili.
 - **Operativa più leggera.** Quando non cambia nulla, l’elenco delle sessioni, le schede e la bacheca non vengono più ridisegnati a ogni controllo.
 - **Squadre.** La persona, il Main Brain e l’orchestratore possono annotare decisioni e pubblicazioni nel registro di progetto. Un client può confermare gli eventi letti in bacheca e rileggerli dopo una disconnessione. L’avviso inviato al terminale è distinto dalla presa in carico dell’incarico.
+- **Più sicurezza negli aggiornamenti.** Un’altra copia di Visual Brain avviata da un terminale dell’app, come un pacchetto di prova o un server di sviluppo, non eredita più gli aggiornamenti automatici dell’app installata.
