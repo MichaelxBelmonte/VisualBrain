@@ -100,6 +100,10 @@ console.log('PASS idle repaints, recaps, resize redraws and delivery echo do not
   assert.deepEqual([info.lastInputAt, a.draft], [3000, false], 'Enter sends it');
   noteInput(a, info, 'x', 3100); noteInput(a, info, '\x03', 3200);
   assert.equal(a.draft, false, 'Ctrl-C clears it');
+  noteInput(a, info, '\x1b[A', 3300);
+  assert.equal(a.draft, true, 'Up may recall an unrelated history entry');
+  noteInput(a, info, '\rnext', 3400);
+  assert.equal(a.draft, true, 'new input after an Enter is a draft');
 }
 console.log('PASS lastInputAt on every key from the person; drafts tracked until Enter or Ctrl-C');
 
@@ -237,11 +241,29 @@ try {
   teams.message(7, 'orc', 'op7', 'Bozza?');
   q.info.stateAt = t0; q.activity.draft = true;
   assert.equal(wakeSession(ctx, 'op7', { now: t0 + 9 * QUIET_AFTER_MS }), false, 'unsent draft: no automatic paste');
+  assert.equal(wakeSession(ctx, 'op7', { manual: true, now: t0 + 9 * QUIET_AFTER_MS }), false, 'manual wake cannot submit a draft either');
   q.activity.draft = false;
   q.info.agent = 'hermes';
   assert.equal(wakeSession(ctx, 'op7', { now: t0 + 9 * QUIET_AFTER_MS }), false, 'hermes thinking silently is not quiet');
   q.info.agent = 'claude';
   assert.equal(wakeSession(ctx, 'op7', { now: t0 + 9 * QUIET_AFTER_MS }), true);
+  const main = mk('brain', 'brain', { workState: 'idle', agent: 'codex' });
+  terms.push(main);
+  teams.message(7, 'orc', 'brain', 'Unrelated message body', 'brain');
+  feed(main.activity, main.info, ['\x1b]7501;state=working:app=codex\x1b\\'], t0);
+  checkIdle(ctx,t0);
+  assert.equal(main.injectedMessage,0,'native busy overrides an idle board report');
+  feed(main.activity, main.info, ['\x1b]7501;state=done:app=codex\x1b\\'], t0+10);
+  appendOutput(main.activity,CODEX_APPROVAL);
+  assert.equal(wakeSession(ctx,'brain'),false,'defer even before the pending approval screen is scanned');
+  scanOutput(main.activity,main.info,t0+20);
+  setAttention(main.activity,main.info,null);
+  checkIdle(ctx,t0+30);
+  checkIdle(ctx,t0+40);
+  const brainWrites = written.filter(([id])=>id==='brain');
+  assert.equal(brainWrites.length,1,'wake the Main Brain once after the block clears');
+  assert.ok(brainWrites[0][1].endsWith('\x1b[201~\r'));
+  assert.ok(!brainWrites[0][1].includes('Unrelated message body'));
   console.log('PASS a session stuck at working but silent receives its messages; manual wake repeats; prompts are never typed over');
 } finally { rmSync(dir, { recursive: true, force: true }); }
 
@@ -292,6 +314,7 @@ try {
   for (const language of ['it', 'en']) {
     const n = deliveryNotice({ host: '127.0.0.1', port: 4747, language }, 138, 'abc12345');
     assert.ok(n.includes('Authorization: Bearer $VB_TEAM_TOKEN') && n.includes('/api/work/138?session=abc12345'), n);
+    assert.doesNotMatch(n, /\$[\w-]+[\p{P}\s]*$/u, 'punctuation after a trailing skill token still leaves the Codex completion menu open');
   }
 }
 console.log('PASS Claude hooks only for team sessions, with port, session and token from the PTY environment');

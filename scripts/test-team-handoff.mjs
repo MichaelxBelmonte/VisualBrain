@@ -25,7 +25,7 @@ try {
       const info = { id, role, agent: opts.agent, nodeId: opts.nodeId, alive: true, cwd: opts.cwd,
         parentId: opts.parentId, createdAt: Date.now(), title: role, workState: 'idle' };
       const term = { info, activity: newActivity(), teamToken: opts.teamToken, seenMessage: opts.seenMessage ?? 0,
-        proc: { write(data) { if (data.startsWith('\x1b[200~')) notices.push({ id, bytes: Buffer.byteLength(data) - 12 }); } } };
+        proc: { write(data) { if (data.startsWith('\x1b[200~')) notices.push({ id, bytes: Buffer.byteLength(data) - 13 }); } } };
       terminals.set(id, term);
       return term;
     },

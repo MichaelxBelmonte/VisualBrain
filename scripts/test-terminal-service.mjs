@@ -92,6 +92,7 @@ try {
   assert.equal(restored.info.name, 'Kept name'); assert.equal(restored.info.workState, 'idle');
   assert.equal(restored.teamToken, 'fixture-token'); assert.equal(restored.seenMessage, 42); assert.equal(restored.injectedMessage, 43);
   assert.equal(restored.activity.draft, true);
+  assert.equal(service.deliver(term.info.id, 'never submit restored draft', 44, Date.now()), false);
   service.resize(term.info.id, 93, 27);
   service.write(term.info.id, 'reconnected\r'); await service.flush();
   await waitFor('PTY still interactive', () => restored.buffer.join('').includes(`ANSWER:reconnected:${pid}`));
@@ -108,7 +109,7 @@ try {
   const noticeAt = Date.now();
   service.deliver(term.info.id, 'delivery-across-detach', 44, noticeAt);
   await service.detach(); service = null;
-  await sleep(250); // Enter is sent by the host even though the API-side timer/process is gone.
+  await sleep(250); // The shell processes the submitted line while the API is detached.
   service = await TerminalService.open(profile, port, () => {});
   assert.equal(service.get(term.info.id).injectedMessage, 44);
   assert.equal(service.get(term.info.id).info.noticeSentAt, noticeAt);

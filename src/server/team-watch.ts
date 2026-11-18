@@ -33,7 +33,9 @@ export function checkIdle(ctx: ApiCtx, now = Date.now(), reminded: Reminded = ne
   // One squad at a time: its own board, its own orchestrator. The Main Brain is nobody's worker.
   const bySquad = new Map<string, { nodeId: number; team: string; sessions: TerminalInfo[] }>();
   for (const t of ctx.teams.withCodes(ctx.terms.list())) {
-    if (!t.alive || t.nodeId == null || !t.role || t.role === 'brain') continue;
+    if (!t.alive || t.nodeId == null || !t.role) continue;
+    if (t.workState === 'idle' || isQuiet(t, now)) wakeSession(ctx, t.id, { now });
+    if (t.role === 'brain') continue;
     const team = ctx.teams.teamOf(t.nodeId, t), key = `${t.nodeId}:${team}`;
     const entry = bySquad.get(key) ?? { nodeId: t.nodeId, team, sessions: [] };
     entry.sessions.push(t); bySquad.set(key, entry);
@@ -47,8 +49,6 @@ export function checkIdle(ctx: ApiCtx, now = Date.now(), reminded: Reminded = ne
     const mark = (key: string, session: string) => reminded.set(key, { at: now, count: (reminded.get(key)?.count ?? 0) + 1, session });
     const last = (keys: string[]) => keys.every(k => (reminded.get(k)?.count ?? 0) + 1 >= MAX_REMINDERS) ? finalNotice : '';
     const lastSign = (s: TerminalInfo) => Math.max(s.stateAt ?? s.createdAt ?? 0, s.lastOutputAt ?? 0, s.lastInputAt ?? 0);
-    // messages queued for a session that went quiet while declared working (its turn ended without reporting idle)
-    for (const s of sessions) if (isQuiet(s, now) || (s.workState === 'idle' && s.noticeSentAt !== undefined)) wakeSession(ctx, s.id, { now });
     const orchestrator = sessions.find(s => s.role === 'orchestrator');
     const workers = sessions.filter(s => s.role !== 'orchestrator');
     const attentionKey = (s: TerminalInfo) => `attention:${s.id}:${ctx.terms.get(s.id)?.activity?.attentionAt ?? ''}`;
@@ -100,7 +100,9 @@ export function checkIdle(ctx: ApiCtx, now = Date.now(), reminded: Reminded = ne
 
 export function startTeamWatch(ctx: ApiCtx): () => void {
   const reminded: Reminded = new Map();
+  // A Stop hook can report idle just before the CLI actually closes its busy composer.
+  ctx.terms.onTurnIdle = id => wakeSession(ctx, id);
   const timer = setInterval(() => { try { checkIdle(ctx, Date.now(), reminded); } catch { /* the watchdog never stops the server */ } }, TICK_MS);
   timer.unref();
-  return () => clearInterval(timer);
+  return () => { clearInterval(timer); delete ctx.terms.onTurnIdle; };
 }
