@@ -148,6 +148,12 @@ const sidebarSessions = [
 const sidebarTabs = new Map(sidebarSessions.map(info => [info.id,{info,term:{},ws:{},pane:{}}]));
 let launched = null;
 Object.assign(sidebar, {
+  patchRail(groups) {
+    const markup = item => item.children ? item.html.replace('</section>', item.children.map(markup).join('') + '</section>') : item.html;
+    const html = groups.map(markup).join('');
+    if (list.html === html) return false;
+    list.innerHTML = html; return true;
+  },
   nodes:nodeRowsInfo,tabs:sidebarTabs,selectedNode:1,active:'shell',links:[],filter:'',nodeOrder:[],sessionOrder:[],
   collapsedNodes:new Set(),railDragCleanup:[],railLinkSource:null,listEl:list,cb:{sessionsChanged(){}},
   syncSel(){},bindNodeDrag(){},renderRailLinks(){},control:()=>({querySelector:()=>null}),picker:{open:false},sel:{ids:[]},updateConnection(){},

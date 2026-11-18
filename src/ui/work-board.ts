@@ -73,6 +73,47 @@ export interface BoardCallbacks {
 }
 export type BoardUpdate = (nodes: NodeDetail[], nodeId: number | null, visible: boolean, team?: string) => void;
 
+/** Keyed groups and rows rendered by the board and the terminal rail. HTML describes static content;
+ * state colours, focus and relative-time titles are updated on the retained elements. */
+export interface WorkListItem { key: string; html: string; children?: WorkListItem[] }
+const workLists = new WeakMap<Element, Map<string, { node: Element; html: string }>>();
+
+export function reconcileWorkList(parent: Element, items: WorkListItem[]): boolean {
+  const previous = workLists.get(parent) ?? new Map<string, { node: Element; html: string }>();
+  const keys = new Set(items.map(item => item.key));
+  let changed = false;
+  for (const [key, entry] of previous) {
+    if (keys.has(key)) continue;
+    entry.node.remove(); previous.delete(key); changed = true;
+  }
+  let cursor = parent.firstElementChild;
+  for (const item of items) {
+    let entry = previous.get(item.key);
+    if (entry?.html !== item.html) {
+      const template = document.createElement('template');
+      template.innerHTML = item.html;
+      const fresh = template.content.firstElementChild!;
+      if (entry && item.children) {
+        // A group's selection or link colour can change while its rows keep their focus and handlers.
+        for (const name of entry.node.getAttributeNames()) if (!fresh.hasAttribute(name)) entry.node.removeAttribute(name);
+        for (const attr of fresh.attributes) if (entry.node.getAttribute(attr.name) !== attr.value) entry.node.setAttribute(attr.name, attr.value);
+      } else {
+        if (entry) {
+          if (entry.node === cursor) cursor = fresh;
+          entry.node.replaceWith(fresh);
+        }
+        entry = { node: fresh, html: item.html };
+      }
+      entry.html = item.html; previous.set(item.key, entry); changed = true;
+    }
+    if (entry.node !== cursor) { parent.insertBefore(entry.node, cursor); changed = true; }
+    cursor = entry.node.nextElementSibling;
+    if (item.children && reconcileWorkList(entry.node, item.children)) changed = true;
+  }
+  workLists.set(parent, previous);
+  return changed;
+}
+
 export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate {
   let nodes: NodeDetail[] = [];
   let nodeId: number | null = null;
@@ -85,7 +126,6 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
   let error = '';
   let shell = '';
   let signature = '';
-  let memberClock = -1;
   let loading = false;
   let openCard: string | null = null;
   let youExpanded = false;
@@ -284,21 +324,13 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     if (nodeId === null) { el.innerHTML = tr('<div class="board-empty muted">Aggiungi un nodo a Operativa per vederne il lavoro.</div>'); shell = ''; return; }
     paintShell();
     if (!view) return;
-    const sig = JSON.stringify([view, reminders, [...folders], links, openCard]);
-    const clock = Math.floor(Date.now() / 30_000);
-    const tick = clock !== memberClock;
-    memberClock = clock;
+    // Activity and relative times belong to the member buttons. Only roster changes and attention
+    // prompts affect the lanes, their editors, the message recipients or the squad filters.
+    const { sessions, peers, brain, ...board } = view;
+    const roster = (s: TerminalInfo) => [s.id, s.nodeId, s.role, s.code, s.name, s.alive, s.attention];
+    const sig = JSON.stringify([board, sessions.map(roster), peers?.map(roster), brain && roster(brain), reminders, [...folders], links, openCard]);
     if (sig === signature) {
-      // Only member tones and their relative time descriptions can age without a data change.
-      if (tick) {
-        for (const chip of el.querySelectorAll<HTMLElement>('[data-goal] .member-chip[data-goto]')) {
-          const member = named(chip.dataset.goto!);
-          if (!member) continue;
-          const tone = sessionTone(member) ?? '', title = memberTitle(member);
-          if (chip.dataset.tone !== tone) chip.dataset.tone = tone;
-          if (chip.title !== title) chip.title = title;
-        }
-      }
+      paintMemberStates();
       return;
     }
     signature = sig;
@@ -346,20 +378,37 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     return `<p class="lavoro-hint"><span>${hint.action === 'agent' ? '' : '✓ '}${esc(hint.text)}</span>${button}</p>`;
   }
 
-  /** One line under the filters: objective, summary, and who is on the squad. */
-  function memberTitle(s: TerminalInfo): string {
-    return [s.name || roleName(s), toneReason(s), s.agent, s.model, s.effort].filter(Boolean).join(' · ');
+  function paintMemberStates(): void {
+    const members = new Map((team === 'brain' ? (view!.brain ? [view!.brain] : []) : view!.sessions).map(member => [member.id, member]));
+    for (const chip of el.querySelectorAll<HTMLElement>('[data-goal] .member-chip[data-goto]')) {
+      const member = members.get(chip.dataset.goto!);
+      if (!member) continue;
+      const tone = sessionTone(member) ?? '';
+      const title = [member.name || roleName(member), toneReason(member), member.agent, member.model, member.effort].filter(Boolean).join(' · ');
+      if (chip.dataset.tone !== tone) chip.dataset.tone = tone;
+      if (chip.title !== title) chip.title = title;
+    }
   }
 
+  /** One line under the filters: objective, summary, and who is on the squad. */
   function paintGoal(): void {
     const box = el.querySelector<HTMLElement>('[data-goal]')!;
-    if (team === REMINDERS) { box.innerHTML = ui`<p class="muted">Promemoria del nodo: note per te, senza agenti. Si spostano con i pulsanti della scheda.</p>`; return; }
+    if (team === REMINDERS) {
+      reconcileWorkList(box, [{ key: 'reminders', html: ui`<p class="muted">Promemoria del nodo: note per te, senza agenti. Si spostano con i pulsanti della scheda.</p>` }]);
+      return;
+    }
     const info = team === 'brain' ? null : view!.team;
     const objective = info?.objective || '', summary = view!.summary;
     const members = (team === 'brain' ? (view!.brain ? [view!.brain] : []) : view!.sessions).slice().sort((a, b) => Number(b.alive) - Number(a.alive) || Number(b.role === 'orchestrator') - Number(a.role === 'orchestrator'));
-    const memberHtml = members.map(s => ui`<button class="member-chip" data-goto="${s.id}" data-tone="${sessionTone(s) ?? ''}" title="${esc(memberTitle(s))}"><i></i>${esc(s.code ?? s.id)}</button>`).join('');
-    const html = `<div class="lavoro-objective">${objective ? `<p class="clamp" title="${esc(objective)}">${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? `<p class="muted">${esc(tr('Nessun obiettivo. Impostalo dal menu ···'))}</p>` : ''}</div><div class="lavoro-members">${memberHtml}${info ? ui`<button class="member-chip add" data-add-agent title="Aggiungi agente">＋</button>` : ''}</div>`;
-    if (box.innerHTML !== html) box.innerHTML = html;
+    const chips: WorkListItem[] = members.map(member => ({
+      key: member.id, html: ui`<button class="member-chip" data-goto="${esc(member.id)}"><i></i>${esc(member.code ?? member.id)}</button>`,
+    }));
+    if (info) chips.push({ key: 'action:add', html: ui`<button class="member-chip add" data-add-agent title="Aggiungi agente">＋</button>` });
+    reconcileWorkList(box, [
+      { key: 'objective', html: `<div class="lavoro-objective">${objective ? `<p class="clamp" title="${esc(objective)}">${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? `<p class="muted">${esc(tr('Nessun obiettivo. Impostalo dal menu ···'))}</p>` : ''}</div>` },
+      { key: 'members', html: '<div class="lavoro-members"></div>', children: chips },
+    ]);
+    paintMemberStates();
   }
 
   function paintPanelData(): void {

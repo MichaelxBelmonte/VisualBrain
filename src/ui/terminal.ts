@@ -17,7 +17,7 @@ import { DEFAULT_FONT_SIZE, dropText, fontZoomKey, isNewTerminalKey, isPlainTerm
 import { api } from './api.ts';
 import { fmtBytes } from './panel.ts';
 import type { AgentName, AgentRole, NodeDetail, SwarmProposal, TeamLink, TerminalInfo } from '../shared/types.ts';
-import { mountWorkBoard, type BoardUpdate } from './work-board.ts';
+import { mountWorkBoard, reconcileWorkList, type WorkListItem, type BoardUpdate } from './work-board.ts';
 
 interface Tab {
   info: TerminalInfo;
@@ -278,10 +278,7 @@ export class Terminals {
             if (!tab) continue;
             const linked = !!button.closest<HTMLElement>('[data-connection-endpoint]');
             const title = this.railSessionTitle(tab.info, linked);
-            if (button.title !== title) {
-              button.title = title;
-              delete this.listEl.dataset.signature; // The saved HTML includes the previous title.
-            }
+            if (button.title !== title) button.title = title;
           }
           this.renderTabs();
         }
@@ -885,11 +882,10 @@ export class Terminals {
     const endpoints = connectionEndpoints(this.links, sessionsInfo);
     const now = Date.now();
     const filteringState = this.stateFilter && this.stateFilter !== 'all';
-    const toneData = (info: TerminalInfo) => { const tone = sessionTone(info, now); return tone ? ` data-tone="${tone}"` : ''; };
-    const flag = (info: TerminalInfo) => { const word = toneFlag(sessionTone(info, now), info); return word ? `<em class="tone-flag">${esc(word)}</em>` : ''; };
     const toneAttr = (id: number | null) => (id !== null && tones.has(id) ? ` data-connection-tone="${tones.get(id)!.tone}"` : '');
     const groupIds = new Set<number | null>([...this.nodes.keys(), ...[...this.tabs.values()].map(t => t.info.nodeId ?? null)]);
-    const groups = orderNodes([...groupIds], this.nodeOrder, this.links, true).map(({ id, clusterSize, clusterStart }) => {
+    const groups: WorkListItem[] = [];
+    for (const { id, clusterSize, clusterStart } of orderNodes([...groupIds], this.nodeOrder, this.links, true)) {
       const node = id !== null ? this.nodes.get(id) : null;
       const sessions = [...this.tabs.values()].filter(t => (t.info.nodeId ?? null) === id);
       const name = id === null ? tr('Terminali liberi') : node?.name ?? sessions[0]?.info.cwd.split('/').pop() ?? ui`Nodo #${id}`;
@@ -908,18 +904,22 @@ export class Terminals {
       const rank = (t: Tab) => { const at = this.sessionOrder.indexOf(t.info.id); return at < 0 ? Infinity : at; };
       const collapsed = id !== null && this.collapsedNodes.has(id) && !this.filter && !filteringState;
       const shown = [...matching].sort((a, b) => rank(a) - rank(b)); // stable: sessions never moved keep their creation order
-      if ((!matchesNode || filteringState) && !shown.length) return '';
-      return ui`${clusterStart ? ui`<div class="work-cluster"${toneAttr(id)}>⇄ Collegati · ${clusterSize} nodi</div>` : ''}<section class="work-group ${this.selectedNode === id ? 'current-node' : ''}"${toneAttr(id)} ${id !== null ? `data-drag="${id}"` : ''}><div class="work-node-row">${id !== null ? ui`<button class="work-row-grip" data-node-grip="${id}" aria-label="Sposta ${esc(name)}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button>` : ''}${id !== null ? ui`<button class="work-fold" data-fold="${id}" aria-expanded="${!collapsed}" title="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}" aria-label="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}">${collapsed ? '›' : '⌄'}</button>` : ''}<button class="work-node ${this.selectedNode === id ? 'selected' : ''}" data-node="${id ?? ''}" aria-current="${this.selectedNode === id ? 'true' : 'false'}" title="${esc(path)}"><span class="work-node-icon" aria-hidden="true">${icon('folder')}</span><span><strong>${esc(name)}</strong>${id !== null && tones.has(id) ? ui` <span class="work-link-mark" title="Nodo con collegamenti" aria-hidden="true">⇄</span>` : ''}</span><span class="work-number">${sessions.length}</span></button>${id === null ? ui`<button class="work-rail-action" data-add-shell="" title="Nuovo terminale libero" aria-label="Nuovo terminale libero">${icon('terminal')}</button>` : ''}${id !== null ? ui`<button class="work-rail-action" data-add-agent="${id}" title="Aggiungi agente a ${esc(name)}" aria-label="Aggiungi agente a ${esc(name)}">${icon('plus')}</button><button class="work-rail-action" data-add-shell="${id}" title="Terminale in ${esc(name)}" aria-label="Terminale in ${esc(name)}">${icon('terminal')}</button><button class="work-rail-action" data-node-link="${id}" title="Collega ${esc(name)}" aria-label="Collega ${esc(name)}" aria-expanded="${this.railLinkSource === `node:${id}`}">${icon('connect')}</button>${tones.has(id) ? ui`<button class="work-rail-action" data-group="${id}" title="Affianca i nodi collegati" aria-label="Affianca i nodi collegati a ${esc(name)}">${icon('grid')}</button>` : ''}` : ''}${id !== null ? ui`<button class="work-remove" data-remove="${id}" title="${sessions.length ? tr('Chiudi il nodo e termina le sue sessioni') : tr('Rimuovi il nodo dalla vista Operativa')}" aria-label="Chiudi ${esc(name)}">×</button>` : ''}</div>${(collapsed ? [] : shown).map(t => ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${toneData(t.info)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}" title="${esc(this.railSessionTitle(t.info, endpoints.has(t.info.id)))}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}${flag(t.info)}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button></div>`).join('')}</section>`;
-    }).join('');
-    const html = groups || tr('<div class="work-list-empty">Nessun nodo trovato.</div>');
-    if (this.listEl.dataset.signature !== html) {
-      const focused = this.listEl.contains(document.activeElement) && document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      const actionKey = ['addAgent', 'nodeLink', 'sessionLink'].find(key => focused?.dataset[key]);
-      const focusKey = actionKey ? `[${actionKey.replace(/[A-Z]/g, c => '-' + c.toLowerCase()).replace(/^/, 'data-')}="${focused!.dataset[actionKey]}"]` : focused?.dataset.nodeGrip ? `[data-node-grip="${focused.dataset.nodeGrip}"]` : focused?.dataset.sessionGrip ? `[data-session-grip="${focused.dataset.sessionGrip}"]` : focused?.dataset.fold ? `[data-fold="${focused.dataset.fold}"]` : focused?.dataset.node ? `[data-node="${focused.dataset.node}"]` : focused?.dataset.session ? `[data-session="${focused.dataset.session}"]` : null;
-      // The highlighted session may leave the list (closed, filtered out): the highlight stays at the same place.
-      const focusedAt = focused?.dataset.session ? [...this.listEl.querySelectorAll('button[data-session]')].indexOf(focused) : -1;
+      if ((!matchesNode || filteringState) && !shown.length) continue;
+      if (clusterStart) groups.push({ key: `cluster:${id}`, html: ui`<div class="work-cluster"${toneAttr(id)}>⇄ Collegati · ${clusterSize} nodi</div>` });
+      const rows: WorkListItem[] = [{ key: 'header', html: ui`<div class="work-node-row">${id !== null ? ui`<button class="work-row-grip" data-node-grip="${id}" aria-label="Sposta ${esc(name)}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button>` : ''}${id !== null ? ui`<button class="work-fold" data-fold="${id}" aria-expanded="${!collapsed}" title="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}" aria-label="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}">${collapsed ? '›' : '⌄'}</button>` : ''}<button class="work-node ${this.selectedNode === id ? 'selected' : ''}" data-node="${id ?? ''}" aria-current="${this.selectedNode === id ? 'true' : 'false'}" title="${esc(path)}"><span class="work-node-icon" aria-hidden="true">${icon('folder')}</span><span><strong>${esc(name)}</strong>${id !== null && tones.has(id) ? ui` <span class="work-link-mark" title="Nodo con collegamenti" aria-hidden="true">⇄</span>` : ''}</span><span class="work-number">${sessions.length}</span></button>${id === null ? ui`<button class="work-rail-action" data-add-shell="" title="Nuovo terminale libero" aria-label="Nuovo terminale libero">${icon('terminal')}</button>` : ''}${id !== null ? ui`<button class="work-rail-action" data-add-agent="${id}" title="Aggiungi agente a ${esc(name)}" aria-label="Aggiungi agente a ${esc(name)}">${icon('plus')}</button><button class="work-rail-action" data-add-shell="${id}" title="Terminale in ${esc(name)}" aria-label="Terminale in ${esc(name)}">${icon('terminal')}</button><button class="work-rail-action" data-node-link="${id}" title="Collega ${esc(name)}" aria-label="Collega ${esc(name)}" aria-expanded="${this.railLinkSource === `node:${id}`}">${icon('connect')}</button>${tones.has(id) ? ui`<button class="work-rail-action" data-group="${id}" title="Affianca i nodi collegati" aria-label="Affianca i nodi collegati a ${esc(name)}">${icon('grid')}</button>` : ''}` : ''}${id !== null ? ui`<button class="work-remove" data-remove="${id}" title="${sessions.length ? tr('Chiudi il nodo e termina le sue sessioni') : tr('Rimuovi il nodo dalla vista Operativa')}" aria-label="Chiudi ${esc(name)}">×</button>` : ''}</div>` }];
+      if (!collapsed) for (const t of shown) {
+        rows.push({ key: `session:${t.info.id}`, html: ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button></div>` });
+      }
+      groups.push({ key: `node:${id}`, html: `<section class="work-group ${this.selectedNode === id ? 'current-node' : ''}"${toneAttr(id)} ${id !== null ? `data-drag="${id}"` : ''}></section>`, children: rows });
+    }
+    if (!groups.length) groups.push({ key: 'empty', html: tr('<div class="work-list-empty">Nessun nodo trovato.</div>') });
+    const focused = this.listEl.contains(document.activeElement) && document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const actionKey = ['addAgent', 'nodeLink', 'sessionLink'].find(key => focused?.dataset[key]);
+    const focusKey = actionKey ? `[${actionKey.replace(/[A-Z]/g, c => '-' + c.toLowerCase()).replace(/^/, 'data-')}="${focused!.dataset[actionKey]}"]` : focused?.dataset.nodeGrip ? `[data-node-grip="${focused.dataset.nodeGrip}"]` : focused?.dataset.sessionGrip ? `[data-session-grip="${focused.dataset.sessionGrip}"]` : focused?.dataset.fold ? `[data-fold="${focused.dataset.fold}"]` : focused?.dataset.node ? `[data-node="${focused.dataset.node}"]` : focused?.dataset.session ? `[data-session="${focused.dataset.session}"]` : null;
+    // The highlighted session may leave the list (closed, filtered out): the highlight stays at the same place.
+    const focusedAt = focused?.dataset.session ? [...this.listEl.querySelectorAll('button[data-session]')].indexOf(focused) : -1;
+    if (this.patchRail(groups)) {
       this.railDragCleanup.forEach(cleanup => cleanup()); this.railDragCleanup = [];
-      this.listEl.innerHTML = html; this.listEl.dataset.signature = html;
       this.listEl.querySelectorAll<HTMLElement>('[data-node]').forEach(el => el.onclick = () => {
         const id = el.dataset.node ? Number(el.dataset.node) : null;
         this.openNode(id);
@@ -952,6 +952,22 @@ export class Terminals {
       }
       this.markPreviewRow();
     }
+    for (const row of this.listEl.querySelectorAll<HTMLElement>('.work-session[data-sid]')) {
+      const info = this.tabs.get(row.dataset.sid!)!.info;
+      const tone = sessionTone(info, now);
+      if (tone !== (row.dataset.tone ?? null)) {
+        if (tone) row.dataset.tone = tone; else delete row.dataset.tone;
+      }
+      const button = row.querySelector<HTMLButtonElement>('button[data-session]')!;
+      const title = this.railSessionTitle(info, endpoints.has(info.id));
+      if (button.title !== title) button.title = title;
+      const flag = toneFlag(tone, info);
+      let badge = button.querySelector('em');
+      if (flag) {
+        if (!badge) { badge = document.createElement('em'); badge.className = 'tone-flag'; button.append(badge); }
+        if (badge.textContent !== flag) badge.textContent = flag;
+      } else badge?.remove();
+    }
     this.renderRailLinks();
     this.renderNodeMenu();
     document.getElementById('session-count')!.textContent = String(this.tabs.size);
@@ -959,6 +975,8 @@ export class Terminals {
     this.sel.ids.forEach((id, i) => { const tab = this.tabs.get(id); if (tab) this.updateTileHead(tab, i); });
     for (const tab of this.tabs.values()) this.updateConnection(tab);
   }
+
+  private patchRail(groups: WorkListItem[]): boolean { return reconcileWorkList(this.listEl, groups); }
 
   private saveCollapsed(): void {
     try { localStorage.setItem('vb:collapsed-nodes', JSON.stringify([...this.collapsedNodes])); } catch { /* unavailable */ }
@@ -1153,7 +1171,11 @@ export class Terminals {
     // Sessions of one node can be reordered among themselves too (never across nodes).
     for (const group of this.listEl.querySelectorAll<HTMLElement>('.work-group')) {
       const items = [...group.querySelectorAll<HTMLElement>('.work-session[data-sid]')];
-      if (items.length < 2) continue;
+      if (items.length < 2) {
+        const grip = items[0]?.querySelector<HTMLElement>('[data-session-grip]');
+        if (grip) grip.onkeydown = null; // A retained row may have had a neighbour before filtering.
+        continue;
+      }
       const move = (id: string, before: string | null) => {
         const nodeId = group.dataset.drag ? Number(group.dataset.drag) : null;
         const infos = [...this.tabs.values()].filter(t => (t.info.nodeId ?? null) === nodeId).map(t => t.info.id);
