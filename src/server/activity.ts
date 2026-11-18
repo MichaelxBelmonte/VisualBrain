@@ -19,6 +19,7 @@ export interface Activity {
   draft?: boolean;           // the person typed something not sent yet: the server must not paste into it
   navigation?: 'history' | 'menu' | 'return'; // a recalled entry or another view may own Enter
   escapeArmed?: boolean;     // a second Esc can open the transcript/rewind view
+  slashCommand?: boolean;    // Enter may open a selector before its first repaint
   cliBusy?: boolean;         // last native CLI turn signal, independent of the board's reported state
 }
 
@@ -204,12 +205,12 @@ function navigate(a: Activity, info: TerminalInfo, tail: string): boolean {
   return true;
 }
 
-/** Returns true for a navigation-only suffix, so a backend can correct a pre-fix PTY host. */
+/** Returns true when a pre-fix host needs to preserve the navigation guard across this input. */
 export function noteInput(a: Activity, info: TerminalInfo, data: string, now = Date.now()): boolean {
   const keys = data.replace(NOT_KEYS, '');
   if (!keys) return false;
   a.quietUntil = Math.max(a.quietUntil, now + QUIET_AFTER_KEY_MS);
-  const typed = keys.replace(/\x1b\[200~[\s\S]*?\x1b\[201~/g, 'x');
+  const typed = keys.replace(/\x1b\[200~([\s\S]*?)\x1b\[201~/g, (_, paste: string) => paste.startsWith('/') ? '/x' : 'x');
   if (!info.attention && a.pending) {
     const prompt = attentionIn(stripAnsi(a.pending.slice(composerEnd(a.pending, info.agent))));
     if (prompt) setAttention(a, info, prompt, now);
@@ -221,18 +222,25 @@ export function noteInput(a: Activity, info: TerminalInfo, data: string, now = D
   const tail = typed.slice(end + 1);
   returnFrames.delete(a);
   if (end >= 0) {
+    const lastLine = typed.slice(0, end).split(/[\r\x03]/).at(-1)!;
+    const command = a.slashCommand || ((info.agent === 'codex' || info.agent === 'claude') && !a.draft && lastLine.startsWith('/'));
     a.draft = false; a.escapeArmed = false;
+    delete a.slashCommand;
     // Enter in a menu can restore an old prompt. A confirmed empty composer or explicit Ctrl-C releases it.
-    if (typed[end] === '\r' && (a.navigation === 'menu' || a.navigation === 'return')) a.navigation = 'return';
+    if (typed[end] === '\r' && (command || a.navigation === 'menu' || a.navigation === 'return')) a.navigation = 'return';
     else delete a.navigation;
     if (info.attention) setAttention(a, info, null, now);
   }
   const navigation = !!tail && navigate(a, info, tail);
-  if (tail && !navigation) { a.draft = true; delete a.navigation; }
+  if (tail && !navigation) {
+    if (!a.draft) a.slashCommand = (info.agent === 'codex' || info.agent === 'claude') && tail.startsWith('/');
+    a.draft = true;
+    delete a.navigation;
+  }
   // Arrows move through the choices. Enter, Esc or Ctrl-C answer any prompt; a choice key (1-9, y, n, a) answers a
   // permission dialog only, since in a free answer box it is just the first letter of the reply.
   if (info.attention && (typed === '\x1b' || (info.attention === 'permission' && /^[1-9ynaYNA]$/.test(typed)))) setAttention(a, info, null, now);
-  return navigation;
+  return navigation || !!a.navigation;
 }
 
 export function noteResize(a: Activity, now = Date.now()): void {

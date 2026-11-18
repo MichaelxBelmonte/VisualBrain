@@ -141,6 +141,10 @@ console.log('PASS lastInputAt on every key from the person; drafts tracked until
   assert.equal(confirmComposerReturn(a,info,empty),false,'history navigation never releases a real draft');
   assert.ok(noticeInputBlocked(a,info));
   const other = fresh();
+  noteInput(other.a,other.info,'/model',800);
+  noteInput(other.a,other.info,'\r',850);
+  assert.ok(noticeInputBlocked(other.a,other.info),'the command owns Enter even before its selector is painted');
+  feed(other.a,other.info,[CLAUDE_QUESTION],870);
   noteInput(other.a,other.info,'\x1b',900);
   setAttention(other.a,other.info,'input',920);
   assert.ok(confirmComposerReturn(other.a,other.info,empty),'notify a waiting reader when the selector was reported after Esc');
