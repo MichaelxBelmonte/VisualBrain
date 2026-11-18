@@ -19,6 +19,9 @@ import { fmtBytes } from './panel.ts';
 import type { AgentName, AgentRole, NodeDetail, SwarmProposal, TeamLink, TerminalInfo } from '../shared/types.ts';
 import { mountWorkBoard, reconcileWorkList, type WorkListItem, type BoardUpdate } from './work-board.ts';
 
+/** How long keys typed before the terminal connection opens are still worth sending. */
+const EARLY_KEYS_MS = 5000;
+
 interface Tab {
   info: TerminalInfo;
   pane?: HTMLElement;
@@ -27,8 +30,9 @@ interface Tab {
   ws?: WebSocket;
   observer?: ResizeObserver;
   connected?: boolean;
-  /** Keys typed while the session is still connecting: sent as soon as the connection opens. */
+  /** Keys typed while the session is still connecting: sent once when the connection opens, unless they waited too long. */
   early?: string;
+  earlyAt?: number;
 }
 /** Contract of src/ui/work-channel.ts (root): a read-only board of the messages exchanged between linked sessions. */
 interface WorkChannelLike {
@@ -1097,7 +1101,7 @@ export class Terminals {
     t.term.attachCustomKeyEventHandler(e => !(this.tiled && tileKeyAction(e)));
     t.term.onData(data => {
       if (t.ws?.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'input', data }));
-      else if (t.ws?.readyState === WebSocket.CONNECTING) t.early = ((t.early ?? '') + data).slice(0, 4096);
+      else if (t.ws?.readyState === WebSocket.CONNECTING) { if (!t.early) t.earlyAt = Date.now(); t.early = ((t.early ?? '') + data).slice(0, 4096); }
     });
     t.term.onResize(({ cols, rows }) => { if (t.ws?.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'resize', cols, rows })); });
     t.observer = new ResizeObserver(() => { if (!pane.classList.contains('hidden') && this.isOpen()) this.fitTab(t); }); t.observer.observe(surface);
@@ -1133,7 +1137,8 @@ export class Terminals {
       t.connected = true; this.updateCard(t); this.renderList(); this.fitTab(t);
       // fit may preserve the dimensions; always send them on a new connection.
       ws.send(JSON.stringify({ type: 'resize', cols: t.term!.cols, rows: t.term!.rows }));
-      if (t.early) ws.send(JSON.stringify({ type: 'input', data: t.early }));
+      // Old keys never land by surprise: a connection that took longer than EARLY_KEYS_MS drops them.
+      if (t.early && Date.now() - (t.earlyAt ?? 0) < EARLY_KEYS_MS) ws.send(JSON.stringify({ type: 'input', data: t.early }));
       t.early = '';
     };
     ws.onmessage = e => { if (t.ws === ws) t.term?.write(e.data); };
