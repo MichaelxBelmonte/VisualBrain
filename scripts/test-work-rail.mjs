@@ -101,6 +101,7 @@ try {
     assert.deepEqual([...states.matchAll(/<button type="button" role="radio" data-state="(\w+)" aria-label="([^"]+)" title="([^"]+)"><\/button>/g)].map(m => m.slice(1)),
       [['all', 'Tutti', 'Tutti'], ['active', 'In corso', 'In corso: agenti al lavoro'], ['needs', 'Serve te', 'Serve te: permessi, domande e bloccati'], ['ended', 'Terminati', 'Terminati: processi chiusi']]);
     assert.match(css, /\.rail-states button \{[^}]*min-width: 28px; height: 26px;/, 'a comfortable target round a small dot');
+    assert.match(css, /\.rail-states \{ display: flex; gap: 2px; padding: 0 8px 6px; flex-wrap: nowrap;/, 'the four dots stay on one row');
     assert.match(css, /\.rail-states button\[aria-checked="true"\]::before \{ border-color: var\(--fg\); \}/, 'the chosen filter has a ring round its dot');
     assert.match(css, /\.rail-states button\[data-state="ended"\]::before \{ background: radial-gradient/, 'the ended filter is a hollow dot, not only another colour');
     assert.match(css, /\.rail-states button:focus-visible \{ outline: 2px solid var\(--fg\); outline-offset: 1px; \}/);

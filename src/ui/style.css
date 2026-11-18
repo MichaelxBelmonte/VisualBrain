@@ -1398,7 +1398,7 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .rail-search input::-webkit-search-cancel-button { display: none; }
 /* The four state filters are dots: neutral for all, the colours of the session states for the others, a hollow one for
    the ended. The chosen one has a ring round the dot and a plate behind; names are in the tooltip and for the reader. */
-.rail-states { display: flex; gap: 2px; padding: 0 10px 6px; flex-wrap: wrap; }
+.rail-states { display: flex; gap: 2px; padding: 0 8px 6px; flex-wrap: nowrap; min-width: 0; } /* always one row, down to the narrowest rail */
 .rail-states button { --dot: var(--g5); display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 28px; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; background: none; font: inherit; cursor: pointer; }
 .rail-states button::before { content: ''; box-sizing: border-box; flex: none; width: 15px; height: 15px; padding: 2px; border: 1.5px solid transparent; border-radius: 50%; background: var(--dot) content-box; }
 .rail-states button[data-state="active"] { --dot: var(--role-active); }
