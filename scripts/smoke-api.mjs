@@ -45,7 +45,7 @@ try {
   const launchLog = join(temp, 'fake-agent-launches.jsonl');
   const inputLog = join(temp, 'fake-agent-input.jsonl');
   const fakeAgent = join(isolatedApp, 'fake-agent.cjs');
-  await writeFile(fakeAgent, `#!${process.execPath}\nconst fs=require('node:fs'); fs.appendFileSync(${JSON.stringify(launchLog)},JSON.stringify(process.argv.slice(2))+'\\n'); console.log('FAKE_AGENT_READY'); process.stdin.on('data',b=>fs.appendFileSync(${JSON.stringify(inputLog)},JSON.stringify(b.toString())+'\\n'));\n`, { mode: 0o755 });
+  await writeFile(fakeAgent, `#!${process.execPath}\nconst fs=require('node:fs'); fs.appendFileSync(${JSON.stringify(launchLog)},JSON.stringify({id:process.env.VB_SESSION_ID,token:process.env.VB_TEAM_TOKEN,args:process.argv.slice(2)})+'\\n', {mode:0o600}); console.log('FAKE_AGENT_READY'); process.stdin.on('data',b=>fs.appendFileSync(${JSON.stringify(inputLog)},JSON.stringify(b.toString())+'\\n'));\n`, { mode: 0o755 });
   await writeFile(join(isolatedApp, 'brain.config.json'), JSON.stringify({ language: 'it', agents: { claude: fakeAgent, codex: fakeAgent, hermes: fakeAgent } }));
   await writeFile(join(temp, '.zshrc'), '');
   const dbPath = join(temp, 't.db');
@@ -121,10 +121,11 @@ try {
   const launchDeadline = Date.now() + 5000;
   while ((await launches()).length < 4 && Date.now() < launchDeadline) await new Promise(ok => setTimeout(ok, 25));
   const records = await launches(); assert.equal(records.length, 4);
-  const record = id => records.find(args => args.at(-1).includes(`sessione ${id}.`));
-  const token = id => record(id).at(-1).match(/Bearer ([a-z0-9-]+)/)[1];
-  assert.equal(record(worker.id)[record(worker.id).indexOf('--model') + 1], 'fixture-model');
-  assert.ok(!record(worker.id).at(-1).includes('Relazioni nel grafo'));
+  const record = id => records.find(row => row.id === id);
+  const token = id => record(id).token;
+  const workerArgs = record(worker.id).args;
+  assert.equal(workerArgs[workerArgs.indexOf('--model') + 1], 'fixture-model');
+  assert.ok(!workerArgs.at(-1).includes('Relazioni nel grafo'));
   assert.ok(!(await request('/api/terminals')).some(t => 'teamToken' in t));
   pass('modello, effort e ruoli su tre CLI, contesto mirato, token non esposto nell’elenco');
   const teamPath = `/api/work/${a.id}`;
@@ -149,10 +150,26 @@ try {
   assert.equal((await actorGet(a.id, worker.id)).messages.length, 0);
   const inputDeadline = Date.now() + 3000;
   let input = '';
-  while (Date.now() < inputDeadline) { try { input = await readFile(inputLog, 'utf8'); } catch {} if (input.includes('Visual Brain:')) break; await new Promise(ok => setTimeout(ok, 25)); }
-  assert.ok(input.includes('Visual Brain:'));
-  assert.equal((await request('/api/terminals')).find(s => s.id === worker.id).workState, 'working');
+  while (Date.now() < inputDeadline) { try { input = await readFile(inputLog, 'utf8'); } catch {} if (input.includes('Visual Brain ·')) break; await new Promise(ok => setTimeout(ok, 25)); }
+  assert.ok(input.includes('Visual Brain ·'));
+  assert.equal((await request('/api/terminals')).find(s => s.id === worker.id).workState, 'idle');
   pass('messaggi mirati, lettura incrementale e notifica PTY solo alla sessione in attesa');
+  await post(`${teamPath}/state`, { from: worker.id, state: 'idle' }, 200, token(worker.id));
+  const batchTask = await post(`${teamPath}/tasks`, { from: orch.id, title: 'Receipt fixture', assignedTo: worker.id }, 201, token(orch.id));
+  const headers = { authorization: `Bearer ${token(worker.id)}` };
+  const pageUrl = `${teamPath}?session=${worker.id}&consumer=fixture`;
+  const page = await request(pageUrl, { headers });
+  assert.deepEqual((await request(pageUrl, { headers })).messages, page.messages);
+  assert.ok(page.messages.some(m => m.text.includes(batchTask.id)));
+  await post(`${teamPath}/ack`, { from: worker.id, consumer: 'fixture', through: page.delivery.next }, 200, token(worker.id));
+  const acknowledged = await request(pageUrl, { headers });
+  const self = acknowledged.sessions.find(s => s.id === worker.id);
+  assert.deepEqual([self.workState,self.noticeConfirmed,acknowledged.messages.length], ['idle',true,0]);
+  assert.equal(acknowledged.tasks.find(t => t.id === batchTask.id).status, 'pending');
+  const claimBody = { from: worker.id, status: 'working' };
+  const firstClaim = await patch(`${teamPath}/tasks/${batchTask.id}`, claimBody, 200, token(worker.id));
+  assert.deepEqual(await patch(`${teamPath}/tasks/${batchTask.id}`, claimBody, 200, token(worker.id)), firstClaim);
+  pass('PTY, conferma del client e presa in carico esplicita lungo il percorso HTTP');
   await post(`${teamPath}/messages`, { from: orch.id, to: other.id, text: 'Not linked yet' }, 403, token(orch.id));
   const link = await post('/api/team-links', { srcNodeId: a.id, dstNodeId: b.id, srcSessionId: orch.id, dstSessionId: other.id });
   const duplicateLink = await post('/api/team-links', { srcNodeId: b.id, dstNodeId: a.id, srcSessionId: other.id, dstSessionId: orch.id });

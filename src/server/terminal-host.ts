@@ -62,7 +62,7 @@ const server = createServer(socket => {
       saveRecord();
       owner = socket; authenticated = true; clearTimeout(authTimer); clearTimeout(idleTimer); idleTimer = undefined;
       for (const info of terms.list()) sendFrame(socket, { event: 'term', term: snapshot(terms.get(info.id)!) });
-      sendFrame(socket, { event: 'ready', protocol: TERMINAL_PROTOCOL, pid: process.pid });
+      sendFrame(socket, { event: 'ready', protocol: TERMINAL_PROTOCOL, pid: process.pid, noticeOnly: true });
       return;
     }
     if (owner !== socket) { socket.destroy(); return; }
@@ -85,10 +85,13 @@ const server = createServer(socket => {
         case 'deliver':
           if (t?.info.alive) {
             if (!Number.isSafeInteger(m.cursor) || typeof m.notice !== 'string' || !Number.isFinite(m.now)) throw new Error('Invalid terminal delivery');
-            t.injectedMessage = Math.max(t.injectedMessage, m.cursor);
-            t.info.workState = 'working'; t.info.stateSource = 'server'; t.info.stateAt = m.now; delete t.info.idleSince;
             noteInjected(t.activity, m.now);
             t.proc.write(`\x1b[200~${m.notice}\x1b[201~`);
+            t.injectedMessage = Math.max(t.injectedMessage, m.cursor);
+            if (m.noticeOnly) { delete t.info.noticeConfirmed; t.info.noticeSentAt = m.now; }
+            else { // Older attached servers mirror this legacy transition locally.
+              t.info.workState = 'working'; t.info.stateSource = 'server'; t.info.stateAt = m.now; delete t.info.idleSince;
+            }
             setTimeout(() => { if (t.info.alive) try { t.proc.write('\r'); } catch { /* terminal exited during the paste */ } }, 150);
           }
           break;

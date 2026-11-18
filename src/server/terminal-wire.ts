@@ -13,7 +13,7 @@ export interface TermSnapshot {
   activity: Omit<Activity, 'timer'>;
 }
 export interface TermPatch { section: 'info' | 'activity' | 'term'; key: string; value?: unknown }
-const infoFields = new Set(['name', 'parentId', 'workState', 'idleSince', 'stateSource', 'stateAt', 'attention', 'lastOutputAt', 'lastInputAt']);
+const infoFields = new Set(['name', 'parentId', 'workState', 'idleSince', 'stateSource', 'stateAt', 'noticeSentAt', 'noticeConfirmed', 'attention', 'lastOutputAt', 'lastInputAt']);
 const activityFields = new Set(['quietUntil', 'attentionAt', 'draft']);
 
 export function snapshot(t: Term): TermSnapshot {
@@ -56,10 +56,14 @@ export function observe<T extends object>(target: T, changed: (key: string, valu
 export const metadataFields = { info: infoFields, activity: activityFields, term: new Set(['seenMessage', 'injectedMessage']) };
 
 export function sendFrame(socket: Socket, message: unknown): void {
+  sendFrames(socket, [message]);
+}
+
+export function sendFrames(socket: Socket, messages: unknown[]): void {
   if (socket.destroyed) throw new Error('Terminal service disconnected');
   // A stuck UI/server must not stop PTY reads or grow the host without a bound.
   if (socket.writableLength > 8 * MAX_FRAME) { socket.destroy(); throw new Error('Terminal service client too slow'); }
-  socket.write(JSON.stringify(message) + '\n');
+  socket.write(messages.map(message => JSON.stringify(message) + '\n').join(''));
 }
 
 export function readFrames(socket: Socket, receive: (message: any) => void): void {

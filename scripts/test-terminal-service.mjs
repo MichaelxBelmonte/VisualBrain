@@ -105,11 +105,15 @@ try {
   assert.equal(again.info.alive, true); assert.equal(again.info.resumeId, 'conversation-1');
   service.kill('resume-fixture'); await service.flush();
   assert.equal(service.get(term.info.id).info.alive, true);
-  service.deliver(term.info.id, 'delivery-across-detach', 44, Date.now());
+  const noticeAt = Date.now();
+  service.deliver(term.info.id, 'delivery-across-detach', 44, noticeAt);
   await service.detach(); service = null;
   await sleep(250); // Enter is sent by the host even though the API-side timer/process is gone.
   service = await TerminalService.open(profile, port, () => {});
   assert.equal(service.get(term.info.id).injectedMessage, 44);
+  assert.equal(service.get(term.info.id).info.noticeSentAt, noticeAt);
+  assert.equal(service.get(term.info.id).info.workState, 'idle');
+  assert.equal(service.get(term.info.id).info.stateAt, 1234);
   assert.ok(service.get(term.info.id).buffer.join('').includes('ANSWER:'));
   assert.match(service.get(term.info.id).buffer.join(''), /ANSWER:[^\n]*delivery-across-detach/);
   await service.detach(); service = null;

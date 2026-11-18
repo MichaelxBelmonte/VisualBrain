@@ -38,10 +38,13 @@ export function youDisclosure(total: number, columns: number, expanded: boolean)
 }
 
 /** One line under a task title: who has it and what happens next, in plain words. Pure, so the wording is testable. */
-export function taskStatus(t: Pick<TeamTask, 'status' | 'assignedTo'>, assignee?: { code?: string; name?: string; alive: boolean }): { text: string; tone: string } {
-  const code = assignee?.code || assignee?.name || '';
+export function taskStatus(t: Pick<TeamTask, 'status' | 'assignedTo' | 'blockedOwnerCode'>, assignee?: { code?: string; name?: string; alive: boolean }): { text: string; tone: string } {
+  const code = assignee?.code || t.blockedOwnerCode || assignee?.name || '';
   if (t.status === 'done') return { text: code ? ui`Completato · ${code}` : tr('Completato'), tone: 'done' };
-  if (t.status === 'blocked') return { text: code ? ui`Bloccato · ${code} aspetta una tua decisione` : tr('Bloccato · serve una tua decisione'), tone: 'blocked' };
+  if (t.status === 'blocked') {
+    if (t.assignedTo && !assignee?.alive) return { text: code ? ui`Bloccato · ultimo responsabile ${code}` : tr('Bloccato · sessione terminata'), tone: 'blocked' };
+    return { text: code ? ui`Bloccato · ${code} aspetta una tua decisione` : tr('Bloccato · serve una tua decisione'), tone: 'blocked' };
+  }
   // Assigned to a session that has ended or is gone: the task will not move by itself.
   const gone = !!t.assignedTo && !assignee?.alive;
   if (t.status === 'working') return gone ? { text: code ? ui`${code} si è fermato · riassegnalo` : tr('L’agente si è fermato · riassegnalo'), tone: 'stale' } : { text: code ? ui`${code} ci sta lavorando` : tr('In corso'), tone: 'active' };

@@ -23,6 +23,7 @@ assert.deepEqual(taskStatus({ status: 'working', assignedTo: 'a' }, op(false)), 
 assert.deepEqual(taskStatus({ status: 'working', assignedTo: 'gone' }), { text: 'L’agente si è fermato · riassegnalo', tone: 'stale' });
 assert.deepEqual(taskStatus({ status: 'pending', assignedTo: 'gone' }), { text: 'Assegnato a una sessione terminata · riassegnalo', tone: 'stale' });
 assert.deepEqual(taskStatus({ status: 'blocked', assignedTo: 'a' }, op()), { text: 'Bloccato · OP3 aspetta una tua decisione', tone: 'blocked' });
+assert.equal(taskStatus({ status: 'blocked', assignedTo: 'a', blockedOwnerCode: 'OP3' }).text, 'Bloccato · ultimo responsabile OP3');
 assert.deepEqual(taskStatus({ status: 'done', assignedTo: 'a' }, op(false)), { text: 'Completato · OP3', tone: 'done' });
 console.log('PASS task status line: unassigned, waiting, working, stopped, blocked, done');
 

@@ -172,7 +172,8 @@ try {
   // No-double-injection guard: an agent that cannot read the board (403) and ends its turn is not re-prompted forever.
   teams.message(7, 'orc', 'op1', 'Incarico: verifica la release');
   assert.equal(wakeSession(ctx, 'op1'), true);
-  assert.deepEqual([op1.info.workState, op1.info.stateSource], ['working', 'server']);
+  assert.deepEqual([op1.info.workState, op1.info.stateSource, op1.info.idleSince], ['idle', undefined, 0]);
+  assert.ok(op1.info.noticeSentAt > 0);
   assert.ok(op1.activity.quietUntil > 0, 'the pasted delivery is marked as server input');
   setWorkState(op1.info, 'idle', 'hook'); // Stop hook, board never read
   assert.equal(wakeSession(ctx, 'op1'), false, 'same pending messages: not pasted again');
@@ -299,7 +300,7 @@ console.log('PASS Claude hooks only for team sessions, with port, session and to
   // Real PTY (a shell, not an agent): environment, typed input, initial state and output scanning end to end.
   const terms = new Terminals(() => {});
   const t = terms.spawn({ agent: 'claude', cwd: tmpdir(), file: '/bin/sh', args: ['-c', `printf "$VB_SESSION_ID\\n"; read line; printf '\\033[1m✽\\033[22m Manifesting… (2s · ↓ 1.2k tokens)\\n'; sleep 1`], title: 't', role: 'operator', task: 'fai', env: { VB_SESSION_ID: 'pty-env-ok' } });
-  assert.deepEqual([t.info.workState, t.info.stateSource, typeof t.info.stateAt], ['working', 'server', 'number']);
+  assert.deepEqual([t.info.workState, t.info.stateSource, typeof t.info.stateAt], ['idle', 'server', 'number'], 'the initial assignment awaits a claim');
   const output = () => t.buffer.join('');
   const until = async (ok, what) => { for (let i = 0; i < 100 && !ok(); i++) await new Promise(r => setTimeout(r, 30)); assert.ok(ok(), what); };
   await until(() => output().includes('pty-env-ok'), 'env vars reach the PTY');
