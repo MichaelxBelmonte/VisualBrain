@@ -20,6 +20,10 @@ import { harnessCatalog, launchHarness } from './harnesses.ts';
 import { startHarnessInstall } from './harness-installer.ts';
 import { BRAIN_TEAM, DEFAULT_TEAM, Teams, TeamError, boundedText, classify, isTeamId } from './team.ts';
 import { modelCatalog } from './models.ts';
+import { answerModelChange, cancelModelChange, forgetModelChange, modelFields, requestModelChange, screenSize, switchChoices, switchLimit } from './model-switch.ts';
+import { forgetSessionModel } from './session-model.ts';
+import { sessionPreview } from '../shared/session-preview.ts';
+import { Screen } from './screen.ts';
 import { resumeSession, startSession, startSquad } from './sessions.ts';
 import { removeWorktree } from './worktrees.ts';
 import { gitCommit, gitFetch, gitOverview, gitTop, githubState } from './git.ts';
@@ -1014,15 +1018,36 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       }
       throw new HttpError(405, 'metodo non consentito');
     }
-    if (path === '/api/terminals' && method === 'GET') return send(res, 200, ctx.teams.withCodes(ctx.terms.list()));
+    // Conversations already bound to a session: a Codex session still looking for its own never takes one of them.
+    const claimed = () => new Set(ctx.terms.list().map(s => s.resumeId).filter((r): r is string => Boolean(r)));
+    if (path === '/api/terminals' && method === 'GET') return send(res, 200, ctx.teams.withCodes(ctx.terms.list()).map(info => ({ ...info, ...modelFields(info, claimed) })));
+    if (path === '/api/model-switch' && method === 'GET') return send(res, 200, { claude: switchChoices('claude'), codex: switchChoices('codex'), limits: { hermes: switchLimit('hermes'), agy: switchLimit('agy') } });
+    m = /^\/api\/terminals\/([a-z0-9-]+)\/model\/confirm$/.exec(path);
+    if (m && method === 'POST') {
+      if (req.headers.authorization) throw new HttpError(403, 'La conferma spetta alla persona, dall’interfaccia');
+      return send(res, 200, { ok: answerModelChange(m[1], true) });
+    }
+    m = /^\/api\/terminals\/([a-z0-9-]+)\/model$/.exec(path);
+    if (m && (method === 'POST' || method === 'DELETE')) {
+      if (req.headers.authorization) throw new HttpError(403, 'Il modello di una sessione si cambia dall’interfaccia');
+      if (method === 'DELETE') return send(res, 200, { ok: cancelModelChange(m[1]) });
+      const b = await readJson(req);
+      if (!ctx.terms.get(m[1])) throw new HttpError(404, 'Sessione non trovata');
+      try { return send(res, 202, { change: requestModelChange(ctx.terms, m[1], typeof b.model === 'string' ? b.model : '', claimed) }); }
+      catch (error) { throw new HttpError(409, error instanceof Error ? error.message : String(error)); }
+    }
     m = /^\/api\/terminals\/([a-z0-9-]+)\/preview$/.exec(path);
     if (m && method === 'GET') {
       if (req.headers.authorization || req.headers['sec-fetch-site'] !== 'same-origin') throw new HttpError(403, 'Anteprima disponibile dalla vista Operativa');
       const term = ctx.terms.get(m[1]);
       if (!term) throw new HttpError(404, 'Sessione non trovata');
-      // Read the retained output without attaching to or resizing an unseen PTY.
-      const lines = stripAnsi(term.buffer.join('')).trimEnd().split('\n').slice(-6);
-      return sendJson(res, 200, { text: lines.map(line => line.slice(-240)).join('\n') });
+      // Read the retained output without attaching to or resizing an unseen PTY: the screen as the pane last showed it,
+      // or the plain stream when no pane has shown this session since the server started.
+      const size = screenSize(m[1]);
+      let lines: string[];
+      if (size) { const screen = new Screen(size.cols, size.rows); for (const chunk of term.buffer) screen.write(chunk); lines = screen.lines(); }
+      else lines = stripAnsi(term.buffer.join('')).trimEnd().split('\n').slice(-60);
+      return sendJson(res, 200, sessionPreview(lines));
     }
     m = /^\/api\/terminals\/([a-z0-9-]+)\/resume$/.exec(path);
     if (m && method === 'POST') {
@@ -1046,6 +1071,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const cwd = ctx.terms.get(m[1])?.info.cwd;
       if (nodeId != null) ctx.teams.release(nodeId, m[1]);
       ctx.terms.kill(m[1]);
+      forgetModelChange(m[1]); forgetSessionModel(m[1]);
       // A closed operator's worktree goes away only when Git can remove it without losing anything; its branch stays.
       // A squad's own worktree stays while the squad exists: its other sessions work there.
       if (cwd && !(nodeId != null && ctx.teams.isTeamWorktree(nodeId, cwd))) void removeWorktree(ctx.cfg.dataDir, cwd);

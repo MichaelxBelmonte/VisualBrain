@@ -1,12 +1,11 @@
 import { t } from './i18n.ts';
+import type { SessionPreview } from '../shared/session-preview.ts';
 
 interface TerminalQuickItem {
   id: string;
   label: string;
   model?: string;
-  preview: () => string | Promise<string>;
-  canChangeModel: boolean;
-  nativeModel?: boolean;
+  preview: () => SessionPreview | Promise<SessionPreview>;
 }
 
 interface TerminalQuickMenuOptions {
@@ -14,14 +13,12 @@ interface TerminalQuickMenuOptions {
   items: readonly TerminalQuickItem[];
   selectedId?: string | null;
   onOpen: (id: string) => void;
-  onModel: (id: string) => void;
-  onNativeModel?: (id: string) => void;
 }
 
 let dismissCurrent: (() => void) | undefined;
 
 /** A non-modal terminal picker. Selecting a row previews it; activating it opens the terminal. */
-export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onModel, onNativeModel }: TerminalQuickMenuOptions): () => void {
+export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen }: TerminalQuickMenuOptions): () => void {
   dismissCurrent?.();
   const previousFocus = document.activeElement;
   const menu = document.createElement('section');
@@ -46,7 +43,7 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
     row.append(label);
     if (item.model) {
       const model = document.createElement('small');
-      model.textContent = t('Modello all’avvio') + ': ' + item.model;
+      model.textContent = item.model;
       row.append(model);
     }
     row.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') select(index); });
@@ -59,33 +56,15 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
   preview.tabIndex = -1;
   preview.setAttribute('role', 'region');
   preview.setAttribute('aria-label', t('Anteprima del terminale'));
-  const modelButton = document.createElement('button');
-  modelButton.type = 'button';
-  modelButton.className = 'btn terminal-quick-model';
-  modelButton.textContent = t('Nuova sessione con un altro modello');
-  const nativeButton = document.createElement('button');
-  nativeButton.type = 'button';
-  nativeButton.className = 'btn terminal-quick-native-model';
-  nativeButton.textContent = t('Copia /model e apri');
-  const actions = document.createElement('div');
-  actions.className = 'terminal-quick-actions';
-  actions.append(nativeButton, modelButton);
   let active = -1;
   let previewRequest = 0;
   async function showPreview(item: TerminalQuickItem) {
     const request = ++previewRequest;
-    let text = '';
-    try {
-      const output = item.preview();
-      if (typeof output === 'string') text = output;
-      else {
-        preview.textContent = t('Caricamento anteprima…');
-        text = await output;
-      }
-    } catch { /* An ended or disconnected terminal may have no preview. */ }
+    let shown: SessionPreview = { text: '' };
+    try { shown = await item.preview(); } catch { /* An ended or disconnected terminal may have no preview. */ }
     if (request !== previewRequest || signal.aborted) return;
-    preview.textContent = text || t('Nessuna anteprima disponibile');
-    preview.scrollTop = preview.scrollHeight;
+    preview.textContent = [shown.text, shown.error].filter(Boolean).join('\n') || t('Nessuna attività leggibile');
+    preview.classList.toggle('none', !shown.text && !shown.error);
   }
   function select(index: number) {
     if (active === index) return;
@@ -95,19 +74,8 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
     row.setAttribute('aria-selected', 'true');
     list.setAttribute('aria-activedescendant', row.id);
     void showPreview(item);
-    modelButton.hidden = !item.canChangeModel;
-    nativeButton.hidden = !(item.nativeModel && onNativeModel);
-    actions.hidden = nativeButton.hidden && modelButton.hidden;
   }
-  modelButton.addEventListener('click', () => {
-    const item = items[active];
-    if (item?.canChangeModel) { close(); onModel(item.id); }
-  });
-  nativeButton.addEventListener('click', () => {
-    const item = items[active];
-    if (item?.nativeModel && onNativeModel) { close(); onNativeModel(item.id); }
-  });
-  if (items.length) menu.append(list, preview, actions);
+  if (items.length) menu.append(list, preview);
   else menu.textContent = t('Nessun terminale disponibile');
   document.body.append(menu);
   const oldControls = anchor.getAttribute('aria-controls');
@@ -156,8 +124,7 @@ export function openTerminalQuickMenu({ anchor, items, selectedId, onOpen, onMod
       return;
     }
     if (e.key === 'Tab') {
-      const last = !modelButton.hidden ? modelButton : !nativeButton.hidden ? nativeButton : list;
-      if (items.length && (e.shiftKey ? e.target !== list : e.target !== last)) return;
+      if (items.length && e.target !== list) return;
       if (e.shiftKey) e.preventDefault();
       close();
       return;

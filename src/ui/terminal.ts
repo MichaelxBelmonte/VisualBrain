@@ -16,7 +16,8 @@ import { CODE_IN_TEXT, resumable, roleName, sessionTone, sessionWorking, toneFla
 import { DEFAULT_FONT_SIZE, dropText, fontZoomKey, isNewTerminalKey, isPlainTerminalKey, parseFileDrop, zoomFont } from './work-input.ts';
 import { api } from './api.ts';
 import { fmtBytes } from './panel.ts';
-import type { AgentName, AgentRole, NodeDetail, SwarmProposal, TeamLink, TerminalInfo } from '../shared/types.ts';
+import type { AgentName, AgentRole, ModelSwitchChoice, NodeDetail, SwarmProposal, TeamLink, TerminalInfo } from '../shared/types.ts';
+import { sessionPreview, type SessionPreview } from '../shared/session-preview.ts';
 import { mountWorkBoard, reconcileWorkList, type WorkListItem, type BoardUpdate } from './work-board.ts';
 
 /** How long keys typed before the terminal connection opens are still worth sending. */
@@ -122,9 +123,12 @@ export class Terminals {
   private pollSignature = '';
   private pollReasons = '';
 
-  private railPreview!: HTMLElement;
   private railPreviewId: string | null = null;
   private railPreviewRequest = 0;
+  private railPreviewData: { id: string; preview: SessionPreview } | null = null;
+  /** What each agent's own model selector offers (or why an agent has none), asked once. */
+  private modelChoices: { claude: ModelSwitchChoice[]; codex: ModelSwitchChoice[]; limits: Record<string, string | null> } | null = null;
+  private modelWatch: ReturnType<typeof setTimeout> | null = null;
   private control<T extends Element = HTMLElement>(selector: string): T | null { return this.root.querySelector<T>(selector) ?? document.querySelector<T>(selector); }
 
   constructor(root: HTMLElement, cb: Callbacks) {
@@ -177,30 +181,24 @@ export class Terminals {
     this.control('#work-brain')!.addEventListener('click', () => { if (this.selectedNode !== null) { this.show(false); this.cb.reveal(this.selectedNode); } });
     bindRailSearch(this.control<HTMLInputElement>('#work-filter')!);
     this.listEl.addEventListener('keydown', e => this.railKey(e));
-    const preview = this.railPreview = document.createElement('section');
-    preview.id = 'work-rail-preview'; preview.className = 'work-rail-preview'; preview.hidden = true;
-    preview.setAttribute('aria-label', tr('Anteprima del terminale'));
-    preview.innerHTML = ui`<div class="work-rail-preview-head"><strong></strong><small data-preview-launch-model></small></div><pre></pre><div class="work-rail-preview-actions"><button type="button" class="btn" data-preview-native>Copia /model e apri</button><button type="button" class="btn" data-preview-model>Nuova sessione con un altro modello</button></div><small data-preview-hint></small>`;
-    this.listEl.insertAdjacentElement('afterend', preview);
-    // The preview takes its room from the list: the highlighted row must not end up hidden under it.
-    new ResizeObserver(() => this.listEl.querySelector<HTMLElement>('.work-session.previewed')?.scrollIntoView({ block: 'nearest' })).observe(this.listEl);
-    // The preview follows the keyboard highlight and goes away with it; it never follows the pointer.
+    // The detail under a row follows the keyboard highlight and goes away with it; it never follows the pointer.
     this.listEl.addEventListener('focusin', e => this.showRailPreview((e.target as HTMLElement).closest<HTMLElement>('.work-session')?.dataset.sid ?? null));
-    const left = () => setTimeout(() => {
+    this.listEl.addEventListener('focusout', () => setTimeout(() => {
       const at = document.activeElement;
-      if (!(at instanceof HTMLElement) || !(at.closest('#work-list .work-session') || preview.contains(at))) this.showRailPreview(null);
-    }, 0);
-    this.listEl.addEventListener('focusout', left); preview.addEventListener('focusout', left);
-    const highlighted = () => this.listEl.querySelector<HTMLElement>(`button[data-session="${this.railPreviewId}"]`);
-    preview.addEventListener('keydown', e => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'Escape') return;
-      e.preventDefault(); e.stopPropagation(); highlighted()?.focus({ preventScroll: true });
+      if (!(at instanceof HTMLElement) || !at.closest('#work-list .work-session')) this.showRailPreview(null);
+    }, 0));
+    // The model of a session is chosen on its row; the answer to a question of the CLI is given there too.
+    this.listEl.addEventListener('change', e => {
+      const select = e.target instanceof HTMLSelectElement ? e.target : null;
+      if (select?.dataset.modelSelect) void this.switchModel(select.dataset.modelSelect, select.value);
     });
-    preview.addEventListener('click', e => {
-      const button = (e.target as HTMLElement).closest('button'), id = this.railPreviewId;
-      if (!button || !id) return;
-      if (button.hasAttribute('data-preview-native')) this.nativeModel(id); else this.changeModel(id);
+    this.listEl.addEventListener('click', e => {
+      const button = (e.target as HTMLElement).closest<HTMLElement>('[data-model-confirm], [data-model-cancel]');
+      if (!button) return;
+      e.stopPropagation();
+      void this.answerModel(button.dataset.modelConfirm ?? button.dataset.modelCancel!, button.dataset.modelConfirm !== undefined);
     });
+    void api.modelSwitch().then(choices => { this.modelChoices = choices; this.renderDetails(); }).catch(() => {});
     this.listEl.addEventListener('paste', e => {
       const t = this.railOpenRow(e.target), text = e.clipboardData?.getData('text');
       if (!t || !text) return;
@@ -266,7 +264,8 @@ export class Terminals {
         else tab.info = info;
       }
       for (const tab of this.tabs.values()) if (!list.some(info => info.id === tab.info.id)) tab.info.alive = false;
-      if (this.railPreviewId) this.showRailPreview(this.railPreviewId); // the last lines of the highlighted session move on
+      if (this.railPreviewId) this.showRailPreview(this.railPreviewId); // the last words of the highlighted session move on
+      this.watchModels();
       this.sel = reconcileTiles(this.sel, new Set(this.tabs.keys()));
       const sessions = [...this.tabs.values()].map(tab => tab.info);
       const now = Date.now();
@@ -409,12 +408,25 @@ export class Terminals {
 
   /** ↑/↓ and Home/End move the keyboard highlight across the visible sessions of the rail without opening any; Enter opens
    *  the highlighted one and gives it the keyboard. A character typed on the row of the open session goes to its terminal,
-   *  so "click a session, then type" still works. → reaches the model actions in the preview of the highlighted session.
+   *  so "click a session, then type" still works. → reaches the model of the highlighted session, under its row.
    *  Alt+arrows keep reordering (see bindNodeDrag). */
   private railKey(e: KeyboardEvent): void {
     if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
     const from = e.target instanceof HTMLElement ? e.target : null;
-    if (!from || from.closest('input, textarea, select, #work-rail-links')) return;
+    if (!from) return;
+    if (from.closest('.work-model')) {
+      // ← or Esc go back from the model of a session to its row. On the selector no key changes the model by itself (a
+      // browser would step through the choices on arrows or letters): ↑, ↓ and Space open the list, where the choice is made.
+      if (!e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'Escape')) {
+        e.preventDefault(); e.stopPropagation();
+        from.closest('.work-session')?.querySelector<HTMLElement>('button[data-session]')?.focus({ preventScroll: true });
+      } else if (from instanceof HTMLSelectElement && (e.key.length === 1 || e.key.startsWith('Arrow') || ['Home', 'End', 'PageUp', 'PageDown'].includes(e.key))) {
+        e.preventDefault();
+        if (['ArrowDown', 'ArrowUp', ' '].includes(e.key)) try { from.showPicker(); } catch { /* no list to show here */ }
+      }
+      return;
+    }
+    if (from.closest('input, textarea, select, #work-rail-links')) return;
     if (!e.shiftKey && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
       const rows = [...this.listEl.querySelectorAll<HTMLElement>('button[data-session]')];
       if (!rows.length) return;
@@ -429,9 +441,9 @@ export class Terminals {
       return;
     }
     if (!e.shiftKey && e.key === 'ArrowRight' && from.closest('.work-session')) {
-      // The model actions of the highlighted session live in the preview under the list; ← or Esc come back.
-      const action = this.railPreview.hidden ? null : this.railPreview.querySelector<HTMLElement>('.work-rail-preview-actions:not([hidden]) button:not([hidden])');
-      if (action) { e.preventDefault(); action.focus({ preventScroll: true }); }
+      // The model of the highlighted session is under its row; ← or Esc come back.
+      const control = from.closest('.work-session')!.querySelector<HTMLElement>('.work-model :is(select, button):not([disabled])');
+      if (control) { e.preventDefault(); control.focus({ preventScroll: true }); }
       return;
     }
     const t = e.key.length === 1 ? this.railOpenRow(from) : null;
@@ -697,78 +709,120 @@ export class Terminals {
     if (this.root.classList.contains('rail-collapsed')) this.control<HTMLElement>('#work-toggle-rail')!.click();
     const items = [...this.tabs.values()].map(tab => this.quickItem(tab));
     this.dismissQuickMenu = openTerminalQuickMenu({ anchor, items, selectedId: this.active,
-      onOpen: id => this.activate(id), onNativeModel: id => this.nativeModel(id), onModel: id => this.changeModel(id) });
+      onOpen: id => this.activate(id) });
   }
 
-  /** What the quick menu and the rail preview say about a session, and which model actions it supports. */
+  /** What the quick menu says about a session: who it is, the model it is on, its last words. */
   private quickItem(tab: Tab) {
     return {
       id: tab.info.id,
       label: [tab.info.code ?? tab.info.id, tab.info.name || labels[tab.info.agent], this.nodeLabel(tab.info.nodeId ?? null)].join(' · '),
-      model: tab.info.model,
-      canChangeModel: tab.info.agent !== 'shell' && tab.info.nodeId != null && !!this.cb.agents()[tab.info.agent],
-      nativeModel: tab.info.alive && tab.info.agent !== 'shell',
+      model: tab.info.modelNext ?? tab.info.modelNow ?? tab.info.model,
       preview: () => this.quickPreview(tab),
     };
   }
-  /** The CLI's own model picker: the session opens with /model ready to paste. */
-  private nativeModel(id: string): void {
-    this.activate(id);
-    void navigator.clipboard?.writeText('/model').catch(() => {});
-    this.message(tr('Usa /model nel terminale per scegliere il modello.'));
+
+  /** Asks the session's own CLI for another model, in place. The row shows the new model only once the CLI confirms it. */
+  private async switchModel(id: string, model: string): Promise<void> {
+    const tab = this.tabs.get(id);
+    if (!tab || !model) return;
+    try { tab.info.modelChange = (await api.switchModel(id, model)).change; }
+    catch (err) { this.message(String(err instanceof Error ? err.message : err)); }
+    this.renderDetails(); this.watchModels();
   }
-  /** A new session of the same agent in the same node and squad, with the model to choose in the launcher. */
-  private changeModel(id: string): void {
-    const info = this.tabs.get(id)?.info;
-    if (!info || info.agent === 'shell' || info.nodeId == null) return;
-    this.openLauncher(info.agent, 'embedded', '', false, info.nodeId, {
-      teamId: info.role === 'brain' ? 'new' : info.teamId,
-      initialModel: info.model ?? '', initialEffort: info.effort,
-    });
+  /** The person's answer to what the CLI asked before switching (yes), or a change they no longer want (no). */
+  private async answerModel(id: string, yes: boolean): Promise<void> {
+    try { await (yes ? api.confirmModel(id) : api.cancelModel(id)); } catch (err) { this.message(String(err instanceof Error ? err.message : err)); }
+    await this.syncSessions();
+    this.listEl.querySelector<HTMLElement>(`.work-session[data-sid="${id}"] .work-model :is(select, button):not([disabled])`)?.focus({ preventScroll: true });
+  }
+  /** While a change is on its way the list is read again often, so its outcome shows as soon as the CLI confirms it. */
+  private watchModels(): void {
+    if (this.modelWatch || ![...this.tabs.values()].some(t => ['waiting', 'running', 'confirm'].includes(t.info.modelChange?.state ?? ''))) return;
+    this.modelWatch = setTimeout(() => { this.modelWatch = null; void this.syncSessions(); }, 700);
   }
 
-  /** The row the preview talks about stays marked while the keyboard is on the preview's own buttons. */
+  /** The row the keyboard highlights stays marked while the keyboard is on its model. */
   private markPreviewRow(): void {
     for (const row of this.listEl.querySelectorAll<HTMLElement>('.work-session')) row.classList.toggle('previewed', row.dataset.sid === this.railPreviewId);
   }
 
-  /** The compact preview docked under the rail list, for the session the keyboard highlights (null: nothing highlighted).
-   *  It says which session it is, its launch model, its last lines, and offers the model actions of the quick menu. */
+  /** The session the keyboard highlights (null: none) shows its detail under its row: its model and, when its terminal
+   *  is not on screen, its last words. */
   private showRailPreview(id: string | null): void {
     const tab = id ? this.tabs.get(id) : undefined;
-    const box = this.railPreview;
-    if (!tab) { this.railPreviewId = null; this.railPreviewRequest++; box.hidden = true; this.markPreviewRow(); return; }
-    const item = this.quickItem(tab), changed = this.railPreviewId !== item.id;
-    this.railPreviewId = item.id; box.hidden = false; this.markPreviewRow();
-    box.querySelector('strong')!.textContent = item.label;
-    const model = box.querySelector<HTMLElement>('[data-preview-launch-model]')!;
-    model.hidden = !item.model; model.textContent = item.model ? `${tr('Modello all’avvio')}: ${item.model}` : '';
-    const native = box.querySelector<HTMLElement>('[data-preview-native]')!, other = box.querySelector<HTMLElement>('[data-preview-model]')!;
-    native.hidden = !item.nativeModel; other.hidden = !item.canChangeModel;
-    box.querySelector<HTMLElement>('.work-rail-preview-actions')!.hidden = native.hidden && other.hidden;
-    box.querySelector<HTMLElement>('[data-preview-hint]')!.textContent = tr(native.hidden && other.hidden ? 'Invio apre la sessione' : 'Invio apre la sessione · → modello');
-    const text = box.querySelector('pre')!;
-    if (changed) text.textContent = '';
+    if (!tab) { this.railPreviewId = null; this.railPreviewData = null; this.railPreviewRequest++; this.markPreviewRow(); this.renderDetails(); return; }
+    this.railPreviewId = tab.info.id; this.markPreviewRow(); this.renderDetails();
     const request = ++this.railPreviewRequest;
-    void item.preview().catch(() => '').then(lines => {
+    void this.quickPreview(tab).catch((): SessionPreview => ({ text: '' })).then(preview => {
       if (request !== this.railPreviewRequest) return;
-      const shown = lines || tr('Nessuna anteprima disponibile');
-      if (text.textContent !== shown) { text.textContent = shown; text.scrollTop = text.scrollHeight; }
+      this.railPreviewData = { id: tab.info.id, preview }; this.renderDetails();
     });
   }
 
   /** Reading an xterm buffer has no effect on the active pane, its selection or its PTY. */
-  private async quickPreview(tab: Tab): Promise<string> {
+  private async quickPreview(tab: Tab): Promise<SessionPreview> {
     const buffer = tab.term?.buffer.active;
-    if (buffer) {
+    if (buffer?.length) {
       const lines: string[] = [];
-      for (let i = buffer.length - 1; i >= 0 && lines.length < 6; i--) {
-        const line = buffer.getLine(i)?.translateToString(true) ?? '';
-        if (line || lines.length) lines.unshift(line.slice(-240));
-      }
-      if (lines.length) return lines.join('\n');
+      for (let i = buffer.baseY; i < buffer.length; i++) lines.push(buffer.getLine(i)?.translateToString(true) ?? '');
+      if (lines.some(line => line.trim())) return sessionPreview(lines);
     }
-    return (await api.terminalPreview(tab.info.id)).text;
+    return api.terminalPreview(tab.info.id);
+  }
+
+  private renderDetails(): void {
+    for (const row of this.listEl.querySelectorAll<HTMLElement>('.work-session[data-sid]')) this.renderDetail(row);
+  }
+
+  /** Under the row of the open session and of the highlighted one: the model, changed in place with the CLI's own
+   *  selector, and for a highlighted session whose terminal is not on screen its last words. Rebuilt only when what it
+   *  says changes, so an open choice list is not closed by a poll. */
+  private renderDetail(row: HTMLElement): void {
+    const box = row.querySelector<HTMLElement>('.work-session-detail'), info = this.tabs.get(row.dataset.sid!)?.info;
+    if (!box || !info) return;
+    const highlighted = this.railPreviewId === info.id, onScreen = this.active === info.id || !!this.sel?.ids.includes(info.id);
+    const model = highlighted || this.active === info.id ? this.modelLine(info) : '';
+    const data = highlighted && !onScreen && this.railPreviewData?.id === info.id ? this.railPreviewData.preview : null;
+    const words = !data ? '' : (data.text ? `<p class="work-session-preview">${esc(data.text)}</p>` : '') + (data.error ? `<p class="work-session-preview error">${esc(data.error)}</p>` : '')
+      + (!data.text && !data.error ? `<p class="work-session-preview none">${tr('Nessuna attività leggibile')}</p>` : '');
+    const html = model + words;
+    if (box.dataset.shown === html) return;
+    const focused = box.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
+    const refocus = focused?.dataset.modelSelect !== undefined ? 'select' : focused ? 'button' : '';
+    box.dataset.shown = html; box.innerHTML = html; box.hidden = !html;
+    if (refocus) (box.querySelector<HTMLElement>(`.work-model ${refocus}:not([disabled])`) ?? row.querySelector<HTMLElement>('button[data-session]'))?.focus({ preventScroll: true });
+    if (highlighted && html) row.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** The model of a session as its own CLI reports it, with the choice to change it. The launch model is named only when
+   *  the session has moved away from it. */
+  private modelLine(info: TerminalInfo): string {
+    if (!info.alive || info.agent === 'shell') return '';
+    const limit = this.modelChoices?.limits[info.agent];
+    if (limit) return `<div class="work-model"><span class="work-model-state">${info.model ? `${esc(info.model)} · ` : ''}${esc(tr(limit))}</span></div>`;
+    const choices = info.agent === 'claude' || info.agent === 'codex' ? this.modelChoices?.[info.agent] : undefined;
+    if (!choices?.length) return '';
+    const change = info.modelChange, busy = change && ['waiting', 'running', 'confirm'].includes(change.state);
+    const current = info.modelChoice ?? '';
+    const options = (choices.some(c => c.id === current) ? '' : `<option value="" selected disabled>${esc(info.modelNow ?? info.model ?? tr('Predefinito'))}</option>`)
+      + choices.map(c => `<option value="${esc(c.id)}"${c.id === current ? ' selected' : ''}>${esc(c.label)}</option>`).join('');
+    const moved = info.model && current && info.model !== current ? ` · ${tr('avvio')}: ${esc(info.model)}` : '';
+    let state = info.modelNext ? `${esc(info.modelNext)} ${tr('dal prossimo turno')}${info.modelNow ? ` · ${tr('ultimo')}: ${esc(info.modelNow)}` : ''}`
+      : info.modelNow ? `${tr('ultimo turno')}: ${esc(info.modelNow)}${moved}` : info.model ? `${tr('all’avvio')}: ${esc(info.model)}` : '';
+    let tone = '', title = '', actions = '';
+    const cancel = `<button type="button" class="work-model-act" data-model-cancel="${info.id}">${tr('Annulla')}</button>`;
+    const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+    if (change?.state === 'waiting') { state = `→ ${esc(change.label)} · ${esc(lower(tr(change.message ?? 'In coda')))}`; actions = cancel; }
+    else if (change?.state === 'running') state = `→ ${esc(change.label)} · ${tr('cambio in corso…')}`;
+    else if (change?.state === 'confirm') {
+      // The CLI's own warning, in the person's language when it is the one we know; its exact words stay in the tooltip.
+      const cost = /slower and use more tokens/i.test(change.message ?? '');
+      state = `→ ${esc(change.label)} · ${cost ? tr('la prossima risposta sarà più lenta e userà più token: confermi?') : esc(change.message ?? '')}`;
+      title = change.message ?? ''; tone = ' ask';
+      actions = `<button type="button" class="work-model-act" data-model-confirm="${info.id}">${tr('Conferma')}</button>${cancel}`;
+    } else if (change?.state === 'failed') { state = esc(tr(change.message ?? 'Cambio non riuscito')); tone = ' warn'; }
+    return `<div class="work-model"><select data-model-select="${info.id}" aria-label="${tr('Modello di')} ${esc(info.code ?? info.id)}" title="${tr('Modello della sessione: il cambio vale dal prossimo turno')}"${busy ? ' disabled' : ''}>${options}</select><span class="work-model-state${tone}"${title ? ` title="${esc(title)}"` : ''}>${state}</span>${actions}</div>`;
   }
 
   /** Files dropped on the window (the desktop shell reports their paths): they are typed, escaped, into the terminal under the pointer. */
@@ -869,7 +923,7 @@ export class Terminals {
   }
 
   private railSessionTitle(info: TerminalInfo, linked: boolean): string {
-    return [info.code, labels[info.agent], info.model, info.effort, toneReason(info), linked ? tr('Canale collegato') : ''].filter(Boolean).join(' · ');
+    return [info.code, labels[info.agent], info.modelNext ?? info.modelNow ?? [info.model, info.effort].filter(Boolean).join(' '), toneReason(info), linked ? tr('Canale collegato') : ''].filter(Boolean).join(' · ');
   }
 
   private renderList(): void {
@@ -916,14 +970,14 @@ export class Terminals {
       if (clusterStart) groups.push({ key: `cluster:${id}`, html: ui`<div class="work-cluster"${toneAttr(id)}>⇄ Collegati · ${clusterSize} nodi</div>` });
       const rows: WorkListItem[] = [{ key: 'header', html: ui`<div class="work-node-row">${id !== null ? ui`<button class="work-row-grip" data-node-grip="${id}" aria-label="Sposta ${esc(name)}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button>` : ''}${id !== null ? ui`<button class="work-fold" data-fold="${id}" aria-expanded="${!collapsed}" title="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}" aria-label="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}">${collapsed ? '›' : '⌄'}</button>` : ''}<button class="work-node ${this.selectedNode === id ? 'selected' : ''}" data-node="${id ?? ''}" aria-current="${this.selectedNode === id ? 'true' : 'false'}" title="${esc(path)}"><span class="work-node-icon" aria-hidden="true">${icon('folder')}</span><span><strong>${esc(name)}</strong>${id !== null && tones.has(id) ? ui` <span class="work-link-mark" title="Nodo con collegamenti" aria-hidden="true">⇄</span>` : ''}</span><span class="work-number">${sessions.length}</span></button>${id === null ? ui`<button class="work-rail-action" data-add-shell="" title="Nuovo terminale libero" aria-label="Nuovo terminale libero">${icon('terminal')}</button>` : ''}${id !== null ? ui`<button class="work-rail-action" data-add-agent="${id}" title="Aggiungi agente a ${esc(name)}" aria-label="Aggiungi agente a ${esc(name)}">${icon('plus')}</button><button class="work-rail-action" data-add-shell="${id}" title="Terminale in ${esc(name)}" aria-label="Terminale in ${esc(name)}">${icon('terminal')}</button><button class="work-rail-action" data-node-link="${id}" title="Collega ${esc(name)}" aria-label="Collega ${esc(name)}" aria-expanded="${this.railLinkSource === `node:${id}`}">${icon('connect')}</button>${tones.has(id) ? ui`<button class="work-rail-action" data-group="${id}" title="Affianca i nodi collegati" aria-label="Affianca i nodi collegati a ${esc(name)}">${icon('grid')}</button>` : ''}` : ''}${id !== null ? ui`<button class="work-remove" data-remove="${id}" title="${sessions.length ? tr('Chiudi il nodo e termina le sue sessioni') : tr('Rimuovi il nodo dalla vista Operativa')}" aria-label="Chiudi ${esc(name)}">×</button>` : ''}</div>` }];
       if (!collapsed) for (const t of shown) {
-        rows.push({ key: `session:${t.info.id}`, html: ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button></div>` });
+        rows.push({ key: `session:${t.info.id}`, html: ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button><div class="work-session-detail" hidden></div></div>` });
       }
       groups.push({ key: `node:${id}`, html: `<section class="work-group ${this.selectedNode === id ? 'current-node' : ''}"${toneAttr(id)} ${id !== null ? `data-drag="${id}"` : ''}></section>`, children: rows });
     }
     if (!groups.length) groups.push({ key: 'empty', html: tr('<div class="work-list-empty">Nessun nodo trovato.</div>') });
     const focused = this.listEl.contains(document.activeElement) && document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const actionKey = ['addAgent', 'nodeLink', 'sessionLink'].find(key => focused?.dataset[key]);
-    const focusKey = actionKey ? `[${actionKey.replace(/[A-Z]/g, c => '-' + c.toLowerCase()).replace(/^/, 'data-')}="${focused!.dataset[actionKey]}"]` : focused?.dataset.nodeGrip ? `[data-node-grip="${focused.dataset.nodeGrip}"]` : focused?.dataset.sessionGrip ? `[data-session-grip="${focused.dataset.sessionGrip}"]` : focused?.dataset.fold ? `[data-fold="${focused.dataset.fold}"]` : focused?.dataset.node ? `[data-node="${focused.dataset.node}"]` : focused?.dataset.session ? `[data-session="${focused.dataset.session}"]` : null;
+    const focusKey = actionKey ? `[${actionKey.replace(/[A-Z]/g, c => '-' + c.toLowerCase()).replace(/^/, 'data-')}="${focused!.dataset[actionKey]}"]` : focused?.dataset.nodeGrip ? `[data-node-grip="${focused.dataset.nodeGrip}"]` : focused?.dataset.sessionGrip ? `[data-session-grip="${focused.dataset.sessionGrip}"]` : focused?.dataset.fold ? `[data-fold="${focused.dataset.fold}"]` : focused?.dataset.node ? `[data-node="${focused.dataset.node}"]` : focused?.dataset.session ? `[data-session="${focused.dataset.session}"]` : focused?.dataset.modelSelect ? `[data-model-select="${focused.dataset.modelSelect}"]` : null;
     // The highlighted session may leave the list (closed, filtered out): the highlight stays at the same place.
     const focusedAt = focused?.dataset.session ? [...this.listEl.querySelectorAll('button[data-session]')].indexOf(focused) : -1;
     if (this.patchRail(groups)) {
@@ -975,6 +1029,7 @@ export class Terminals {
         if (!badge) { badge = document.createElement('em'); badge.className = 'tone-flag'; button.append(badge); }
         if (badge.textContent !== flag) badge.textContent = flag;
       } else badge?.remove();
+      this.renderDetail(row);
     }
     this.renderRailLinks();
     this.renderNodeMenu();

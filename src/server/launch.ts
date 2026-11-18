@@ -199,9 +199,27 @@ function memoryDirectory(dir: string): string {
  * skipping conversations already bound to another session. Codex has no flag to choose the id at launch.
  */
 export function findCodexSession(cwd: string, createdAt: number, claimed: Set<string>, home = process.env.CODEX_HOME || join(homedir(), '.codex')): string | undefined {
+  let best: { id: string; at: number } | undefined;
+  for (const r of codexRollouts(cwd, createdAt, home)) if (!claimed.has(r.id) && (!best || r.at < best.at)) best = r;
+  return best?.id;
+}
+
+/**
+ * The Codex conversation that Visual Brain's own launch text opened for this session: its first message names the session
+ * ("sessione <id>" / "session <id>"). Unlike the guess above it cannot take the conversation of another session started
+ * in the same folder in the same seconds; undefined until Codex has recorded that first message.
+ */
+export function findCodexSessionOf(session: string, cwd: string, createdAt: number, home = process.env.CODEX_HOME || join(homedir(), '.codex')): string | undefined {
+  if (!/^[a-z0-9-]+$/i.test(session)) return undefined;
+  const named = new RegExp(`\\bsessione? ${session}\\b`);
+  for (const r of codexRollouts(cwd, createdAt, home)) if (named.test(r.head)) return r.id;
+  return undefined;
+}
+
+/** Codex conversations recorded in this folder around the launch of a session, with the start of their record. */
+function* codexRollouts(cwd: string, createdAt: number, home: string): Generator<{ id: string; at: number; head: string }> {
   const real = (p: string) => { try { return realpathSync(p); } catch { return p; } };
   const folder = real(cwd);
-  let best: { id: string; at: number } | undefined;
   for (const offset of [-1, 0, 1]) {
     const day = new Date(createdAt + offset * 86_400_000);
     const dir = join(home, 'sessions', String(day.getFullYear()), String(day.getMonth() + 1).padStart(2, '0'), String(day.getDate()).padStart(2, '0'));
@@ -209,27 +227,28 @@ export function findCodexSession(cwd: string, createdAt: number, claimed: Set<st
     try { names = readdirSync(dir); } catch { continue; }
     for (const name of names) {
       if (!name.startsWith('rollout-') || !name.endsWith('.jsonl')) continue;
-      const meta = firstLine(join(dir, name));
+      // A conversation started from the launch on was written after it: older records are not even opened.
+      if (!((statSync(join(dir, name), { throwIfNoEntry: false })?.mtimeMs ?? 0) >= createdAt - 5_000)) continue;
+      const head = fileHead(join(dir, name));
+      let meta: any;
+      try { const end = head.indexOf('\n'); meta = JSON.parse(end < 0 ? head : head.slice(0, end)); } catch { continue; }
       const p = meta?.type === 'session_meta' ? meta.payload : undefined;
       const at = Date.parse(p?.timestamp);
-      if (typeof p?.id !== 'string' || typeof p.cwd !== 'string' || claimed.has(p.id) || real(p.cwd) !== folder) continue;
+      if (typeof p?.id !== 'string' || typeof p.cwd !== 'string' || real(p.cwd) !== folder) continue;
       // A little slack before the launch for clock rounding; nothing that started long after it.
       if (!(at >= createdAt - 5_000 && at <= createdAt + 10 * 60_000)) continue;
-      if (!best || at < best.at) best = { id: p.id, at };
+      yield { id: p.id, at, head };
     }
   }
-  return best?.id;
 }
 
-function firstLine(file: string): any {
+function fileHead(file: string): string {
   let fd: number | undefined;
   try {
     fd = openSync(file, 'r');
     const buf = Buffer.alloc(256 * 1024);
-    const text = buf.toString('utf8', 0, readSync(fd, buf, 0, buf.length, 0));
-    const end = text.indexOf('\n');
-    return JSON.parse(end < 0 ? text : text.slice(0, end));
-  } catch { return undefined; } finally { if (fd !== undefined) closeSync(fd); }
+    return buf.toString('utf8', 0, readSync(fd, buf, 0, buf.length, 0));
+  } catch { return ''; } finally { if (fd !== undefined) closeSync(fd); }
 }
 
 /** Opens Terminal.app with the agent running in `cwd`; the prompt is read from a file to avoid quoting issues. */

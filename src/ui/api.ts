@@ -1,6 +1,6 @@
 import { ui } from './i18n.ts';
 // Typed client of the local API.
-import type { NodeReminder, ReminderBoard, AgentName, ModelChoice, TeamLink, TeamView, GraphEdge, GraphNode, GraphPayload, LaunchRequest, NodeDetail, Note, StatusPayload, TerminalInfo, GitRepoView, CodeTree, CodeFile, CodeSearchHit, RepoChoice, GitCommitDetail, GitCommitFile, GithubState } from '../shared/types.ts';
+import type { NodeReminder, ReminderBoard, AgentName, ModelChoice, ModelChange, ModelSwitchChoice, TeamLink, TeamView, GraphEdge, GraphNode, GraphPayload, LaunchRequest, NodeDetail, Note, StatusPayload, TerminalInfo, GitRepoView, CodeTree, CodeFile, CodeSearchHit, RepoChoice, GitCommitDetail, GitCommitFile, GithubState } from '../shared/types.ts';
 
 /** One agent CLI as Impostazioni → Agenti shows it (src/server/agent-clis.ts). */
 export interface AgentCli { id: AgentName; label: string; command: string; path: string | null; version: string | null; signedIn: boolean | null; account: string | null; installCommand: string; canLogout: boolean; docs: string }
@@ -61,7 +61,11 @@ export const api = {
   launch: (req: LaunchRequest & { cols?: number; rows?: number }) => call<{ termId?: string; info?: TerminalInfo; opened?: boolean; teamId?: string; warning?: string }>('POST', '/api/launch', req),
   open: (id: number, app: 'finder' | 'default' | 'editor') => call<{ ok: boolean }>('POST', '/api/open', { id, app }),
   terminals: () => call<TerminalInfo[]>('GET', '/api/terminals'),
-  terminalPreview: (id: string) => call<{ text: string }>('GET', `/api/terminals/${encodeURIComponent(id)}/preview`),
+  terminalPreview: (id: string) => call<import('../shared/session-preview.ts').SessionPreview>('GET', `/api/terminals/${encodeURIComponent(id)}/preview`),
+  modelSwitch: () => call<{ claude: ModelSwitchChoice[]; codex: ModelSwitchChoice[]; limits: Record<string, string | null> }>('GET', '/api/model-switch'),
+  switchModel: (id: string, model: string) => call<{ change: ModelChange }>('POST', `/api/terminals/${encodeURIComponent(id)}/model`, { model }),
+  confirmModel: (id: string) => call<{ ok: boolean }>('POST', `/api/terminals/${encodeURIComponent(id)}/model/confirm`, {}),
+  cancelModel: (id: string) => call<{ ok: boolean }>('DELETE', `/api/terminals/${encodeURIComponent(id)}/model`),
   killTerminal: (id: string) => call<{ ok: boolean }>('DELETE', ui`/api/terminals/${id}`),
   models: () => call<Record<AgentName, ModelChoice[]>>('GET', '/api/models'),
   harnesses: () => call<Array<{ id: string; label: string; installed: boolean; canInstall: boolean; install: { state: 'installing' | 'ready' | 'error'; step: string; error?: string } | null; version?: string | null; latest?: string; outdated?: boolean }>>('GET', '/api/harnesses'),

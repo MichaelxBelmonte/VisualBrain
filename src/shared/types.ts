@@ -225,7 +225,18 @@ export interface TerminalInfo {
   branch?: string;
   /** Squad of the node the session belongs to ("1" for the node's first squad, "brain" for the node's Main Brain). */
   teamId?: string;
+  /** Read from the agent CLI's own records each time the sessions are listed, never stored: the model of the last turn
+   *  and the model the CLI confirmed for the next one (absent when it is the same), as the person reads them. */
+  modelNow?: string;
+  modelNext?: string;
+  /** The entry of the model selector the session is on now (Claude: family; Codex: model id). */
+  modelChoice?: string;
+  /** A change of model asked from the interface: queued until the session is free, running, held by a question of the
+   *  CLI that the person must answer (`confirm`, with the CLI's own words as message), then its outcome for a while. */
+  modelChange?: ModelChange;
 }
+export interface ModelChange { state: 'waiting' | 'running' | 'confirm' | 'done' | 'failed'; target: string; label: string; message?: string; at: number }
+export interface ModelSwitchChoice { id: string; label: string }
 
 export type AgentName = 'claude' | 'codex' | 'hermes' | 'agy';
 /** brain: the node's Main Brain, above the orchestrators of its squads (one per node, it edits no files). */

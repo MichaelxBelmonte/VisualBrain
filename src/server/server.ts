@@ -1,5 +1,6 @@
 // HTTP + WebSocket server: API, static UI, live events, terminals, filesystem watcher.
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { noteSize } from './model-switch.ts';
 import { createReadStream, existsSync, readFileSync, statSync, watch, type FSWatcher } from 'node:fs';
 import { join, extname, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -330,6 +331,7 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
             if (m.type === 'input') terms.write(id, String(m.data));
             else if (m.type === 'resize') {
               size = { cols: Number(m.cols), rows: Number(m.rows) };
+              noteSize(id, size.cols, size.rows); // what the pane shows; the one-row nudge below is undone at once
               if (!repaint || size.rows < 3) { terms.resize(id, size.cols, size.rows); return; }
               repaint = false;
               let done = false;
