@@ -86,8 +86,9 @@ export class Terminals {
     const path = (process.env.PATH ?? '/usr/bin:/bin').split(delimiter);
     for (const p of extra) if (!path.includes(p)) path.unshift(p);
     // Private to the desktop shell and its server. A terminal that inherited them would switch on the updater of any other
-    // Visual Brain started from it (a development server, a trial build) and point it at the installed app.
-    const { VISUAL_BRAIN_UPDATES: _updates, VISUAL_BRAIN_APP: _app, ...inherited } = process.env;
+    // Visual Brain started from it (a development server, a trial build), point it at the installed app, and give it this
+    // server's version and instance.
+    const { VISUAL_BRAIN_UPDATES: _updates, VISUAL_BRAIN_APP: _app, VISUAL_BRAIN_SHELL: _shell, VISUAL_BRAIN_VERSION: _version, VISUAL_BRAIN_INSTANCE: _instance, ...inherited } = process.env;
     return { ...inherited, PATH: path.join(delimiter), TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: process.env.LANG ?? 'it_IT.UTF-8', ...vars };
   }
 

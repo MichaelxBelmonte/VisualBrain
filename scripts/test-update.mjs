@@ -7,7 +7,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand, reopenProfile, restartCommand } from '../src/server/updater.ts';
+import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand, reopenProfile, restartCommand, startedByShell } from '../src/server/updater.ts';
 import { RESTART_SLOW_MS, bannerFor, noteLines, restartKey, settingsRow } from '../src/ui/updates.ts';
 import { setLanguage } from '../src/ui/i18n.ts';
 import { UPDATE_PUBLIC_KEY } from '../src/server/update-key.ts';
@@ -457,6 +457,22 @@ if (process.platform === 'darwin') {
 
 // --- wiring -------------------------------------------------------------------------------------------------------------
 const src = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+// Updates only in the server the desktop shell started itself: a terminal opened by an older version still carries the
+// switch, and `open` hands a terminal's environment to whatever it opens.
+ok(startedByShell({ VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_SHELL: '4242' }, 4242), 'the server started by the shell that names itself updates');
+ok(!startedByShell({ VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_APP: '/Applications/Visual Brain.app' }, 4242), 'the switch inherited from an older terminal, without a shell, updates nothing');
+ok(!startedByShell({ VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_SHELL: '4242' }, 777), 'a server started from a terminal is not the shell\'s child: no updates, no restart');
+ok(!startedByShell({ VISUAL_BRAIN_SHELL: '4242' }, 4242) && !startedByShell({ VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_SHELL: '' }, 0) && !startedByShell({ VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_SHELL: '4242x' }, 4242), 'no switch, an empty or a malformed shell: no updates');
+{
+  const keys = ['VISUAL_BRAIN_UPDATES', 'VISUAL_BRAIN_APP', 'VISUAL_BRAIN_SHELL'], saved = keys.map(key => process.env[key]);
+  try {
+    Object.assign(process.env, { VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_APP: '/Applications/Visual Brain.app' }); delete process.env.VISUAL_BRAIN_SHELL;
+    const leaked = new Updater({ dataDir: tmpdir(), version: '0.2.4' });
+    eq([leaked.snapshot.enabled, leaked.snapshot.canRestart], [false, false], 'a development server started from a terminal that still carries the switch neither updates nor restarts the installed app');
+    process.env.VISUAL_BRAIN_SHELL = String(process.ppid);
+    eq(new Updater({ dataDir: tmpdir(), version: '0.2.4' }).snapshot.enabled, true, 'the shell\'s own server is enabled');
+  } finally { keys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i]; }); }
+}
 ok(/VISUAL_BRAIN_UPDATES/.test(src('app/src-tauri/src/main.rs')) && /!TRIAL/.test(src('app/src-tauri/src/main.rs')), 'only the installed regular app enables updates');
 ok(/\/api\/update\/install/.test(src('src/server/api.ts')) && /updater\.start\(\)/.test(src('src/server/server.ts')), 'API and background check are wired');
 ok(/res\.once\('close', \(\) => ctx\.updater\.quit\(\)\)/.test(src('src/server/api.ts')), "the server quits after the answer even when the page left first ('finish' would never fire)");

@@ -216,9 +216,11 @@ fn run(window: &WebviewWindow, handle: &tauri::AppHandle, dir: &Path, lang: &str
     let updates = !TRIAL && dev.is_none() && bundle.is_some();
     let mut command = Command::new(node);
     command.env("VISUAL_BRAIN_VERSION", env!("CARGO_PKG_VERSION"));
-    if let (true, Some(bundle)) = (updates, bundle) { command.env("VISUAL_BRAIN_UPDATES", "1").env("VISUAL_BRAIN_APP", bundle); }
+    // The server updates the app only as the direct child of the shell named here: a terminal opened by an older version
+    // still carries the switch, and a server started from it is not that child.
+    if let (true, Some(bundle)) = (updates, bundle) { command.env("VISUAL_BRAIN_UPDATES", "1").env("VISUAL_BRAIN_APP", bundle).env("VISUAL_BRAIN_SHELL", std::process::id().to_string()); }
     // An app opened from a terminal inherits that terminal's environment: never the update switch of another installation.
-    else { command.env_remove("VISUAL_BRAIN_UPDATES").env_remove("VISUAL_BRAIN_APP"); }
+    else { command.env_remove("VISUAL_BRAIN_UPDATES").env_remove("VISUAL_BRAIN_APP").env_remove("VISUAL_BRAIN_SHELL"); }
     let child = command.args(["src/cli.ts", "serve", "--port", &port.to_string()]).current_dir(&server_dir)
         .env("PATH", path).env("VISUAL_BRAIN_DATA_DIR", dir).env("VISUAL_BRAIN_LANGUAGE", lang).env("VISUAL_BRAIN_INSTANCE", &instance)
         .env_remove("CLAUDECODE").env_remove("CLAUDE_CODE_ENTRYPOINT").env_remove("CLAUDE_CODE_CHILD_SESSION")

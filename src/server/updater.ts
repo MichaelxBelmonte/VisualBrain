@@ -1,5 +1,5 @@
 // Updates of the installed desktop app: a signed feed, a verified download, and an installation that never closes a terminal.
-// Only active inside the installed app (the desktop shell sets VISUAL_BRAIN_UPDATES=1): development runs and tests never update.
+// Only active inside the installed app, in the server its desktop shell started (see startedByShell): development runs and tests never update.
 //
 // Installation = the same swap scripts/update-app.mjs does by hand. The running app is MOVED aside (a rename keeps every open
 // file of the running server valid), the new bundle is cloned at the same path, and the moved-aside copy is deleted only once
@@ -191,6 +191,15 @@ export function parseFeed(text: string, signature: string, publicKey: string = U
   return { ...feed, notes: String(feed.notes ?? '').slice(0, 2000) };
 }
 
+/**
+ * True only in the server the desktop shell started itself. The shell switches updates on and names its own process; a
+ * terminal opened by an older version still carries the switch (and `open` hands a terminal's environment to whatever it
+ * opens), but a server started from there is not the shell's child, so it never updates or restarts the installed app.
+ */
+export function startedByShell(env: NodeJS.ProcessEnv = process.env, parent: number = process.ppid): boolean {
+  return env.VISUAL_BRAIN_UPDATES === '1' && /^\d+$/.test(env.VISUAL_BRAIN_SHELL ?? '') && Number(env.VISUAL_BRAIN_SHELL) === parent;
+}
+
 export interface UpdaterOptions {
   dataDir: string;
   version: string;
@@ -209,7 +218,7 @@ export interface UpdaterOptions {
   applicationFolders?: string[];
   /** The desktop shell, which spawns the server directly: when it exits the user has quit. */
   shellPid?: number;
-  /** Starts the detached reopen watcher. Default: only in the real app (VISUAL_BRAIN_UPDATES=1), never in tests. */
+  /** Starts the detached reopen watcher. Default: only in the real app (see startedByShell), never in tests. */
   spawnImpl?: ((command: string, args: string[]) => void | Promise<void>) | null;
   /** Clean shutdown of this server, for "Riavvia". Without it the user quits with ⌘Q as before. */
   quit?: (() => void) | null;
@@ -244,9 +253,9 @@ export class Updater {
 
   constructor(options: UpdaterOptions) {
     this.o = {
-      execPath: process.execPath, enabled: process.env.VISUAL_BRAIN_UPDATES === '1', feedUrl: FEED_URL, publicKey: UPDATE_PUBLIC_KEY, fetchImpl: fetch, persistentTerminals: false,
+      execPath: process.execPath, enabled: startedByShell(), feedUrl: FEED_URL, publicKey: UPDATE_PUBLIC_KEY, fetchImpl: fetch, persistentTerminals: false,
       applicationFolders: ['/Applications', join(homedir(), 'Applications')], shellPid: process.ppid,
-      spawnImpl: process.env.VISUAL_BRAIN_UPDATES === '1' ? spawnDetached : null, profile: reopenProfile(),
+      spawnImpl: startedByShell() ? spawnDetached : null, profile: reopenProfile(),
       ...options,
     };
     const given = options.bundle ?? process.env.VISUAL_BRAIN_APP ?? appBundleOf(this.o.execPath);

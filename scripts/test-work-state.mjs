@@ -311,17 +311,20 @@ console.log('PASS Claude hooks only for team sessions, with port, session and to
 }
 {
   // The update switch belongs to the desktop shell and its server: a terminal must not hand it to whatever is started from it.
-  const saved = { updates: process.env.VISUAL_BRAIN_UPDATES, app: process.env.VISUAL_BRAIN_APP, data: process.env.VISUAL_BRAIN_DATA_DIR };
-  Object.assign(process.env, { VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_APP: '/Applications/Visual Brain.app', VISUAL_BRAIN_DATA_DIR: '/tmp/vb-profile' });
+  const keys = ['VISUAL_BRAIN_UPDATES', 'VISUAL_BRAIN_APP', 'VISUAL_BRAIN_SHELL', 'VISUAL_BRAIN_VERSION', 'VISUAL_BRAIN_INSTANCE', 'VISUAL_BRAIN_DATA_DIR'];
+  const saved = keys.map(key => process.env[key]);
+  Object.assign(process.env, { VISUAL_BRAIN_UPDATES: '1', VISUAL_BRAIN_APP: '/Applications/Visual Brain.app', VISUAL_BRAIN_SHELL: '4242', VISUAL_BRAIN_VERSION: '0.0.1', VISUAL_BRAIN_INSTANCE: '4242-1', VISUAL_BRAIN_DATA_DIR: '/tmp/vb-profile' });
   try {
     const env = new Terminals(() => {}).env({ VB_SESSION_ID: 'x' });
-    assert.deepEqual([env.VISUAL_BRAIN_UPDATES, env.VISUAL_BRAIN_APP], [undefined, undefined], 'a terminal does not inherit the update switch nor the installed app path');
+    assert.deepEqual([env.VISUAL_BRAIN_UPDATES, env.VISUAL_BRAIN_APP, env.VISUAL_BRAIN_SHELL], [undefined, undefined, undefined], 'a terminal does not inherit the update switch, the installed app path nor the shell it belongs to');
+    assert.deepEqual([env.VISUAL_BRAIN_VERSION, env.VISUAL_BRAIN_INSTANCE], [undefined, undefined], 'nor the version and the instance of this server');
     assert.deepEqual([env.VISUAL_BRAIN_DATA_DIR, env.VB_SESSION_ID, env.TERM], ['/tmp/vb-profile', 'x', 'xterm-256color'], 'the rest of the environment is unchanged');
     assert.equal(process.env.VISUAL_BRAIN_UPDATES, '1', 'the server keeps its own switch');
   } finally {
-    for (const [key, value] of [['VISUAL_BRAIN_UPDATES', saved.updates], ['VISUAL_BRAIN_APP', saved.app], ['VISUAL_BRAIN_DATA_DIR', saved.data]]) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    keys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i]; });
   }
   const shell = readFileSync(new URL('../app/src-tauri/src/main.rs', import.meta.url), 'utf8');
-  assert.match(shell, /else \{ command\.env_remove\("VISUAL_BRAIN_UPDATES"\)\.env_remove\("VISUAL_BRAIN_APP"\); \}/, 'a shell without updates drops an inherited update switch');
+  assert.ok(shell.includes('else { command.env_remove("VISUAL_BRAIN_UPDATES").env_remove("VISUAL_BRAIN_APP").env_remove("VISUAL_BRAIN_SHELL"); }'), 'a shell without updates drops an inherited update switch');
+  assert.ok(shell.includes('.env("VISUAL_BRAIN_SHELL", std::process::id().to_string())'), 'a shell with updates names its own process for its server');
 }
 console.log('PASS PTY sessions carry the hook environment, never the update switch, and record input and busy output');
