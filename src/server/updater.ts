@@ -143,14 +143,20 @@ export function reopenCommand(pid: number, app: string): string[] {
 /**
  * "Riavvia" after an installation. Waits for this server (`serverPid`) to finish its clean shutdown, ends the desktop shell,
  * which has nothing left to save, and opens `app` once it is gone. `app` is null when a reopen watcher already waits for the
- * shell (a relocated install). Gives up after 30 s instead of waiting for ever. Arguments for /bin/sh, never quoted in.
+ * shell (a relocated install). Arguments for /bin/sh, never quoted in.
+ *
+ * It never stops halfway: a server still closing after 30 s and a shell still there 10 s after SIGTERM are ended with
+ * SIGKILL (the terminals live in their own host, SQLite survives an abrupt exit), so the app is always reopened. Exit 1
+ * only when a process outlives SIGKILL. `ticks` (×0.2 s) exist for tests.
  *
  * "Gone" is read from the process state, not from `kill -0`: the shell starts the server and never waits on it, so the
  * server that has exited stays a zombie, which still answers `kill -0`, for as long as the shell lives.
  */
-export function restartCommand(serverPid: number, shellPid: number, app: string | null): string[] {
-  const gone = (arg: string) => `n=0; while /bin/ps -o stat= -p "${arg}" 2>/dev/null | /usr/bin/grep -qv '^ *Z'; do n=$((n+1)); [ "$n" -gt 150 ] && exit 1; sleep 0.2; done`;
-  return ['-c', `${gone('$0')}; kill -TERM "$1" 2>/dev/null; ${gone('$1')}; [ -n "$2" ] && exec /usr/bin/open -n "$2"; exit 0`, String(serverPid), String(shellPid), app ?? ''];
+export function restartCommand(serverPid: number, shellPid: number, app: string | null, ticks = { server: 150, shell: 50 }): string[] {
+  // gone PID TICKS: true once PID has exited (absent, or a zombie nobody reaps), false after TICKS × 0.2 s
+  const gone = 'gone() { n=0; while /bin/ps -o stat= -p "$1" 2>/dev/null | /usr/bin/grep -qv \'^ *Z\'; do n=$((n+1)); [ "$n" -gt "$2" ] && return 1; sleep 0.2; done; return 0; }';
+  const end = (arg: string, ticks: number) => `gone "${arg}" ${ticks} || { kill -KILL "${arg}" 2>/dev/null; gone "${arg}" 25 || exit 1; }`;
+  return ['-c', `${gone}; s="$0"; w="$1"; a="$2"; ${end('$s', ticks.server)}; kill -TERM "$w" 2>/dev/null; ${end('$w', ticks.shell)}; [ -n "$a" ] && exec /usr/bin/open -n "$a"; exit 0`, String(serverPid), String(shellPid), app ?? ''];
 }
 
 /**
@@ -190,12 +196,17 @@ export interface UpdaterOptions {
   /** The desktop shell, which spawns the server directly: when it exits the user has quit. */
   shellPid?: number;
   /** Starts the detached reopen watcher. Default: only in the real app (VISUAL_BRAIN_UPDATES=1), never in tests. */
-  spawnImpl?: ((command: string, args: string[]) => void) | null;
+  spawnImpl?: ((command: string, args: string[]) => void | Promise<void>) | null;
   /** Clean shutdown of this server, for "Riavvia". Without it the user quits with ⌘Q as before. */
   quit?: (() => void) | null;
 }
 
-const spawnDetached = (command: string, args: string[]): void => { spawn(command, args, { detached: true, stdio: 'ignore' }).unref(); };
+/** Resolves once the process runs; a failure to start (EAGAIN, missing /bin/sh) rejects instead of being an unhandled 'error'. */
+const spawnDetached = (command: string, args: string[]): Promise<void> => new Promise((resolve, reject) => {
+  const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+  child.once('error', reject);
+  child.once('spawn', () => { child.unref(); resolve(); });
+});
 
 export class Updater {
   private readonly o: Required<Omit<UpdaterOptions, 'liveSessions' | 'bundle' | 'spawnImpl' | 'quit'>> & Pick<UpdaterOptions, 'liveSessions' | 'spawnImpl' | 'quit'>;
@@ -365,22 +376,28 @@ export class Updater {
   private scheduleReopen(dest: string): void {
     const pid = this.o.shellPid;
     if (!this.o.spawnImpl || !Number.isInteger(pid) || pid <= 1) return;
-    try { this.o.spawnImpl('/bin/sh', reopenCommand(pid, dest)); this.reopening = true; } catch { /* the user can open it from Applications */ }
+    // the user can open it from Applications when the watcher cannot start; "Riavvia" then opens it itself
+    this.reopening = true;
+    try { void Promise.resolve(this.o.spawnImpl('/bin/sh', reopenCommand(pid, dest))).catch(() => { this.reopening = false; }); } catch { this.reopening = false; }
   }
 
   /**
-   * "Riavvia" after an installation: starts the watcher that reopens the installed app. The caller then calls `quit()`.
-   * Terminals live in their own host and are found again; without that host a restart would close them, so it is refused.
+   * "Riavvia" after an installation: starts the watcher that reopens the installed app and resolves once it runs, so the
+   * caller answers and then calls `quit()` only with someone left to reopen the app. Terminals live in their own host and
+   * are found again; without that host a restart would close them, so it is refused.
    */
-  restart(): void {
+  async restart(): Promise<void> {
     const dest = this.state.installedTo;
     if (this.state.status !== 'installed' || !dest) throw new Error('Nessun aggiornamento installato da avviare.');
     if (!this.canRestart) throw new Error('Riavvio non disponibile: chiudi Visual Brain con ⌘Q e riaprila.');
     if (this.restarting) return;
     const live = this.o.liveSessions?.() ?? 0;
     if (!this.o.persistentTerminals && live > 0) throw new Error(`Ci sono ${live} terminali attivi che si chiuderebbero: chiudi Visual Brain con ⌘Q quando hai finito.`);
-    this.o.spawnImpl!('/bin/sh', restartCommand(process.pid, this.o.shellPid, this.reopening ? null : dest));
     this.restarting = true;
+    try { await this.o.spawnImpl!('/bin/sh', restartCommand(process.pid, this.o.shellPid, this.reopening ? null : dest)); } catch (error) {
+      this.restarting = false;
+      throw new Error(`Riavvio non riuscito (${error instanceof Error ? error.message : String(error)}): chiudi Visual Brain con ⌘Q e riaprila.`);
+    }
   }
 
   /** Ends this server cleanly once the answer to "Riavvia" is out. */

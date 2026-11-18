@@ -20,8 +20,10 @@ export interface UpdateView {
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 /** What the banner says for a state, or null when there is nothing to show. Pure, so the wording is testable. */
-export function bannerFor(s: UpdateView, dismissed: string | null, locationDismissed = false): { kind: 'ready' | 'installed' | 'error' | 'busy' | 'location'; text: string } | null {
+export function bannerFor(s: UpdateView, dismissed: string | null, locationDismissed = false): { kind: 'ready' | 'installed' | 'error' | 'busy' | 'location'; text: string; restart?: true } | null {
   if (!s.enabled) return null;
+  // the same offer as the Aggiornamenti row: one click, the terminals stay
+  if (s.status === 'installed' && s.canRestart && s.persistentTerminals === true) return { kind: 'installed', restart: true, text: restartText(s) };
   if (s.status === 'ready' && s.latest && dismissed !== s.latest) return { kind: 'ready', text: ui`La versione ${s.latest} è pronta. Installarla non chiude nessun terminale.` };
   if (s.status === 'installing') return { kind: 'busy', text: tr('Installazione in corso…') };
   if (s.status === 'installed' && s.persistentTerminals === true) return { kind: 'installed', text: s.relocated
@@ -40,6 +42,11 @@ export function bannerFor(s: UpdateView, dismissed: string | null, locationDismi
 
 const READ_ONLY = /EROFS|read-only file system|AppTranslocation/i;
 const fill = (text: string, values: Record<string, string | number>) => text.replace(/\{(\w+)\}/g, (_m, key: string) => String(values[key] ?? ''));
+function restartText(s: UpdateView): string {
+  return fill(tr(s.relocated ? 'Versione {v} installata in Applicazioni. Riavvia per usarla: i terminali restano attivi.' : 'Versione {v} installata. Riavvia per usarla: i terminali restano attivi.'), { v: s.latest ?? '' });
+}
+/** After this long without the window going away the restart is stuck somewhere the page cannot see: say what to do. */
+export const RESTART_SLOW_MS = 20_000;
 
 export interface UpdateRow {
   /** The sentence under the app name. It changes with the step, never with the percentage: it is a live region. */
@@ -52,10 +59,12 @@ export interface UpdateRow {
 }
 
 /**
- * The "Aggiornamenti" row for a state. `s` is null when the server did not answer; `restarting` once "Riavvia" was accepted.
- * Pure, so every wording is testable.
+ * The "Aggiornamenti" row for a state. `s` is null when the server did not answer; `restarting` once "Riavvia" was accepted,
+ * 'slow' when the window is still here RESTART_SLOW_MS later. Pure, so every wording is testable.
  */
-export function settingsRow(s: UpdateView | null, restarting = false): UpdateRow {
+export function settingsRow(s: UpdateView | null, restarting: boolean | 'slow' = false): UpdateRow {
+  // the server is gone on purpose: whatever happened, only ⌘Q is left, and the terminals are safe in their own host
+  if (restarting === 'slow') return { text: tr('Il riavvio ci mette più del previsto. Se Visual Brain non si riapre, chiudila con ⌘Q e riaprila: i terminali restano attivi.'), tone: 'error', action: null, progress: null };
   const retry = { id: 'check' as const, label: tr('Riprova'), primary: false };
   if (!s) return { text: tr('Non riesco a leggere lo stato degli aggiornamenti.'), tone: 'error', action: retry, progress: null };
   if (!s.enabled) return { text: tr('Gli aggiornamenti automatici sono attivi solo nell’app installata.'), tone: 'quiet', action: null, progress: null };
@@ -72,7 +81,7 @@ export function settingsRow(s: UpdateView | null, restarting = false): UpdateRow
     case 'installed': {
       // A restart is offered only when it costs nothing: the terminals live in their own host and are found again.
       if (s.canRestart && s.persistentTerminals) return {
-        text: fill(tr(s.relocated ? 'Versione {v} installata in Applicazioni. Riavvia per usarla: i terminali restano attivi.' : 'Versione {v} installata. Riavvia per usarla: i terminali restano attivi.'), { v }),
+        text: restartText(s),
         tone: 'ok', action: { id: 'restart', label: tr('Riavvia ora'), primary: true }, progress: null,
       };
       const text = s.persistentTerminals || s.liveSessions === 0
@@ -104,7 +113,9 @@ export class Updates {
   private readonly banner: HTMLElement;
   /** False after a state read that failed: the row says so instead of showing an old state. */
   private reachable = true;
-  private restarting = false;
+  private restarting: boolean | 'slow' = false;
+  /** Bumped by every action: a state read that started before it answers with an older state and is dropped. */
+  private epoch = 0;
   private follow: ReturnType<typeof setTimeout> | null = null;
   private readonly rows = new Set<() => void>();
 
@@ -119,13 +130,18 @@ export class Updates {
   get enabled(): boolean { return !!this.state?.enabled; }
 
   async refresh(): Promise<void> {
+    const epoch = this.epoch;
+    let next: UpdateView | null = null;
+    try { next = await api.updateState(); } catch { /* below */ }
     // After "Riavvia" the server goes away on purpose: that is not an error to show.
-    try { this.state = await api.updateState(); this.reachable = true; } catch { if (this.restarting) return; this.reachable = false; }
+    if (epoch !== this.epoch || this.restarting) return;
+    if (next) { this.state = next; this.reachable = true; } else this.reachable = false;
     this.render();
   }
 
   /** Shows `next` at once, then asks the server; a refusal is already in the server's state, which is read again. */
   private async act(next: UpdateView['status'], call: () => Promise<UpdateView>): Promise<void> {
+    this.epoch++;
     if (this.state) { this.state = { ...this.state, status: next, error: '' }; this.render(); }
     try { this.state = await call(); this.reachable = true; this.render(); } catch { await this.refresh(); }
   }
@@ -134,12 +150,16 @@ export class Updates {
   private install(): Promise<void> { return this.act('installing', api.updateInstall); }
 
   private async restart(): Promise<void> {
-    this.restarting = true; this.render();
+    if (this.restarting) return;
+    this.epoch++; this.restarting = true; this.render();
     try { await api.updateRestart(); } catch (error) {
       this.restarting = false;
       if (this.state) this.state = { ...this.state, status: 'error', error: String(error instanceof Error ? error.message : error) };
       this.render();
+      return;
     }
+    // On success this window is closed by the watcher; still here means it is stuck, and the page says what to do.
+    setTimeout(() => { this.restarting = 'slow'; this.render(); }, RESTART_SLOW_MS);
   }
 
   /**
@@ -147,6 +167,12 @@ export class Updates {
    * The frame is rebuilt only when the step changes, so its short entrance plays once; the percentage moves in place.
    */
   mountSettings(root: HTMLElement): void {
+    // The status line is built once and only its text changes: a live region inserted already filled is often not read.
+    root.innerHTML = `<div class="settings-row update-row"></div>`
+      + `<div class="update-progress" role="progressbar" aria-label="${esc(tr('Avanzamento dell’aggiornamento'))}" aria-valuemin="0" aria-valuemax="100"><i></i></div>`
+      + `<p class="update-status" role="status"><i class="update-mark" aria-hidden="true"></i><span tabindex="-1"></span></p><div data-update-notes></div>`;
+    const head = root.querySelector<HTMLElement>('.update-row')!, status = root.querySelector<HTMLElement>('.update-status')!;
+    const said = status.querySelector<HTMLElement>('span')!, notesBox = root.querySelector<HTMLElement>('[data-update-notes]')!;
     let shown = '';
     const paint = () => {
       if (!root.isConnected) { this.rows.delete(paint); return; }
@@ -157,14 +183,14 @@ export class Updates {
       if (key !== shown) {
         const hadFocus = root.contains(document.activeElement);
         shown = key;
-        root.innerHTML = `<div class="settings-row update-row"><div><b>Visual Brain</b><small>${this.current ? ui`versione ${esc(this.current)}` : tr('versione di sviluppo')}</small></div>${row.action ? `<button type="button" class="btn small${row.action.primary ? ' primary' : ''}" data-update="${row.action.id}">${esc(row.action.label)}</button>` : '<span class="update-pct" aria-hidden="true"></span>'}</div>`
-          + `<div class="update-progress" role="progressbar" aria-label="${esc(tr('Avanzamento dell’aggiornamento'))}" aria-valuemin="0" aria-valuemax="100"><i></i></div>`
-          + `<p class="update-status" data-tone="${row.tone}" role="status"><i class="update-mark" aria-hidden="true"></i><span tabindex="-1">${esc(row.text)}</span></p>`
-          + (notes.length ? `<details class="update-notes"><summary>${esc(tr('Novità della {v}').replace('{v}', s!.latest!))}</summary><ul>${notes.map(line => `<li>${esc(line)}</li>`).join('')}</ul></details>` : '');
-        const button = root.querySelector<HTMLButtonElement>('[data-update]');
+        head.innerHTML = `<div><b>Visual Brain</b><small>${this.current ? ui`versione ${esc(this.current)}` : tr('versione di sviluppo')}</small></div>${row.action ? `<button type="button" class="btn small${row.action.primary ? ' primary' : ''}" data-update="${row.action.id}">${esc(row.action.label)}</button>` : '<span class="update-pct" aria-hidden="true"></span>'}`;
+        status.dataset.tone = row.tone;
+        if (said.textContent !== row.text) said.textContent = row.text;
+        notesBox.innerHTML = notes.length ? `<details class="update-notes"><summary>${esc(tr('Novità della {v}').replace('{v}', s!.latest!))}</summary><ul>${notes.map(line => `<li>${esc(line)}</li>`).join('')}</ul></details>` : '';
+        const button = head.querySelector<HTMLButtonElement>('[data-update]');
         if (button) button.onclick = () => void ({ check: () => this.check(), install: () => this.install(), restart: () => this.restart() })[row.action!.id]();
         // the button that was pressed is replaced by the next step: the keyboard stays in the row
-        if (hadFocus) (button ?? root.querySelector<HTMLElement>('.update-status span'))?.focus({ preventScroll: true });
+        if (hadFocus && !root.contains(document.activeElement)) (button ?? said).focus({ preventScroll: true });
       }
       const bar = root.querySelector<HTMLElement>('.update-progress')!;
       const known = typeof row.progress === 'number';
@@ -191,12 +217,17 @@ export class Updates {
   }
 
   private renderBanner(): void {
-    const view = this.state ? bannerFor(this.state, this.dismissed, this.locationDismissed) : null;
+    const view = this.restarting && this.state
+      ? { kind: 'busy' as const, text: settingsRow(this.state, this.restarting).text, restart: undefined }
+      : this.state ? bannerFor(this.state, this.dismissed, this.locationDismissed) : null;
     this.banner.classList.toggle('hidden', !view);
     if (!view) { this.banner.innerHTML = ''; return; }
     this.banner.dataset.kind = view.kind;
-    this.banner.innerHTML = ui`<span>${esc(view.text)}</span>` + (view.kind === 'ready' ? ui`<span><button class="btn small" data-update-install>Installa</button> <button class="btn small ghost" data-update-later>Più tardi</button></span>` : view.kind === 'busy' ? '' : ui`<button class="btn small ghost" data-update-later>Chiudi</button>`);
+    this.banner.innerHTML = ui`<span>${esc(view.text)}</span>` + (view.kind === 'ready' ? ui`<span><button class="btn small" data-update-install>Installa</button> <button class="btn small ghost" data-update-later>Più tardi</button></span>`
+      : view.restart ? `<span><button class="btn small" data-update-restart>${esc(tr('Riavvia ora'))}</button> ${ui`<button class="btn small ghost" data-update-later>Chiudi</button>`}</span>`
+      : view.kind === 'busy' ? '' : ui`<button class="btn small ghost" data-update-later>Chiudi</button>`);
     this.banner.querySelector('[data-update-install]')?.addEventListener('click', () => void this.install());
+    this.banner.querySelector('[data-update-restart]')?.addEventListener('click', () => void this.restart());
     this.banner.querySelector('[data-update-later]')?.addEventListener('click', () => {
       if (view.kind === 'location') {
         this.locationDismissed = true;

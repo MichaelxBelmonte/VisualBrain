@@ -210,6 +210,7 @@ export const en: Record<string, string> = {
   'è pronta. Installarla non chiude nessun terminale.': 'is ready. Installing it does not close any terminal.',
   'La versione': 'Version', 'Versione': 'Version',
   'Verifica aggiornamenti': 'Check for updates', 'Cerco aggiornamenti…': 'Checking for updates…', 'Riprova': 'Try again', 'Riavvia ora': 'Restart now', 'Riavvio in corso…': 'Restarting…',
+  'Il riavvio ci mette più del previsto. Se Visual Brain non si riapre, chiudila con ⌘Q e riaprila: i terminali restano attivi.': 'The restart is taking longer than expected. If Visual Brain does not reopen, quit it with ⌘Q and open it again: terminals keep running.',
   'Sei aggiornato: la {v} è l’ultima versione.': 'You are up to date: {v} is the latest version.',
   'Scarico la versione {v}…': 'Downloading version {v}…', 'Aggiorna alla {v}': 'Update to {v}', 'Novità della {v}': 'What’s new in {v}',
   'La versione {v} è pronta. Installarla non chiude nessun terminale.': 'Version {v} is ready. Installing it does not close any terminal.',

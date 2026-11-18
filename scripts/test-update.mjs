@@ -8,7 +8,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand, restartCommand } from '../src/server/updater.ts';
-import { bannerFor, noteLines, settingsRow } from '../src/ui/updates.ts';
+import { RESTART_SLOW_MS, bannerFor, noteLines, settingsRow } from '../src/ui/updates.ts';
 import { setLanguage } from '../src/ui/i18n.ts';
 import { UPDATE_PUBLIC_KEY } from '../src/server/update-key.ts';
 
@@ -64,6 +64,19 @@ execFileSync('/bin/sh', ['-n', '-c', again[1]]); checks++;
   shell.kill(); watcher.kill();
   eq(outcome, 'SIGTERM', 'a server that exited but was never reaped by the shell counts as gone');
   ok(Date.now() - from < 5000, 'and the shell is ended at once, not after the timeout');
+}
+{
+  // The watcher never stops halfway: a shell that ignores SIGTERM and a server stuck in its shutdown get SIGKILL, so the
+  // window always goes and the app is reopened (short limits here; 10 s and 30 s in the app).
+  const stubborn = spawn('/bin/sh', ['-c', 'trap "" TERM; while :; do sleep 0.1; done'], { stdio: 'ignore' });
+  const stuck = spawn('/bin/sh', ['-c', 'trap "" TERM; while :; do sleep 0.1; done'], { stdio: 'ignore' });
+  const signals = [stuck, stubborn].map(p => new Promise(r => p.once('exit', (_code, signal) => r(signal))));
+  const watcher = spawn('/bin/sh', restartCommand(stuck.pid, stubborn.pid, null, { server: 5, shell: 5 }), { stdio: 'ignore' });
+  const done = new Promise(r => watcher.once('exit', r));
+  const outcome = await Promise.race([Promise.all(signals), new Promise(r => setTimeout(() => r('still alive'), 8000))]);
+  if (outcome === 'still alive') { stubborn.kill('SIGKILL'); stuck.kill('SIGKILL'); watcher.kill(); }
+  eq(outcome, ['SIGKILL', 'SIGKILL'], 'a server stuck closing and a shell that ignores SIGTERM are ended with SIGKILL');
+  eq(await done, 0, 'and the watcher goes on to the reopen instead of giving up');
 }
 ok(inApplications('/Applications/Visual Brain.app', ['/Applications', '/Users/me/Applications']) && inApplications('/Users/me/Applications/Visual Brain.app', ['/Applications', '/Users/me/Applications/']), 'a copy in either Applications folder is the installed one');
 ok(!inApplications('/Users/me/Desktop/vb/app/src-tauri/target/universal-apple-darwin/release/bundle/macos/Visual Brain.app', ['/Applications']) && !inApplications('/Applications/Sub/Visual Brain.app', ['/Applications']), 'a build folder or a subfolder is not');
@@ -133,6 +146,13 @@ const costly = row({ status: 'installed', latest: '0.2.6', canRestart: true, liv
 ok(costly.action === null && /3 terminali attivi si chiuderanno/.test(costly.text), 'no restart button when it would close terminals');
 eq([row({ status: 'error', error: 'Boom' }).text, row({ status: 'error', error: 'Boom' }).action.label, row({ status: 'error', error: 'Boom' }).tone], ['Boom', 'Riprova', 'error'], 'error: the reason and a way to try again');
 ok(/sola lettura/.test(row({ status: 'error', error: 'EROFS: read-only file system' }).text), 'a read-only location is explained here too');
+const slow = settingsRow(view({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true }), 'slow');
+ok(slow.action === null && slow.progress === null && slow.tone === 'error' && /⌘Q/.test(slow.text) && /terminali restano attivi/.test(slow.text), 'a restart that does not close the window ends in what to do, not in an endless spinner');
+ok(RESTART_SLOW_MS >= 10_000 && RESTART_SLOW_MS <= 30_000, 'the page waits long enough for a clean shutdown, not for ever');
+const offer = bannerFor(view({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true, liveSessions: 3 }), null);
+ok(offer.restart === true && offer.text === row({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true }).text, 'the banner offers the same restart as the row, with the same words');
+ok(!bannerFor(view({ status: 'installed', latest: '0.2.6', persistentTerminals: true }), null).restart, 'without a restart the banner still says ⌘Q');
+ok(/data-update-restart/.test(readFileSync(new URL('../src/ui/updates.ts', import.meta.url), 'utf8')), 'the banner button is wired to the restart');
 eq([row({ enabled: false }).action, row({ enabled: false }).tone], [null, 'quiet'], 'a development run has no button');
 ok(/solo nell’app installata/.test(row({ enabled: false }).text), 'and says why');
 eq([settingsRow(null).tone, settingsRow(null).action.id], ['error', 'check'], 'a server that does not answer: say it, offer to try again');
@@ -273,30 +293,38 @@ if (process.platform === 'darwin') {
     const startedR = []; let quits = 0;
     const r1 = await ready('restart', appR, { applicationFolders: [appsR], spawnImpl: (c, a) => startedR.push([c, a]), shellPid: 4242, persistentTerminals: true, quit: () => { quits++; } });
     eq(r1.snapshot.canRestart, true, 'inside the real app (shell, reopen watcher, clean exit) a restart is possible');
-    throws(() => r1.restart(), /Nessun aggiornamento installato/, 'but there is nothing to restart into before an installation');
+    await rejects(() => r1.restart(), /Nessun aggiornamento installato/, 'but there is nothing to restart into before an installation');
     await r1.install();
     r1.quit(); eq(quits, 0, 'the server never quits unless a restart was accepted');
-    r1.restart();
+    await r1.restart();
     eq(startedR, [['/bin/sh', restartCommand(process.pid, 4242, appR)]], 'restart: one watcher that waits for this server, ends the shell and opens the installed app');
     eq(quits, 0, 'the server stays until the answer is out'); r1.quit(); eq(quits, 1, 'then it closes cleanly');
-    r1.restart(); eq(startedR.length, 1, 'a second request starts nothing more');
+    await r1.restart(); eq(startedR.length, 1, 'a second request starts nothing more');
+    // a watcher that cannot start: refused with what to do, nothing quits, and the next request may try again
+    const appsSF = join(temp, 'appsSF'); mkdirSync(appsSF);
+    let failing = true, quitsF = 0;
+    const rf = await ready('restart-spawn-fails', makeApp(appsSF, '0.2.5', 'spawnfail'), { applicationFolders: [appsSF], spawnImpl: async () => { if (failing) throw new Error('spawn EAGAIN'); }, shellPid: 4242, persistentTerminals: true, quit: () => { quitsF++; } });
+    await rf.install();
+    await rejects(() => rf.restart(), /Riavvio non riuscito \(spawn EAGAIN\).*⌘Q/, 'a watcher that cannot start refuses the restart and says to quit with ⌘Q');
+    rf.quit(); eq(quitsF, 0, 'and the server stays: nobody would reopen the app');
+    failing = false; await rf.restart(); rf.quit(); eq(quitsF, 1, 'once the watcher starts, the restart goes ahead');
     // relocated: the watcher of the installation already opens the app in Applications when the shell exits
     const appsS = join(temp, 'appsS'); mkdirSync(appsS);
     const startedS = [];
     const r2 = await ready('restart-relocated', translocated, { applicationFolders: [appsS], spawnImpl: (c, a) => startedS.push([c, a]), shellPid: 4242, persistentTerminals: true, quit: () => {} });
-    await r2.install(); r2.restart();
+    await r2.install(); await r2.restart();
     eq(startedS, [['/bin/sh', reopenCommand(4242, join(appsS, 'Visual Brain.app'))], ['/bin/sh', restartCommand(process.pid, 4242, null)]], 'a relocated install is opened once, by the watcher it already has');
     // terminals that would not survive: refused, the person quits when done
     const appsT = join(temp, 'appsT'); mkdirSync(appsT);
     const r3 = await ready('restart-live', makeApp(appsT, '0.2.5', 'live'), { applicationFolders: [appsT], spawnImpl: () => {}, shellPid: 4242, quit: () => {} });
     await r3.install();
-    throws(() => r3.restart(), /2 terminali attivi/, 'without the terminal host a restart with live terminals is refused');
+    await rejects(() => r3.restart(), /2 terminali attivi/, 'without the terminal host a restart with live terminals is refused');
     // not the real app (no shell to end, no clean exit): the button is not offered and the route refuses
     const appsU = join(temp, 'appsU'); mkdirSync(appsU);
     const r4 = await ready('restart-none', makeApp(appsU, '0.2.5', 'none'), { applicationFolders: [appsU], persistentTerminals: true });
     await r4.install();
     eq(r4.snapshot.canRestart, false, 'outside the real app no restart is offered');
-    throws(() => r4.restart(), /Riavvio non disponibile/, 'and asking for one is refused');
+    await rejects(() => r4.restart(), /Riavvio non disponibile/, 'and asking for one is refused');
 
     // an existing app in one of the Applications folders is preferred and swapped
     const appsC = join(temp, 'appsC'), appsD = join(temp, 'appsD'); mkdirSync(appsC); mkdirSync(appsD);
@@ -358,6 +386,8 @@ if (process.platform === 'darwin') {
 const src = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 ok(/VISUAL_BRAIN_UPDATES/.test(src('app/src-tauri/src/main.rs')) && /!TRIAL/.test(src('app/src-tauri/src/main.rs')), 'only the installed regular app enables updates');
 ok(/\/api\/update\/install/.test(src('src/server/api.ts')) && /updater\.start\(\)/.test(src('src/server/server.ts')), 'API and background check are wired');
+ok(/res\.once\('close', \(\) => ctx\.updater\.quit\(\)\)/.test(src('src/server/api.ts')), "the server quits after the answer even when the page left first ('finish' would never fire)");
+ok(/await ctx\.updater\.restart\(\)/.test(src('src/server/api.ts')), 'the answer waits until the watcher runs');
 ok(/\/api\/update\/restart/.test(src('src/server/api.ts')) && /updater\.quit\(\)/.test(src('src/server/api.ts')) && /quit: /.test(src('src/server/server.ts')), 'restart is wired: route, clean exit after the answer');
 ok(!/killTerminal|killAll|\.kill\(/.test(src('src/server/updater.ts')), 'the updater never kills a terminal; the only process it ends is the app shell, on "Riavvia"');
 ok(/mountUpdates/.test(src('src/ui/settings.ts')) && /mountSettings/.test(src('src/ui/main.ts')), 'the settings row is mounted from Impostazioni');
