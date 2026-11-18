@@ -368,8 +368,9 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       return send(res, 200, ctx.updater.snapshot);
     }
     if (path === '/api/update/restart' && method === 'POST') {
-      try { ctx.updater.restart(); } catch (error) { throw new HttpError(409, error instanceof Error ? error.message : String(error)); }
-      res.once('finish', () => ctx.updater.quit()); // the page gets its answer before the server goes
+      try { await ctx.updater.restart(); } catch (error) { throw new HttpError(409, error instanceof Error ? error.message : String(error)); }
+      // the page gets its answer before the server goes; 'close' also fires when the page left first, which 'finish' does not
+      res.once('close', () => ctx.updater.quit());
       return send(res, 200, ctx.updater.snapshot);
     }
     if (path === '/api/preferences' && method === 'GET') return send(res, 200, { roots: ctx.cfg.roots, language: ctx.cfg.language, setupComplete: ctx.cfg.setupComplete, home: homedir(), desktopMode: ctx.cfg.desktopMode });
