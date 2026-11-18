@@ -135,3 +135,8 @@ assert.equal(ui`termina le sue ${3} sessioni e lo toglie dalla vista`, 'stops it
 assert.equal(ui`<span>Chiudere ${'X'}?</span>`, '<span>Close X?</span>');
 setLanguage('it');
 console.log('PASS node menu named after its node, closing a node confirmed with its sessions listed, settings in one window');
+
+if (process.argv.includes('--transitions')) {
+  const { testTransitions } = await import('./test-work-transitions.mjs');
+  await testTransitions();
+}
