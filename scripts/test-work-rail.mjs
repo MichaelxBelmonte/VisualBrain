@@ -57,6 +57,7 @@ try {
     assert.match(source, /\?\? rows\[Math\.min\(focusedAt, rows\.length - 1\)\]\)\?\.focus\(\{ preventScroll: true \}\)/, 'the highlight keeps its place when its session leaves the list');
     // The preview of the highlighted session lives in the rail and reuses what the quick menu already supports.
     assert.match(source, /this\.listEl\.insertAdjacentElement\('afterend', preview\);/, 'the preview is part of the rail, not a popup');
+    assert.match(source, /new ResizeObserver\(\(\) => this\.listEl\.querySelector<HTMLElement>\('\.work-session\.previewed'\)\?\.scrollIntoView\(\{ block: 'nearest' \}\)\)\.observe\(this\.listEl\);/, 'the highlighted row stays in view when the preview takes room from the list');
     assert.match(source, /this\.listEl\.addEventListener\('focusin', e => this\.showRailPreview\(\(e\.target as HTMLElement\)\.closest<HTMLElement>\('\.work-session'\)\?\.dataset\.sid \?\? null\)\);/, 'the preview follows the keyboard highlight');
     assert.match(source, /const items = \[\.\.\.this\.tabs\.values\(\)\]\.map\(tab => this\.quickItem\(tab\)\);/, 'the quick menu and the rail preview describe a session the same way');
     assert.match(source, /onNativeModel: id => this\.nativeModel\(id\), onModel: id => this\.changeModel\(id\)/);

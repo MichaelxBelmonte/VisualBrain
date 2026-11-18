@@ -1460,7 +1460,8 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .work-rail-preview-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 11.5px; }
 .work-rail-preview-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .work-rail-preview small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; color: var(--g4); }
-.work-rail-preview pre { flex: 0 1 auto; min-height: 2.8em; max-height: 8.4em; margin: 0; padding: 6px 7px; overflow: auto; border-radius: 5px; background: var(--g1); color: var(--g5); font: 10.5px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A fixed height: the list does not jump while the highlight moves from one session to the next. */
+.work-rail-preview pre { flex: 0 0 auto; height: 5.6em; margin: 0; padding: 6px 7px; overflow: auto; border-radius: 5px; background: var(--g1); color: var(--g5); font: 10.5px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .work-rail-preview-actions { display: flex; flex-direction: column; gap: 4px; }
 .work-rail-preview-actions .btn { width: 100%; min-height: 26px; padding: 3px 8px; justify-content: flex-start; font-size: 11px; text-align: left; white-space: normal; }
 #work-node-rail .work-session.previewed { background: var(--rail-hover); box-shadow: inset 2px 0 var(--fg); }

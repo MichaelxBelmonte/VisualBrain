@@ -176,6 +176,8 @@ export class Terminals {
     preview.setAttribute('aria-label', tr('Anteprima del terminale'));
     preview.innerHTML = ui`<div class="work-rail-preview-head"><strong></strong><small data-preview-launch-model></small></div><pre></pre><div class="work-rail-preview-actions"><button type="button" class="btn" data-preview-native>Copia /model e apri</button><button type="button" class="btn" data-preview-model>Nuova sessione con un altro modello</button></div><small data-preview-hint></small>`;
     this.listEl.insertAdjacentElement('afterend', preview);
+    // The preview takes its room from the list: the highlighted row must not end up hidden under it.
+    new ResizeObserver(() => this.listEl.querySelector<HTMLElement>('.work-session.previewed')?.scrollIntoView({ block: 'nearest' })).observe(this.listEl);
     // The preview follows the keyboard highlight and goes away with it; it never follows the pointer.
     this.listEl.addEventListener('focusin', e => this.showRailPreview((e.target as HTMLElement).closest<HTMLElement>('.work-session')?.dataset.sid ?? null));
     const left = () => setTimeout(() => {
