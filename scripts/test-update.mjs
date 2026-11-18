@@ -473,6 +473,7 @@ ok(!startedByShell({ VISUAL_BRAIN_SHELL: '4242' }, 4242) && !startedByShell({ VI
     eq(new Updater({ dataDir: tmpdir(), version: '0.2.4' }).snapshot.enabled, true, 'the shell\'s own server is enabled');
   } finally { keys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i]; }); }
 }
+ok(/VISUAL_BRAIN_UPDATES === '1' && !startedByShell\(\)\) console\.error\('\[update\]/.test(src('src/server/server.ts')), 'updates left off by an inherited switch are said in the server log');
 ok(/VISUAL_BRAIN_UPDATES/.test(src('app/src-tauri/src/main.rs')) && /!TRIAL/.test(src('app/src-tauri/src/main.rs')), 'only the installed regular app enables updates');
 ok(/\/api\/update\/install/.test(src('src/server/api.ts')) && /updater\.start\(\)/.test(src('src/server/server.ts')), 'API and background check are wired');
 ok(/res\.once\('close', \(\) => ctx\.updater\.quit\(\)\)/.test(src('src/server/api.ts')), "the server quits after the answer even when the page left first ('finish' would never fire)");

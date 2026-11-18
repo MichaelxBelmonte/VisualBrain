@@ -10,7 +10,7 @@ import { GraphCache } from './cache.ts';
 import { TerminalService } from './terminal-service.ts';
 import { replayState } from './terminals.ts';
 import { Teams } from './team.ts';
-import { Updater } from './updater.ts';
+import { Updater, startedByShell } from './updater.ts';
 import { folderAccess } from './access.ts';
 import { startTeamWatch } from './team-watch.ts';
 import { stopHarnessInstalls } from './harness-installer.ts';
@@ -201,6 +201,8 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     ctx.startupMap = openStartupMap();
   };
 
+  // Said once in the log: a switch that arrived without the shell being our parent (an older terminal, a wrapper) leaves updates off.
+  if (process.env.VISUAL_BRAIN_UPDATES === '1' && !startedByShell()) console.error('[update] interruttore degli aggiornamenti ereditato, non dalla shell dell’app: aggiornamenti spenti in questo server');
   const updater = new Updater({ dataDir: cfg.dataDir, version, liveSessions: () => terms.list().filter(t => t.alive).length, persistentTerminals: true, quit: () => { process.kill(process.pid, 'SIGTERM'); } });
   // A folder macOS refused is mapped again as soon as the user allows it in System Settings.
   const access = folderAccess(() => cfg.setupComplete ? cfg.roots : [], () => { startIndex(); });
