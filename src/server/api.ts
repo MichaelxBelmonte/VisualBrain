@@ -620,7 +620,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         if (!member) throw new HttpError(403, 'Conferma riservata alla sessione autenticata');
         const ack = acknowledgeConsumer({ dataDir: ctx.cfg.dataDir, nodeId, team, session: actor, consumer: b.consumer },
           b.through, ctx.teams.get(nodeId, team).messages, b.acceptGapThrough);
-        if (ack.drivesNotices && b.acceptGapThrough === undefined) markNoticeConfirmed(ctx, actor);
+        if (ack.drivesNotices && b.through === ack.ackedThrough) markNoticeConfirmed(ctx, actor, ack.ackedThrough, b.acceptGapThrough !== undefined);
         return send(res, 200, ack);
       }
       const links = ctx.teams.getLinks().filter(l => l.srcNodeId === nodeId || l.dstNodeId === nodeId);

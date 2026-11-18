@@ -22,7 +22,8 @@ async function serve(dataDir, drop) {
   const server = createServer((req, res) => {
     if (req.url === '/fixture-offsets') {
       const a = terminals.get('a');
-      res.end(JSON.stringify({ legacy: a.seenMessage, notice: a.injectedMessage, confirmed: !!a.info.noticeConfirmed, state: a.info.workState }));
+      res.end(JSON.stringify({ legacy: a.seenMessage, notice: a.injectedMessage, confirmed: !!a.info.noticeConfirmed,
+        outstanding: a.info.noticeSentAt !== undefined, state: a.info.workState }));
       return;
     }
     if (drop && req.url.includes('consumer=terminal')) {
@@ -117,7 +118,7 @@ async function run() {
     assert.equal(skipped.delivery.replay,true);
     await ack('terminal',skipped.delivery.next,409);
     assert.equal(JSON.parse(bridge('ack',{consumer:'terminal',through:54}).content[0].text).ackedThrough,54);
-    assert.deepEqual(await offsets(),{legacy:2,notice:54,confirmed:true,state:'idle'},'primary ACK confirms the notice without claiming work');
+    assert.deepEqual(await offsets(),{legacy:2,notice:54,confirmed:true,outstanding:true,state:'idle'},'primary ACK confirms the notice without claiming work');
     assert.equal((await ack('terminal',40)).ackedThrough,54,'late ACK cannot move backwards');
     await idle();
     assert.equal((await offsets()).notice,64,'primary ACK alone enables the next notice on idle');
@@ -181,6 +182,26 @@ async function run() {
     assert.equal(following.delivery.gap,null);
     assert.equal(following.messages[0].id,firstId+1);
     assert.equal(following.delivery.oldestAvailable,firstId+1);
+    // Keep this backend and its PTY alive while the announced page falls out of retention.
+    const acceptPrimary = through => bridge('ack',{consumer:'terminal',through,acceptGapThrough:through});
+    const oldGap = (await read('terminal')).delivery.gap;
+    assert.equal(acceptPrimary(oldGap.to).isError,undefined);
+    await idle();
+    const notice = await offsets();
+    assert.equal(notice.outstanding,true);
+    await read('terminal');
+    for (let i=0;i<552;i++) await call('POST','/api/work/7/messages','b',{to:'a',text:'rollover '+i},201);
+    await ack('terminal',notice.notice,409);
+    const currentGap = (await read('terminal')).delivery.gap;
+    assert.ok(currentGap.to >= notice.notice);
+    assert.equal(acceptPrimary(currentGap.to).isError,undefined);
+    const expired = await offsets();
+    assert.deepEqual([expired.outstanding,expired.confirmed,expired.state],[false,false,'idle'],'reconciliation retires an expired notice without confirming work');
+    await idle();
+    const freshPage = await read('terminal');
+    await ack('terminal',freshPage.delivery.next);
+    assert.equal(acceptPrimary(currentGap.to).isError,undefined);
+    assert.equal((await offsets()).confirmed,true,'retry of an older reconciliation cannot retire a later confirmed notice');
     await stop();
     for(const isolated of [{...key,nodeId:8},{...key,team:'2'}]) {
       assert.throws(()=>acknowledgeConsumer(isolated,pending.next,retained),e=>e.status===409);
