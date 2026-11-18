@@ -1,6 +1,6 @@
 {
   "name": "visual-brain",
-  "version": "0.2.53",
+  "version": "0.2.54",
   "description": "Local-first visual brain: knowledge graph of the files on the Desktop, with agents launched from the nodes.",
   "license": "MIT",
   "author": "Michael Belmonte",

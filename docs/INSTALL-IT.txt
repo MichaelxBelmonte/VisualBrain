@@ -1,4 +1,4 @@
-VISUAL BRAIN 0.2.53 — MAC
+VISUAL BRAIN 0.2.54 — MAC
 
 1. Estrai lo ZIP e trascina Visual Brain.app in Applicazioni PRIMA di aprirla.
    Aperta dalla cartella Download o da quella dello ZIP, macOS la esegue da una
