@@ -70,6 +70,43 @@ const termTs = readFileSync(new URL('../src/ui/terminal.ts', import.meta.url), '
   assert.match(termTs, /new Terminal\(\{[^}]*minimumContrastRatio: 4\.5/, 'xterm lifts any colour still below 4.5:1, truecolor included');
   assert.match(termTs, /\.\.\.\(dark \? ANSI_DARK : ANSI_LIGHT\)/, 'the palette is chosen again on every theme change');
 }
+// Operativa, from the tokens in style.css: the state pills in the node rail read at 4.5:1 on plain, hover and selected rows
+// (before: «Permesso richiesto» 3.29 and «Bloccato» 4.19 in light), and the ⠿ handle of tiled terminals at 3:1 at rest
+// (before: 1.94 light, 2.19 dark).
+{
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, p) => a.map((v, i) => v * p + b[i] * (1 - p));
+  const lum = c => { const [r, g, b] = c.map(v => v / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const tokens = block => Object.fromEntries([...block.matchAll(/--([\w-]+): (#[0-9a-f]{6})/gi)].map(m => [m[1], m[2]]));
+  const light = tokens(css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {'))));
+  const darkAt = css.indexOf(':root[data-theme="dark"] {');
+  const dark = { ...light, ...tokens(css.slice(darkAt, css.indexOf('}', darkAt))) };
+  const pct = (re, what) => { const m = css.match(re); assert.ok(m, what); return Number(m[1]) / 100; };
+  const flag = css.match(/#work-node-rail \.tone-flag \{[^}]*\}/)[0];
+  // Share of the tone in the pill text (the rest is --fg); a plain var(--tone) is 100%.
+  const leanAt = flag.match(/[{ ]color: color-mix\(in srgb, var\(--tone, var\(--g5\)\) (\d+)%, var\(--fg\)\)/);
+  assert.ok(leanAt || /[{ ]color: var\(--tone, var\(--g5\)\)/.test(flag), 'the rail pill text colour is one the test can measure');
+  const lean = leanAt ? Number(leanAt[1]) / 100 : 1;
+  const tint = Number(flag.match(/background: color-mix\(in srgb, var\(--tone, var\(--g4\)\) (\d+)%, transparent\)/)[1]) / 100;
+  const hover = pct(/--rail-hover: color-mix\(in srgb, var\(--fg\) (\d+)%, transparent\)/, 'rail hover'), selected = pct(/--rail-selected: color-mix\(in srgb, var\(--fg\) (\d+)%, transparent\)/, 'rail selected');
+  const grip = Number(css.match(/^\.work-tile-drag \{ border: 0; padding: 4px 2px; opacity: (\.\d+|[01](?:\.\d+)?);/m)[1]);
+  for (const [theme, t] of [['light', light], ['dark', dark]]) {
+    const bg = hex(t.bg), fg = hex(t.fg);
+    for (const [row, k] of [['plain', 0], ['hover', hover], ['selected', selected]]) {
+      for (const tone of ['orch', 'active', 'idle', 'blocked', 'attention', 'stale']) {
+        const c = hex(t[`role-${tone}`]), r = ratio(mix(c, fg, lean), mix(c, mix(fg, bg, k), tint));
+        assert.ok(r >= 4.5, `${theme} rail pill ${tone} on a ${row} row: ${r.toFixed(2)}:1`);
+      }
+    }
+    const g = ratio(mix(hex(t.g4), bg, grip), bg);
+    assert.ok(g >= 3, `${theme} ⠿ handle at rest: ${g.toFixed(2)}:1`);
+  }
+  // The measurements reproduce what was seen before the change.
+  const before = ratio(hex(light['role-attention']), mix(hex(light['role-attention']), mix(hex(light.fg), hex(light.bg), selected), tint));
+  assert.ok(Math.abs(before - 3.29) < 0.05, `the old «Permesso richiesto» on a selected light row was 3.29:1, measured ${before.toFixed(2)}`);
+  assert.ok(Math.abs(ratio(mix(hex(light.g4), hex(light.bg), 0.45), hex(light.bg)) - 1.94) < 0.02, 'the old handle in light was 1.94:1');
+}
 assert.match(css, /\.term-pane\.renaming \.session-heading > \.session-label \{ display: inline-flex;/);
 assert.match(css, /\.term-pane\.renaming \.session-head \.term-tabs \{ display: none; \}/);
 assert.match(termTs, /tabStrip\.addEventListener\('dblclick'[^\n]*startRename/);
