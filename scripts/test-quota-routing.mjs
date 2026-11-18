@@ -72,6 +72,7 @@ try{
   assert.equal(ctx.teams.get(node).messages.length,beforeMessages+1,'restart, replayed handoff and scheduler produce one successor notice');
   assert.equal(ctx.teams.get(node).tasks[1].assignedTo,null,'one owner cannot start two routed tasks');
   await patch(task.id,'working','a');await patch(task.id,'done','a');
+  await api('POST',work+'/state',{state:'idle'},'a');
   ctx.routing.tick(ctx,now);assert.equal(ctx.teams.get(node).tasks[1].assignedTo,'a');
   await patch(second.id,'done','a');
   const pooled={...rule,groups:{...rule.groups,codex:'shared',claude:'shared'}};

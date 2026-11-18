@@ -206,7 +206,11 @@ export interface TerminalInfo {
   workState?: 'working' | 'idle' | 'blocked';
   /** When the session last became idle (ms): lets the team spot operators left without work. */
   idleSince?: number;
-  /** Who set workState last: the agent through the API, Claude Code hooks (turn start/end), or the server (message delivery). */
+  /** Latest terminal notice while waiting. Repeated idle reports can precede the client acknowledgement. */
+  noticeSentAt?: number;
+  /** The primary consumer explicitly confirmed the whole announced batch. */
+  noticeConfirmed?: boolean;
+  /** Who reported the work state: the agent, a lifecycle hook, or the server at launch. */
   stateSource?: 'agent' | 'hook' | 'server';
   /** When workState last changed (ms). */
   stateAt?: number;
@@ -246,6 +250,8 @@ export interface TeamTask {
   status: 'pending' | 'working' | 'done' | 'blocked'; result: string; createdBy: string; updatedAt: number;
   /** The result waits on the sorting board (manual delivery): the orchestrator sees the status, not the result, until it is forwarded. */
   held?: boolean;
+  /** Display code for a blocked task even after its owner's terminal has been removed. */
+  blockedOwnerCode?: string;
 }
 /** What reaches the sorting board instead of the orchestrator, classified by rule (no model call). */
 export type InboxKind = 'result' | 'blocked' | 'question' | 'note';

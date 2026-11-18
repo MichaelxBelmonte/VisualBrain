@@ -25,7 +25,9 @@ import { removeWorktree } from './worktrees.ts';
 import { gitCommit, gitFetch, gitOverview, gitTop, githubState } from './git.ts';
 import { codeDiff, codeFile, codeSearch, codeTree, localCodeSearch, insideRepo, openInEditor } from './code.ts';
 import { saveAttachment } from './attachments.ts';
-import { notifyTeam, setWorkState, wakeSession } from './team-delivery.ts';
+import { markNoticeConfirmed, notifyTeam, setWorkState, wakeSession } from './team-delivery.ts';
+import { acknowledgeConsumer, readConsumer } from './work-cursors.ts';
+import { workRecords } from './work-records.ts';
 import { normalizePath, getOrCreateExternal, lazyIndex, resolveExisting } from './graph.ts';
 import { handleReminderBoard, defaultReminderFolder } from './reminder-board.ts';
 import { apiWrite } from './api-write.ts';
@@ -592,7 +594,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       ctx.stats?.capture(() => ctx.stats!.turn(t.info,phase,typeof b.turnId === 'string' ? b.turnId : undefined));
       return sendJson(res,200,{ok:true});
     }
-    m = /^\/api\/work\/(\d+)(?:\/(messages|tasks|state|spawn|wake|inbox|forward|proposals|handoff)(?:\/([a-z0-9-]+))?)?$/.exec(path);
+    m = /^\/api\/work\/(\d+)(?:\/(messages|tasks|state|spawn|wake|inbox|forward|proposals|handoff|ack|records)(?:\/([a-z0-9-]+))?)?$/.exec(path);
     if (m) {
       const nodeId = Number(m[1]);
       const node = requireNode(ctx, nodeId);
@@ -614,6 +616,18 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       // A squad's board shows its members; the Main Brain's board its own session and the orchestrators it talks to.
       const sessions = isBrain ? all.filter(s => s.role === 'brain' || s.role === 'orchestrator') : all.filter(s => s.role && s.role !== 'brain' && ctx.teams.teamOf(nodeId, s) === team);
       const canManage = actor === 'user' || member?.info.role === (isBrain ? 'brain' : 'orchestrator');
+      if (action === 'records' && !taskId && (method === 'GET' || method === 'POST')) return send(res, 200, workRecords({
+        dataDir: ctx.cfg.dataDir, nodeId, project: node.path, team, actor, author: member?.info.code ?? ctx.teams.get(nodeId).codes?.ids[actor] ?? actor,
+        canManage, shareWithBrain: ctx.teams.get(nodeId, BRAIN_TEAM).policy.delivery !== 'manual',
+        method, body: method === 'GET' ? { before: url.searchParams.get('before') } : b,
+      }));
+      if (action === 'ack' && !taskId && method === 'POST') {
+        if (!member) throw new HttpError(403, 'Conferma riservata alla sessione autenticata');
+        const ack = acknowledgeConsumer({ dataDir: ctx.cfg.dataDir, nodeId, team, session: actor, consumer: b.consumer },
+          b.through, ctx.teams.get(nodeId, team).messages, b.acceptGapThrough);
+        if (ack.drivesNotices && b.through === ack.ackedThrough) markNoticeConfirmed(ctx, actor, ack.ackedThrough, b.acceptGapThrough !== undefined);
+        return send(res, 200, ack);
+      }
       const links = ctx.teams.getLinks().filter(l => l.srcNodeId === nodeId || l.dstNodeId === nodeId);
       // Sessions of other boards (another squad's Main Brain or orchestrator, linked nodes) this board may write to.
       const peers = ctx.teams.withCodes(ctx.terms.list().filter(s => s.alive && s.role && !sessions.some(own => own.id === s.id) && sessions.some(own => own.alive && ctx.teams.canTalk(own, s))));
@@ -633,16 +647,21 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const notify = () => notifyTeam(ctx, nodeId, team);
       const visible = ({ codes: _codes, members: _members, teams: _teams, nextTeam: _next, savedSquads: _saved, ...rest }: TeamBoard) => rest;
       if (!action && method === 'GET') {
+        const consumer = url.searchParams.get('consumer'), after = url.searchParams.get('after');
+        if (after !== null && consumer === null) throw new HttpError(400, 'Il replay richiede un consumer');
+        if (consumer !== null && !member) throw new HttpError(403, 'Consumer riservato alla sessione autenticata');
         if (!member) return send(res, 200, { ...visible(board), savedSquads: ctx.teams.get(nodeId).savedSquads, messages: board.messages.slice(-50), sessions, peers, links, team: isBrain ? undefined : ctx.teams.team(nodeId, team), teamList: ctx.teams.summaries(nodeId, all), brain });
-        const messages = board.messages.filter(msg => msg.id > member.seenMessage && msg.from !== actor && (!msg.to || msg.to === actor)).slice(0, 50);
-        if (messages.length) member.seenMessage = messages.at(-1)!.id;
+        const page = consumer === null ? null : readConsumer({ dataDir: ctx.cfg.dataDir, nodeId, team, session: actor, consumer }, board.messages, member.seenMessage, after);
+        const messages = page?.messages ?? board.messages.filter(msg => msg.id > member.seenMessage && msg.from !== actor && (!msg.to || msg.to === actor)).slice(0, 50);
+        if (!page && messages.length) member.seenMessage = messages.at(-1)!.id;
+        const delivery = page ? { delivery: page.delivery } : {};
         const { inbox: _inbox, ...own } = visible(board);
-        if (isBrain) return send(res, 200, { ...own, messages, sessions, peers, links,
+        if (isBrain) return send(res, 200, { ...own, ...delivery, messages, sessions, peers, links,
           teamList: ctx.teams.summaries(nodeId, all, { id: actor, allHandoffs: url.searchParams.get('handoffs') === 'all' }).filter(t => !t.archived) });
         // With manual delivery a held result is not the orchestrator's yet: it sees the status, the person forwards the content.
         const held = english ? '(delivered, being sorted by the user)' : '(consegnato, in smistamento dall’utente)';
         const tasks = member.info.role === 'orchestrator' ? board.tasks.map(t => t.held ? { ...t, result: held } : t) : board.tasks.filter(t => t.assignedTo === actor || (t.assignedTo === null && t.status !== 'done'));
-        return send(res, 200, { ...own, messages, tasks, sessions, peers, links, team: ctx.teams.team(nodeId, team), brain: member.info.role === 'orchestrator' ? brain : undefined });
+        return send(res, 200, { ...own, ...delivery, messages, tasks, sessions, peers, links, team: ctx.teams.team(nodeId, team), brain: member.info.role === 'orchestrator' ? brain : undefined });
       }
       if (!action && method === 'PATCH') {
         if (!canManage) throw new HttpError(403, 'Solo l’orchestratore aggiorna il riepilogo');
@@ -736,6 +755,9 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
           || (assignedTo !== undefined && assignedTo !== before.assignedTo);
         // Always validate ownership and the transition, including repeat requests.
         const task = ctx.teams.changeTask(nodeId, taskId, actor, member?.info.role, { status: b.status, result: b.result, ...(assignedTo !== undefined ? { assignedTo } : {}), ...(manual && changed ? { held: true } : {}) }, team);
+        if (b.status === 'working' && member && task.assignedTo === actor && (before?.status !== 'working' || before.assignedTo !== actor)) {
+          setWorkState(member.info, 'working', 'agent');
+        }
         if (task.status === 'done' && before?.status !== 'done')
           ctx.stats?.done(nodeId,team,task.assignedTo,task.id);
         if (!changed && task.assignedTo === before?.assignedTo) return send(res, 200, task);

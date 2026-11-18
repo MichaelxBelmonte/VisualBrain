@@ -137,8 +137,8 @@ export function resumeEmbedded(terms: TerminalStore, cfg: Config, info: Terminal
   const agent = info.agent as 'claude' | 'codex';
   const options: LaunchOptions = { model: info.model, effort: info.effort, role: info.role, parentId: info.parentId, task: info.task };
   const prompt = info.role ? (cfg.language === 'en'
-    ? 'Visual Brain restarted this session after its process ended. Your unfinished assignments went back to the queue: read the board, claim again what is still yours and continue.'
-    : 'Visual Brain ha riavviato questa sessione dopo la chiusura del processo. I tuoi incarichi non completati sono tornati in coda: rileggi la bacheca, rivendica di nuovo quelli ancora tuoi e continua.') : undefined;
+    ? 'Visual Brain restarted this session after its process ended. Read the board before resuming. Check each task’s current owner, blocker and checkpoint. Claim available work before starting.'
+    : 'Visual Brain ha riavviato questa sessione dopo la chiusura del processo. Prima di riprendere, rileggi la bacheca. Verifica proprietario, blocco e checkpoint di ogni incarico. Rivendica il lavoro disponibile prima di iniziare.') : undefined;
   const { file, args } = embeddedCommand(agent, resumeCommand(agent, cfg, info.cwd, resumeId, options, prompt), info.role, memory);
   return terms.spawn({ ...options, id: info.id, createdAt: info.createdAt, branch: info.branch, teamToken, seenMessage, resumeId, agent, cwd: info.cwd, file, args, env: embeddedEnv(cfg, agent, info.nodeId ?? null, info.id, teamToken, info.role, memory), title: info.title, nodeId: info.nodeId, cols: size?.cols, rows: size?.rows });
 }

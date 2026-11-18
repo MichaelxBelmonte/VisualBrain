@@ -25,6 +25,10 @@ Base: `http://127.0.0.1:4747`. Tutte le risposte sono JSON. I tipi sono in `src/
 | POST | `/api/harnesses/install` | `{harness: 'deepseek' \| 'harness2-cli' \| 'harness2-google'}` | `202` e stato dell'installazione; solo UI, download nel profilo personale. Doppio clic riusa il lavoro in corso; strumenti pronti preservati. Nessuna chiamata a modelli |
 | POST | `/api/launch-harness` | `{id, harness: 'deepseek' \| 'harness2-cli' \| 'harness2-google', action: 'prepare' \| 'run' \| 'setup', prompt?, maxCalls?: 1..200}` | `{termId, info}`; solo UI, terminale senza ruolo squadra. DeepSeek: run/setup; CLI community: prepare/run; ufficiale: prepare (demo). Vedi [HARNESSES.md](HARNESSES.md) |
 | GET | `/api/work/:nodeId` | `session=<termId>` opzionale | `TeamView`: bacheca, sessioni, `peers` collegati, `links`; lettura autenticata incrementale per agenti |
+| GET | `/api/work/:nodeId?session=:id&consumer=:name` | `after` facoltativo per il replay | Pagina di eventi e stato del cursore. La conferma esplicita avviene dopo l’elaborazione. |
+| POST | `/api/work/:nodeId/ack` | `{from, consumer, through, acceptGapThrough?}` | Conferma cumulativa del consumer. Una lacuna per scadenza richiede riconciliazione esplicita. |
+| GET | `/api/work/:nodeId/records` | `session` per gli agenti, `before` per paginare | Registro del progetto con visibilità per ruolo e squadra. |
+| POST | `/api/work/:nodeId/records` | `{from?, entryId, kind, decision, nextOwner, taskId?, sha?, artifact?}` | Voce idempotente con autore e data attribuiti dal server. |
 | PATCH | `/api/work/:nodeId` | `{ from?, summary?, autoSpawn?, maxAgents?, worktrees? }` | bacheca; riepilogo aggiornabile dall’orchestratore, policy solo dall’utente |
 | POST | `/api/work/:nodeId/messages` | `{ from?, to?: termId | null, text }` | messaggio; destinatari di altri nodi richiedono un canale esplicito |
 | POST | `/api/work/:nodeId/tasks` | `{ from?, title, scope?: string[], assignedTo?: termId | null }` | incarico; utente o orchestratore |

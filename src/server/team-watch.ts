@@ -23,7 +23,7 @@ const name = (s: TerminalInfo) => s.code ?? s.id;
 /**
  * Local watchdog, no AI calls: an operator or reviewer that has been idle for a while with nothing assigned is either told to
  * take an unassigned task, or reported to the orchestrator, which is the one who decides what to hand out next. Sessions
- * waiting for the person in their terminal, or declared working (by the agent or by a delivery) but silent, are reported too.
+ * waiting for the person in their terminal, or declared working but silent, are reported too.
  * Hook turns are checked too: Esc interrupts a turn without the Stop hook.
  */
 export function checkIdle(ctx: ApiCtx, now = Date.now(), reminded: Reminded = new Map()): { nudged: string[]; reported: string[] } {
@@ -48,7 +48,7 @@ export function checkIdle(ctx: ApiCtx, now = Date.now(), reminded: Reminded = ne
     const last = (keys: string[]) => keys.every(k => (reminded.get(k)?.count ?? 0) + 1 >= MAX_REMINDERS) ? finalNotice : '';
     const lastSign = (s: TerminalInfo) => Math.max(s.stateAt ?? s.createdAt ?? 0, s.lastOutputAt ?? 0, s.lastInputAt ?? 0);
     // messages queued for a session that went quiet while declared working (its turn ended without reporting idle)
-    for (const s of sessions) if (isQuiet(s, now)) wakeSession(ctx, s.id, { now });
+    for (const s of sessions) if (isQuiet(s, now) || (s.workState === 'idle' && s.noticeSentAt !== undefined)) wakeSession(ctx, s.id, { now });
     const orchestrator = sessions.find(s => s.role === 'orchestrator');
     const workers = sessions.filter(s => s.role !== 'orchestrator');
     const attentionKey = (s: TerminalInfo) => `attention:${s.id}:${ctx.terms.get(s.id)?.activity?.attentionAt ?? ''}`;

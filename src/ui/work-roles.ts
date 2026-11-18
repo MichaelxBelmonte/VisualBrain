@@ -6,7 +6,7 @@ export type SessionTone = 'orchestrator' | 'active' | 'idle' | 'blocked' | 'atte
 
 export interface ToneSession {
   alive: boolean; role?: string; workState?: string; idleSince?: number;
-  stateSource?: string; stateAt?: number; lastOutputAt?: number; lastInputAt?: number; attention?: string;
+  stateSource?: string; stateAt?: number; noticeSentAt?: number; noticeConfirmed?: boolean; lastOutputAt?: number; lastInputAt?: number; attention?: string;
 }
 
 /** Meaningful terminal output this recent means the agent is working, whatever it declares. */
@@ -73,6 +73,7 @@ export function toneReason(s: ToneSession, now = Date.now()): string {
       return ui`Nessuna attività da ${minutes} min`;
     }
     case 'idle': {
+      if (s.noticeSentAt !== undefined) return s.noticeConfirmed ? tr('Eventi confermati dal client') : tr('Avviso inviato al terminale');
       const minutes = s.idleSince === undefined ? 0 : Math.floor(age(s.idleSince, now) / 60_000);
       return minutes >= 1 ? ui`In attesa da ${minutes} min` : tr('In attesa');
     }

@@ -9,7 +9,10 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Terminals, appendBuffer, type SpawnOptions, type Term, type TerminalStore } from './terminals.ts';
 import { noteInjected } from './activity.ts';
-import { TERMINAL_PROTOCOL, metadataFields, observe, readFrames, sendFrame, type HostRecord, type TermPatch, type TermSnapshot } from './terminal-wire.ts';
+import { TERMINAL_PROTOCOL, metadataFields, observe, readFrames, sendFrame, sendFrames, type HostRecord, type TermPatch, type TermSnapshot } from './terminal-wire.ts';
+
+const workStateFields = ['workState', 'stateSource', 'stateAt', 'idleSince'] as const;
+const noticeField = (key: string) => key === 'noticeSentAt' || key === 'noticeConfirmed';
 
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const alive = (pid: number): boolean => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code !== 'ESRCH'; } };
@@ -65,6 +68,7 @@ export class TerminalService implements TerminalStore {
   private pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   private sequence = 0;
   private applying = false;
+  private noticeOnly = false;
   private closing = false;
   private failure: Error | null = null;
   private onExit: (id: string, code: number) => void;
@@ -140,13 +144,15 @@ export class TerminalService implements TerminalStore {
       });
       readFrames(socket, m => {
         if (m.error && !m.request) { this.failure = new Error(m.error); if (!ready) reject(this.failure); socket.destroy(); return; }
-        if (m.event === 'ready') { ready = true; this.connected = true; this.hostPid = m.pid; clearTimeout(timeout); resolve(); return; }
+        if (m.event === 'ready') { ready = true; this.connected = true; this.hostPid = m.pid; this.noticeOnly = m.noticeOnly === true; clearTimeout(timeout); resolve(); return; }
         if (m.event === 'term') { this.add(m.term); return; }
         if (m.event === 'output') {
           const t = this.terms.get(m.id); if (!t) return;
           appendBuffer(t, m.data); for (const listener of t.listeners) listener(m.data);
         } else if (m.event === 'patch') {
           const t = this.terms.get(m.id); if (!t) return;
+          // These fields are API-owned. Old hosts echo temporary changes from their legacy deliver operation.
+          if (m.patch.section === 'info' && (noticeField(m.patch.key) || (!this.noticeOnly && workStateFields.some(key => key === m.patch.key)))) return;
           this.applying = true;
           try {
             const target = t[m.patch.section as 'info' | 'activity'] as unknown as Record<string, unknown>;
@@ -167,6 +173,7 @@ export class TerminalService implements TerminalStore {
   private add(s: TermSnapshot): void {
     const id = s.info.id;
     const changed = (section: TermPatch['section']) => (key: string, value: unknown) => {
+      if (section === 'info' && noticeField(key) && !this.noticeOnly) return;
       if (!this.applying) this.command({ op: 'patch', id, patch: { section, key, value } });
     };
     const t: Term = {
@@ -200,6 +207,11 @@ export class TerminalService implements TerminalStore {
   async spawn(opts: SpawnOptions): Promise<Term> {
     const id = await this.request({ op: 'spawn', opts: { ...opts, env: this.env(opts.env) } });
     const term = this.terms.get(id)!;
+    // A previous host marks initial assignments working as soon as it starts the PTY.
+    if (!this.noticeOnly && opts.role && opts.task && term.info.stateSource === 'server') {
+      term.info.workState = 'idle';
+      term.info.idleSince = term.info.stateAt;
+    }
     // A host started by an older version drops unknown spawn fields: keep them for this server's lifetime.
     if (opts.resumeId && !term.info.resumeId) term.info.resumeId = opts.resumeId;
     if (opts.branch && !term.info.branch) term.info.branch = opts.branch;
@@ -218,11 +230,18 @@ export class TerminalService implements TerminalStore {
   deliver(id: string, notice: string, cursor: number, now: number): boolean {
     const t = this.get(id); if (!t?.info.alive) return false;
     // One frame owns both the cursor and the complete paste. A backend crash cannot leave "announced" text unsent.
-    this.command({ op: 'deliver', id, notice, cursor, now });
+    const delivery = { op: 'deliver', id, notice, cursor, now, noticeOnly: true };
+    if (this.noticeOnly) this.command(delivery);
+    else {
+      if (!this.connected || this.closing) throw this.failure ?? new Error('Terminal service disconnected');
+      // A hot upgrade keeps the old PTY host. Give it the paste and its corrective state patches together.
+      sendFrames(this.socket, [delivery, ...workStateFields.map(key => ({ op: 'patch', id, patch: { section: 'info', key, value: t.info[key] } }))]);
+    }
     this.applying = true;
     try {
       t.injectedMessage = Math.max(t.injectedMessage, cursor);
-      t.info.workState = 'working'; t.info.stateSource = 'server'; t.info.stateAt = now; delete t.info.idleSince;
+      delete t.info.noticeConfirmed;
+      t.info.noticeSentAt = now;
       noteInjected(t.activity, now);
     } finally { this.applying = false; }
     return true;

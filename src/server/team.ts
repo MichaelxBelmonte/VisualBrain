@@ -106,6 +106,9 @@ export class Teams {
       let saved = emptyBoard();
       try { saved = JSON.parse(readFileSync(join(this.dir, `${key}.json`), 'utf8')); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+      const codes = (team === DEFAULT_TEAM ? saved : this.get(nodeId)).codes?.ids;
+      for (const task of saved.tasks) if (task.status === 'blocked' && task.assignedTo && codes?.[task.assignedTo])
+        task.blockedOwnerCode ??= codes[task.assignedTo];
       this.boards.set(key, saved);
     }
     return this.boards.get(key)!;
@@ -231,6 +234,8 @@ export class Teams {
     if (!task || task.status==='done') throw new TeamError(409,'Incarico non disponibile');
     task.assignedTo = assignedTo; task.routing = routing; task.updatedAt = routing.at;
     task.status = routing.handoff && !routing.handoff.to ? 'blocked' : 'pending';
+    if (task.status === 'blocked' && assignedTo) task.blockedOwnerCode = this.get(nodeId).codes?.ids[assignedTo];
+    else delete task.blockedOwnerCode;
     if (message && assignedTo) {
       b.messages.push({id:(b.messages.at(-1)?.id ?? 0)+1,from:'visual-brain',to:assignedTo,text:message,createdAt:routing.at});
       b.messages = b.messages.slice(-500);
@@ -244,32 +249,38 @@ export class Teams {
     const prior = { ...task };
     const manages = actor === 'user' || role === 'orchestrator';
     if (!manages && task.assignedTo !== null && task.assignedTo !== actor) throw new TeamError(409, 'Incarico già assegnato a un altro agente');
-    if (!manages && task.status === 'done') throw new TeamError(409, 'Incarico già completato');
+    if (!manages && task.status === 'done' && !(body.status === 'done' && task.assignedTo === actor && (body.result === undefined || boundedText(body.result, 2000) === task.result)))
+      throw new TeamError(409, 'Incarico già completato');
     if (body.assignedTo !== undefined) {
       if (!manages) throw new TeamError(403, 'Solo l’orchestratore può riassegnare');
       task.assignedTo = body.assignedTo;
+      if (task.assignedTo !== prior.assignedTo && (task.status === 'working' || task.status === 'blocked')) task.status = 'pending';
     }
     if (body.status !== undefined) {
       if (!['pending', 'working', 'done', 'blocked'].includes(String(body.status))) throw new TeamError(400, 'Stato non valido');
       if (!manages && body.status === 'pending') throw new TeamError(403, 'Solo l’orchestratore può riaprire');
       task.status = body.status as TeamTask['status'];
-      if (!manages && task.assignedTo === null) task.assignedTo = actor; // Atomic claim in this single server process.
+      if (task.assignedTo === null && (!manages || (body.status === 'working' && actor !== 'user'))) task.assignedTo = actor;
+      // A manager may unblock/assign on another member's behalf. The new owner still has to claim.
+      if (task.status === 'working' && task.assignedTo !== actor && (prior.status !== 'working' || prior.assignedTo !== task.assignedTo)) task.status = 'pending';
     }
     if (body.result !== undefined) task.result = boundedText(body.result, 2000);
     if (body.held !== undefined) { if (body.held) task.held = true; else delete task.held; }
     else if (b.policy.delivery !== 'manual' && task.result !== prior.result) delete task.held;
     if (task.status === prior.status && task.result === prior.result && task.assignedTo === prior.assignedTo && task.held === prior.held) return task;
+    if (task.status === 'blocked' && task.assignedTo) {
+      task.blockedOwnerCode = this.get(nodeId).codes?.ids[task.assignedTo];
+    } else delete task.blockedOwnerCode;
     task.updatedAt = Date.now(); this.save(nodeId, b, team); return task;
   }
   release(nodeId: number, sessionId: string, team?: string): void {
     for (const id of team ? [team] : this.teams(nodeId).map(t => t.id)) {
       const b = structuredClone(this.get(nodeId, id));
       let changed = false;
-      for (const t of b.tasks) if (t.assignedTo === sessionId && t.status !== 'done') {
+      for (const t of b.tasks) if (t.assignedTo === sessionId && t.status !== 'done' && t.status !== 'blocked') {
         if (t.routing) {
-          if (t.status !== 'blocked') {
-            t.status = 'blocked'; t.routing.reason = 'Proprietario terminato: serve un checkpoint verificato'; t.updatedAt = Date.now(); changed = true;
-          }
+          t.status = 'blocked'; t.routing.reason = 'Proprietario terminato: serve un checkpoint verificato'; t.updatedAt = Date.now(); changed = true;
+          t.blockedOwnerCode = this.get(nodeId).codes?.ids[sessionId];
           continue;
         }
         t.assignedTo = null; t.status = 'pending'; t.updatedAt = Date.now(); changed = true;
@@ -436,7 +447,7 @@ export class Teams {
   }
   recover(nodeId: number, sessions: TerminalInfo[]): void {
     for (const team of this.teams(nodeId)) {
-      const dead = new Set(this.get(nodeId, team.id).tasks.filter(t => t.status !== 'done' && t.assignedTo && !sessions.some(s => s.id === t.assignedTo && s.alive)).map(t => t.assignedTo!));
+      const dead = new Set(this.get(nodeId, team.id).tasks.filter(t => t.status !== 'done' && t.status !== 'blocked' && t.assignedTo && !sessions.some(s => s.id === t.assignedTo && s.alive)).map(t => t.assignedTo!));
       for (const id of dead) this.release(nodeId, id, team.id);
     }
   }

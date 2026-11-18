@@ -18,7 +18,8 @@ let expired=false;
 const server=createServer(async(req,res)=>{
   let text=''; for await(const data of req) text+=data;
   const data=text?JSON.parse(text):null, url=new URL(req.url,'http://local');
-  calls.push({path:url.pathname,session:url.searchParams.get('session'),method:req.method,auth:req.headers.authorization,data});
+  calls.push({path:url.pathname,session:url.searchParams.get('session'),method:req.method,auth:req.headers.authorization,data,
+    ...(url.searchParams.has('before') ? {before:url.searchParams.get('before')} : {})});
   if(expired) {res.writeHead(403);res.end(JSON.stringify({error:'Session expired'}));return;}
   assert.match(req.headers.authorization,/^Bearer fixture-[ab]$/);
   if(req.method==='POST' && url.pathname.endsWith('/messages')) inbox.push(data);
@@ -58,6 +59,10 @@ try{
   await a.call('update_task',{status:'done',result:'checked'},'task-1');assert.equal(calls.at(-1).path,'/api/work/1/tasks/task-1');assert.equal(calls.at(-1).method,'PATCH');
   await a.call('summary',{summary:'test'});assert.equal(calls.at(-1).path,'/api/work/1');
   await a.call('spawn',{agent:'claude',role:'operator',task:'test'});assert.equal(calls.at(-1).path,'/api/work/1/spawn');
+  await a.call('record',{entryId:'x',kind:'decision',decision:'Checked',nextOwner:'ORC1'});
+  assert.equal(calls.at(-1).path,'/api/work/1/records');assert.equal(calls.at(-1).data.from,'a');
+  await a.call('records',{before:17});
+  assert.equal(calls.at(-1).method,'GET');assert.equal(calls.at(-1).session,'a');assert.equal(calls.at(-1).before,'17');
   const count=calls.length;
   for(const args of [ ['message',{from:'user',text:'forged'}],['../team-links',{}],['update_task',{},'../../other'],['message',{text:'x'.repeat(65000)}] ]) assert.equal((await a.call(...args)).isError,true);
   assert.equal(calls.length,count,'invalid requests never reach HTTP');

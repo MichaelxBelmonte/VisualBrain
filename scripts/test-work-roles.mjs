@@ -15,6 +15,8 @@ const cases = [
   ['old server: not reported yet', { ...op }, 'active', 'In esecuzione'],
   ['old server: idle operator', { ...op, workState: 'idle', idleSince: min(4) }, 'idle', 'In attesa da 4 min'],
   ['old server: idle under a minute', { ...op, workState: 'idle', idleSince: s(20) }, 'idle', 'In attesa'],
+  ['notice written', { ...op, workState: 'idle', noticeSentAt: s(4) }, 'idle', 'Avviso inviato al terminale'],
+  ['announced page confirmed', { ...op, workState: 'idle', noticeSentAt: s(4), noticeConfirmed: true }, 'idle', 'Eventi confermati dal client'],
   ['old server: blocked', { ...op, workState: 'blocked' }, 'blocked', 'Bloccato'],
   ['old server: orchestrator fixed', { alive: true, role: 'orchestrator', workState: 'idle' }, 'orchestrator', 'In attesa'],
   ['terminated, whatever it declared', { ...op, alive: false, workState: 'working', lastOutputAt: s(1) }, 'ended', 'Terminato'],
