@@ -152,7 +152,7 @@ const returnFrames = new WeakMap<Activity, string>();
 
 // Only inspect a fresh repaint requested by a return gesture that started from an empty composer.
 // The Codex placeholder is dim, at column 3, with the caret restored to that very row, column 3.
-const CODEX_EMPTY = /\x1b\[(\d+);(?:3H|1H\x1b\[1m›\x1b\[22m )\x1b\[2mAsk Codex to do anything\x1b\[[\s\S]*?\x1b\[\1;3H\x1b\[\?25h$/;
+const CODEX_EMPTY = /\x1b\[(\d+);(?:3H(?:\x1b\[22m)?|1H\x1b\[1m›\x1b\[22m )\x1b\[2mAsk Codex to do anything\x1b\[[\s\S]*?\x1b\[\1;3H\x1b\[\?25h$/;
 // Claude restores the blank inverse-video cursor and the main session's agents shortcut.
 const CLAUDE_EMPTY = /(?:\x1b\[7m \x1b\[27m\x1b\[K|❯\u00a0\x1b\[7m \r\x1b\[1B\x1b\[27m─)[^\n]*?←\x1b\[\d+Gfor\x1b\[\d+Gagents[^\n]*?\x1b\[\d+;3H$/;
 

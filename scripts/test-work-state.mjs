@@ -147,7 +147,8 @@ console.log('PASS lastInputAt on every key from the person; drafts tracked until
   feed(other.a,other.info,[CLAUDE_QUESTION],870);
   noteInput(other.a,other.info,'\x1b',900);
   setAttention(other.a,other.info,'input',920);
-  assert.ok(confirmComposerReturn(other.a,other.info,empty),'notify a waiting reader when the selector was reported after Esc');
+  const resetBeforeDim = empty.replace('3H\x1b[2m','3H\x1b[22m\x1b[2m');
+  assert.ok(confirmComposerReturn(other.a,other.info,resetBeforeDim),'recognize the partial repaint after early Esc, including its intensity reset');
   assert.equal(other.info.attention,undefined);
   feed(other.a,other.info,[CLAUDE_QUESTION,empty],1000);
   assert.equal(other.info.attention,undefined,'a fully repainted composer supersedes the earlier selector in the same scan');
