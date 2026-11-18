@@ -89,7 +89,8 @@ try {
     // The head of the rail at rest: the lens and +. The quick menu keeps its keyboard shortcut and has no button there.
     const page = readFileSync(new URL('../src/ui/index.html', import.meta.url), 'utf8');
     const head = /<div class="work-rail-head">(.*?)<\/div>/.exec(page)[1];
-    assert.deepEqual([...head.matchAll(/<(?:button|input) id="([^"]+)"/g)].map(m => m[1]), ['work-filter', 'work-add', 'work-rail-dismiss'], 'search, add, and the close button of the narrow window');
+    assert.deepEqual([...head.matchAll(/<(?:button|input) id="([^"]+)"/g)].map(m => m[1]), ['work-filter', 'work-add'], 'the search and add, in the narrow window too');
+    assert.doesNotMatch(page + css, /work-rail-dismiss/, 'the drawer of the narrow window closes with Esc, its toggle, the backdrop or a choice');
     assert.doesNotMatch(page + source, /work-quick-menu/, 'no terminal button in the head');
     assert.match(source, /const anchor = this\.control<HTMLElement>\('\.work-rail-head'\)!;\n\s+if \(terminalQuickMenuOpen\(\)\) \{ this\.dismissQuickMenu\?\.\(\); return; \}/, 'the shortcut opens the quick menu under the head and closes it again');
     assert.match(quick, /const button = anchor\.matches\('button, \[role="button"\]'\);/, 'a plain container is not told it has a menu open');

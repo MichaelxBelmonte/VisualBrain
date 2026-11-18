@@ -560,7 +560,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .work-row-grip { opacity: 0; }
 .work-node-row:hover > .work-row-grip, .work-session:hover > .work-row-grip, .work-row-grip:focus-visible { opacity: .65; }
 
-#work-rail-backdrop, #work-rail-dismiss { display: none; }
+#work-rail-backdrop { display: none; }
 
 /* Context and actions each have a place; overflow menus contain secondary operations. */
 .work-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; min-height: 50px; padding: 8px 14px; border-bottom: 1px solid var(--g2); background: var(--bg); }
@@ -627,7 +627,6 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 
   .work-rail { position: absolute; inset: 0 auto 0 0; width: min(300px, 86vw); z-index: 12; border-right: 1px solid var(--g3); }
   .work-rail-head { flex-wrap: nowrap; }
-  #work-rail-dismiss { display: inline-flex; }
   #terminals:not(.rail-collapsed) #work-rail-backdrop { display: block; position: absolute; inset: 0; z-index: 11; background: #0005; border: 0; cursor: default; }
   .work-rail-resize { display: none; }
   .work-toolbar { padding: 6px 8px; gap: 6px; }

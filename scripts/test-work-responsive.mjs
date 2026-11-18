@@ -10,8 +10,8 @@ class Element extends EventTarget {
 const original = Object.fromEntries(['window','localStorage','requestAnimationFrame'].map(k => [k,globalThis[k]]));
 const media = Object.assign(new EventTarget(), { matches: false });
 const memory = new Map(); let fits = 0;
-const toggle = new Element(), close = new Element(), backdrop = new Element(), root = new Element();
-root.querySelector = selector => selector === '#work-rail-dismiss' ? close : backdrop;
+const toggle = new Element(), backdrop = new Element(), root = new Element();
+root.querySelector = selector => { assert.equal(selector, '#work-rail-backdrop', 'the drawer has no close button of its own'); return backdrop; };
 globalThis.window = { matchMedia: query => { assert.equal(query,'(max-width: 760px)'); return media; } };
 globalThis.localStorage = { getItem: k => memory.get(k) ?? null, setItem: (k,v) => memory.set(k,v) };
 globalThis.requestAnimationFrame = callback => callback();
@@ -32,7 +32,7 @@ try {
   assert.equal(toggle.innerHTML,expandedIcon);
   assert.equal(memory.get('vb:rail-collapsed'),'false','mobile opening preserves desktop preference');
   click(backdrop); assert.equal(collapsed(),true);
-  click(toggle); click(close); assert.equal(collapsed(),true);
+  click(toggle); click(toggle); assert.equal(collapsed(),true,'the toggle that opened the drawer closes it');
   click(toggle);
   const esc = new Event('keydown'); Object.defineProperty(esc,'key',{value:'Escape'}); root.dispatchEvent(esc);
   assert.equal(collapsed(),true); assert.equal(toggle.focused,true,'Escape restores focus to drawer toggle');
@@ -42,7 +42,7 @@ try {
   resize(false); assert.equal(collapsed(),false,'desktop preference survives mobile navigation');
   click(toggle); resize(true); click(toggle); resize(false);
   assert.equal(collapsed(),true,'desktop closed preference survives mobile opening');
-  const prior = fits; cleanup(); click(toggle); resize(true); click(close);
+  const prior = fits; cleanup(); click(toggle); resize(true); click(backdrop);
   assert.equal(fits,prior,'cleanup removes all listeners');
   memory.set('vb:rail-collapsed','true'); media.matches=false;
   const dispose = bindRailVisibility(root,toggle,()=>{}); assert.equal(collapsed(),true,'saved desktop preference restored'); dispose();

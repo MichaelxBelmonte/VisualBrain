@@ -7,7 +7,8 @@ const MAX_WIDTH = 360;
 const CONTENT_MIN = 240;
 const STORAGE_KEY = 'vb:rail-width';
 
-/** A drawer on narrow screens, a persistent rail on desktop. Mobile choices never overwrite desktop preferences. */
+/** A drawer on narrow screens, a persistent rail on desktop. Mobile choices never overwrite desktop preferences.
+ *  The drawer has no close button of its own: Esc, the toggle that opened it, the backdrop and choosing a row close it. */
 export function bindRailVisibility(root: HTMLElement, toggle: HTMLElement, fit: () => void): () => void {
   const narrow = window.matchMedia('(max-width: 760px)');
   let desktopClosed = false, mobileOpen = false;
@@ -38,14 +39,13 @@ export function bindRailVisibility(root: HTMLElement, toggle: HTMLElement, fit: 
     if (event.key === 'Escape' && narrow.matches && mobileOpen) { dismiss(); toggle.focus(); }
   };
   const backdrop = root.querySelector('#work-rail-backdrop');
-  const close = root.querySelector('#work-rail-dismiss');
   toggle.addEventListener('click', click);
-  backdrop?.addEventListener('click', dismiss); close?.addEventListener('click', dismiss);
+  backdrop?.addEventListener('click', dismiss);
   root.addEventListener('click', select); root.addEventListener('keydown', key); toggle.addEventListener('keydown', key);
   narrow.addEventListener('change', change); apply();
   return () => {
     toggle.removeEventListener('click', click);
-    backdrop?.removeEventListener('click', dismiss); close?.removeEventListener('click', dismiss);
+    backdrop?.removeEventListener('click', dismiss);
     root.removeEventListener('click', select); root.removeEventListener('keydown', key); toggle.removeEventListener('keydown', key);
     narrow.removeEventListener('change', change);
   };
