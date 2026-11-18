@@ -5,7 +5,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync, writeFileSync, renameSync, unlinkSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Terminals, type Term } from './terminals.ts';
-import { noteInjected } from './activity.ts';
+import { noticeInput, noticeInputBlocked, noteInjected } from './activity.ts';
 import { TERMINAL_PROTOCOL, applyPatch, metadataFields, observe, readFrames, sendFrame, snapshot } from './terminal-wire.ts';
 
 const serviceDir = process.argv[2];
@@ -62,7 +62,7 @@ const server = createServer(socket => {
       saveRecord();
       owner = socket; authenticated = true; clearTimeout(authTimer); clearTimeout(idleTimer); idleTimer = undefined;
       for (const info of terms.list()) sendFrame(socket, { event: 'term', term: snapshot(terms.get(info.id)!) });
-      sendFrame(socket, { event: 'ready', protocol: TERMINAL_PROTOCOL, pid: process.pid, noticeOnly: true });
+      sendFrame(socket, { event: 'ready', protocol: TERMINAL_PROTOCOL, pid: process.pid, noticeOnly: true, checkedNotices: true });
       return;
     }
     if (owner !== socket) { socket.destroy(); return; }
@@ -83,16 +83,18 @@ const server = createServer(socket => {
           break;
         case 'write': if (t) { if (m.input) terms.write(m.id, String(m.data)); else t.proc.write(String(m.data)); } break;
         case 'deliver':
+          result = false;
           if (t?.info.alive) {
             if (!Number.isSafeInteger(m.cursor) || typeof m.notice !== 'string' || !Number.isFinite(m.now)) throw new Error('Invalid terminal delivery');
+            if (noticeInputBlocked(t.activity, t.info)) break;
             noteInjected(t.activity, m.now);
-            t.proc.write(`\x1b[200~${m.notice}\x1b[201~`);
+            t.proc.write(noticeInput(m.notice));
             t.injectedMessage = Math.max(t.injectedMessage, m.cursor);
             if (m.noticeOnly) { delete t.info.noticeConfirmed; t.info.noticeSentAt = m.now; }
             else { // Older attached servers mirror this legacy transition locally.
               t.info.workState = 'working'; t.info.stateSource = 'server'; t.info.stateAt = m.now; delete t.info.idleSince;
             }
-            setTimeout(() => { if (t.info.alive) try { t.proc.write('\r'); } catch { /* terminal exited during the paste */ } }, 150);
+            result = true;
           }
           break;
         case 'resize': terms.resize(m.id, Number(m.cols), Number(m.rows)); break;

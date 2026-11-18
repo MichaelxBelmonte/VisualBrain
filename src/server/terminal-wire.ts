@@ -14,7 +14,7 @@ export interface TermSnapshot {
 }
 export interface TermPatch { section: 'info' | 'activity' | 'term'; key: string; value?: unknown }
 const infoFields = new Set(['name', 'parentId', 'workState', 'idleSince', 'stateSource', 'stateAt', 'noticeSentAt', 'noticeConfirmed', 'attention', 'lastOutputAt', 'lastInputAt']);
-const activityFields = new Set(['quietUntil', 'attentionAt', 'draft']);
+const activityFields = new Set(['quietUntil', 'attentionAt', 'draft', 'cliBusy']);
 
 export function snapshot(t: Term): TermSnapshot {
   const { timer: _, ...activity } = t.activity;

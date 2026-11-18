@@ -1,6 +1,6 @@
 import type { ApiCtx } from './api.ts';
 import type { TerminalInfo } from '../shared/types.ts';
-import { noteInjected } from './activity.ts';
+import { noticeInput, noticeInputBlocked, noteInjected } from './activity.ts';
 import { notificationCursor } from './work-cursors.ts';
 
 /** Single place that changes a session's work state, so idleSince, stateSource and stateAt always match it. */
@@ -41,7 +41,7 @@ export function isQuiet(info: TerminalInfo, now = Date.now()): boolean {
 export function wakeSession(ctx: ApiCtx, id: string, opts: { manual?: boolean; now?: number } = {}): boolean {
   const t = ctx.terms.get(id);
   const nodeId = t?.info.nodeId;
-  if (!t?.info.alive || nodeId == null || !t.info.role || t.info.attention || (t.activity?.draft && !opts.manual)) return false;
+  if (!t?.info.alive || nodeId == null || !t.info.role || noticeInputBlocked(t.activity, t.info)) return false;
   if (t.info.workState !== 'idle' && !isQuiet(t.info, opts.now)) return false;
   const now = opts.now ?? Date.now();
   // each session reads its own board: its squad's, or the Main Brain's
@@ -65,11 +65,10 @@ export function wakeSession(ctx: ApiCtx, id: string, opts: { manual?: boolean; n
   if (ctx.terms.deliver) return ctx.terms.deliver(id, notice, last.id, now);
   noteInjected(t.activity, now);
   // where the token is, not the token: an agent whose first turn was lost (e.g. an API error) has no protocol in context
-  t.proc.write(`\x1b[200~${notice}\x1b[201~`);
+  t.proc.write(noticeInput(notice));
   t.injectedMessage = last.id;
   delete t.info.noticeConfirmed;
   t.info.noticeSentAt = now;
-  setTimeout(() => { if (t.info.alive) t.proc.write('\r'); }, 150);
   return true;
 }
 export function deliveryNotice(cfg: { host: string; port: number; language?: string }, nodeId: number, id: string, task?: { id: string; status: string }, count = 1, mcp = false): string {
@@ -82,7 +81,8 @@ export function deliveryNotice(cfg: { host: string; port: number; language?: str
       : (en ? 'check assignment' : 'verifica incarico');
     change = `${task.id} · ${task.status} · ${action}`;
   }
-  return `Visual Brain · ${change}${count > 1 ? ' (+' + (count - 1) + ')' : ''}. ${mcp ? 'team_request {"operation":"read"} | ' : ''}GET ${url} · Authorization: Bearer $VB_TEAM_TOKEN`;
+  // A trailing $name opens Codex's skill picker, which consumes Enter instead of submitting the notice.
+  return `Visual Brain · ${change}${count > 1 ? ' (+' + (count - 1) + ')' : ''}. ${mcp ? 'team_request {"operation":"read"} | ' : ''}Authorization: Bearer $VB_TEAM_TOKEN · GET ${url}`;
 }
 /** Announces new messages to the sessions of one board (a squad, the Main Brain), or of every board of the node. */
 export function notifyTeam(ctx: ApiCtx, nodeId: number, team?: string): void {

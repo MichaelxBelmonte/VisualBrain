@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Terminals, appendBuffer, type SpawnOptions, type Term, type TerminalStore } from './terminals.ts';
-import { noteInjected } from './activity.ts';
+import { appendOutput, noticeInput, noticeInputBlocked, noteInjected, noteInput, observedTurn, scanOutput, stripAnsi } from './activity.ts';
 import { TERMINAL_PROTOCOL, metadataFields, observe, readFrames, sendFrame, sendFrames, type HostRecord, type TermPatch, type TermSnapshot } from './terminal-wire.ts';
 
 const workStateFields = ['workState', 'stateSource', 'stateAt', 'idleSince'] as const;
@@ -69,6 +69,9 @@ export class TerminalService implements TerminalStore {
   private sequence = 0;
   private applying = false;
   private noticeOnly = false;
+  private checkedNotices = false;
+  private delivering = new Set<string>();
+  onTurnIdle?: (id: string) => void;
   private closing = false;
   private failure: Error | null = null;
   private onExit: (id: string, code: number) => void;
@@ -144,13 +147,21 @@ export class TerminalService implements TerminalStore {
       });
       readFrames(socket, m => {
         if (m.error && !m.request) { this.failure = new Error(m.error); if (!ready) reject(this.failure); socket.destroy(); return; }
-        if (m.event === 'ready') { ready = true; this.connected = true; this.hostPid = m.pid; this.noticeOnly = m.noticeOnly === true; clearTimeout(timeout); resolve(); return; }
+        if (m.event === 'ready') { ready = true; this.connected = true; this.hostPid = m.pid; this.noticeOnly = m.noticeOnly === true; this.checkedNotices = m.checkedNotices === true; clearTimeout(timeout); resolve(); return; }
         if (m.event === 'term') { this.add(m.term); return; }
         if (m.event === 'output') {
           const t = this.terms.get(m.id); if (!t) return;
+          if (!this.checkedNotices) {
+            const wasBusy = t.activity.cliBusy;
+            this.applying = true;
+            try { appendOutput(t.activity, m.data); scanOutput(t.activity, t.info); } finally { this.applying = false; }
+            if (wasBusy && t.activity.cliBusy === false) setImmediate(() => this.onTurnIdle?.(m.id));
+          }
           appendBuffer(t, m.data); for (const listener of t.listeners) listener(m.data);
         } else if (m.event === 'patch') {
           const t = this.terms.get(m.id); if (!t) return;
+          // This backend owns keyboard writes; an echo can predate a later key already in the mirror.
+          if (m.patch.section === 'activity' && m.patch.key === 'draft') return;
           // These fields are API-owned. Old hosts echo temporary changes from their legacy deliver operation.
           if (m.patch.section === 'info' && (noticeField(m.patch.key) || (!this.noticeOnly && workStateFields.some(key => key === m.patch.key)))) return;
           this.applying = true;
@@ -158,6 +169,8 @@ export class TerminalService implements TerminalStore {
             const target = t[m.patch.section as 'info' | 'activity'] as unknown as Record<string, unknown>;
             if (m.patch.value === undefined) delete target[m.patch.key]; else target[m.patch.key] = m.patch.value;
           } finally { this.applying = false; }
+          if (m.patch.section === 'activity' && m.patch.key === 'cliBusy' && m.patch.value === false)
+            setImmediate(() => this.onTurnIdle?.(m.id));
         } else if (m.event === 'exit') {
           const t = this.terms.get(m.id); if (t) { t.info.alive = false; t.exitCode = m.code; this.onExit(m.id, m.code); }
         } else if (m.event === 'remove') this.terms.delete(m.id);
@@ -172,13 +185,18 @@ export class TerminalService implements TerminalStore {
 
   private add(s: TermSnapshot): void {
     const id = s.info.id;
+    const screen = s.buffer.join('');
+    // An older host may still have its original notice in Codex's completion menu. Preserve that composer.
+    const afterLastTurn = screen.slice(Math.max(0, screen.lastIndexOf('\x1b]7501;state=working')));
+    const stranded = s.info.agent === 'codex' && s.injectedMessage > s.seenMessage
+      && stripAnsi(afterLastTurn).includes('enter insert') && afterLastTurn.includes('$VB_TEAM_TOKEN');
     const changed = (section: TermPatch['section']) => (key: string, value: unknown) => {
       if (section === 'info' && noticeField(key) && !this.noticeOnly) return;
       if (!this.applying) this.command({ op: 'patch', id, patch: { section, key, value } });
     };
     const t: Term = {
       info: observe(s.info, changed('info'), metadataFields.info),
-      activity: observe({ ...s.activity, timer: null }, changed('activity'), metadataFields.activity),
+      activity: observe({ ...s.activity, draft: stranded || s.activity.draft, cliBusy: s.activity.cliBusy ?? observedTurn(screen, s.info.agent), timer: null }, changed('activity'), metadataFields.activity),
       proc: { pid: s.pid, write: data => this.command({ op: 'write', id, data }), resize: (cols, rows) => this.resize(id, cols, rows), kill: () => this.kill(id) },
       buffer: s.buffer, bufferBytes: s.buffer.reduce((n, b) => n + b.length, 0), listeners: new Set(), exitCode: s.exitCode,
       teamToken: s.teamToken, seenMessage: s.seenMessage, injectedMessage: s.injectedMessage,
@@ -223,27 +241,44 @@ export class TerminalService implements TerminalStore {
     if (clean) t.info.name = clean; else delete t.info.name;
     return t.info;
   }
-  write(id: string, data: string) { this.command({ op: 'write', id, data, input: true }); }
+  write(id: string, data: string) {
+    const t = this.get(id);
+    if (!t) return;
+    this.command({ op: 'write', id, data, input: true });
+    const previous = t.activity.draft;
+    this.applying = true;
+    try { noteInput(t.activity, t.info, data); } finally { this.applying = false; }
+    if (!this.checkedNotices && t.activity.draft !== previous)
+      this.command({ op: 'patch', id, patch: { section: 'activity', key: 'draft', value: t.activity.draft } });
+  }
   resize(id: string, cols: number, rows: number) { this.command({ op: 'resize', id, cols, rows }); }
   kill(id: string) { this.command({ op: 'kill', id }); this.terms.delete(id); }
   killAll() { for (const id of this.terms.keys()) this.kill(id); }
   deliver(id: string, notice: string, cursor: number, now: number): boolean {
-    const t = this.get(id); if (!t?.info.alive) return false;
-    // One frame owns both the cursor and the complete paste. A backend crash cannot leave "announced" text unsent.
-    const delivery = { op: 'deliver', id, notice, cursor, now, noticeOnly: true };
-    if (this.noticeOnly) this.command(delivery);
-    else {
+    const t = this.get(id);
+    if (!t?.info.alive || this.delivering.has(id) || noticeInputBlocked(t.activity, t.info)) return false;
+    const sent = () => {
+      this.applying = true;
+      try {
+        t.injectedMessage = Math.max(t.injectedMessage, cursor);
+        delete t.info.noticeConfirmed;
+        t.info.noticeSentAt = now;
+        noteInjected(t.activity, now);
+      } finally { this.applying = false; }
+    };
+    if (this.checkedNotices) {
+      this.delivering.add(id);
+      void this.request({ op: 'deliver', id, notice, cursor, now, noticeOnly: true })
+        .then(ok => { if (ok) sent(); }, () => { /* reattach restores the host's committed cursor */ })
+        .finally(() => this.delivering.delete(id));
+    } else {
       if (!this.connected || this.closing) throw this.failure ?? new Error('Terminal service disconnected');
-      // A hot upgrade keeps the old PTY host. Give it the paste and its corrective state patches together.
-      sendFrames(this.socket, [delivery, ...workStateFields.map(key => ({ op: 'patch', id, patch: { section: 'info', key, value: t.info[key] } }))]);
+      // Installed hosts also support raw writes. Avoid their delayed Enter, keep the cursor across detach.
+      const patch = (section: TermPatch['section'], key: string, value?: unknown) => ({ op: 'patch', id, patch: { section, key, value } });
+      sendFrames(this.socket, [{ op: 'write', id, data: noticeInput(notice) }, patch('term', 'injectedMessage', cursor),
+        ...(this.noticeOnly ? [patch('info', 'noticeSentAt', now), patch('info', 'noticeConfirmed')] : [])]);
+      sent();
     }
-    this.applying = true;
-    try {
-      t.injectedMessage = Math.max(t.injectedMessage, cursor);
-      delete t.info.noticeConfirmed;
-      t.info.noticeSentAt = now;
-      noteInjected(t.activity, now);
-    } finally { this.applying = false; }
     return true;
   }
   async flush() { await this.request({ op: 'flush' }); }

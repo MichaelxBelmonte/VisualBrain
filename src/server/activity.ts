@@ -17,6 +17,7 @@ export interface Activity {
   quietUntil: number;
   attentionAt?: number;      // since when info.attention is set
   draft?: boolean;           // the person typed something not sent yet: the server must not paste into it
+  cliBusy?: boolean;         // last native CLI turn signal, independent of the board's reported state
 }
 
 export const newActivity = (): Activity => ({ pending: '', timer: null, quietUntil: 0 });
@@ -49,6 +50,28 @@ function lastTitle(raw: string): string | undefined {
 export function busyTitle(raw: string): boolean {
   const title = lastTitle(raw);
   return title !== undefined && (CLAUDE_BUSY_TITLE.test(title) || BRAILLE_TITLE.test(title));
+}
+
+export function observedTurn(raw: string, agent: TerminalInfo['agent']): boolean | undefined {
+  if (agent === 'codex') {
+    const states = raw.matchAll(/\x1b\]7501;state=(\w+):app=codex(?:\x07|\x1b\\)/g);
+    let busy: boolean | undefined;
+    for (const m of states) busy = m[1] !== 'idle' && m[1] !== 'done';
+    return busy;
+  }
+  const title = agent === 'claude' ? lastTitle(raw) : undefined;
+  if (title && CLAUDE_BUSY_TITLE.test(title)) return true;
+  if (title?.startsWith('✳')) return false;
+}
+
+export function noticeInputBlocked(a: Activity | undefined, info: TerminalInfo): boolean {
+  if (info.attention || a?.draft) return true;
+  const pending = a?.pending ?? '';
+  return !!((observedTurn(pending, info.agent) ?? a?.cliBusy) || attentionIn(stripAnsi(pending)));
+}
+
+export function noticeInput(notice: string): string {
+  return `\x1b[200~${notice}\x1b[201~\r`;
 }
 
 // Claude Code: spinner "✻ Manifesting… (3m 56s · ↓ 16.4k tokens · thinking with high effort)", repainted every ~100 ms
@@ -98,14 +121,16 @@ export function scanOutput(a: Activity, info: TerminalInfo, now = Date.now()): v
   a.pending = cut ? cut[0] : '';
   if (cut) raw = raw.slice(0, raw.length - cut[0].length);
   const text = stripAnsi(raw);
+  const turn = observedTurn(raw, info.agent);
+  if (turn !== undefined) a.cliBusy = turn;
   const quiet = now < a.quietUntil;
   const title = lastTitle(raw) ?? '';
   // Claude's waiting title (✳) wins over spinner leftovers repainted in the same chunk as the end of the turn
   const busy = CLAUDE_BUSY_TITLE.test(title) || BRAILLE_TITLE.test(title) || (!title.startsWith('✳') && busyMarker(text, quiet));
   const substantial = !quiet && !NOISE.test(text) && text.replace(FILLER, '').length >= SUBSTANTIAL_CHARS;
   if (busy || substantial) info.lastOutputAt = now;
-  if (quiet) return;
   const found = attentionIn(text);
+  if (quiet && !found) return;
   // Answered elsewhere (e.g. a hook approved it): Claude's turn resumes, or new text replaces the prompt. Codex's
   // spinners alone do not clear it, in case they keep running under the approval.
   if (found) setAttention(a, info, found, now);
@@ -122,8 +147,10 @@ export function noteInput(a: Activity, info: TerminalInfo, data: string, now = D
   a.quietUntil = Math.max(a.quietUntil, now + QUIET_AFTER_KEY_MS);
   const typed = keys.replace(/\x1b\[200~[\s\S]*?\x1b\[201~/g, 'x');
   info.lastInputAt = now; // any key: the person is there, the session is not quiet
-  if (/[\r\x03]/.test(typed)) a.draft = false;
-  else if (/[^\x00-\x1f\x7f]/.test(typed.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1bO./g, ''))) a.draft = true;
+  // History navigation, completion and yank can populate an empty composer too.
+  // Respect the order in a single write such as Enter followed by the start of a new draft.
+  const end = Math.max(typed.lastIndexOf('\r'), typed.lastIndexOf('\x03'));
+  a.draft = typed.length > end + 1;
   // Arrows move through the choices. Enter, Esc or Ctrl-C answer any prompt; a choice key (1-9, y, n, a) answers a
   // permission dialog only, since in a free answer box it is just the first letter of the reply.
   if (info.attention && (/[\r\x03]/.test(typed) || typed === '\x1b' || (info.attention === 'permission' && /^[1-9ynaYNA]$/.test(typed)))) setAttention(a, info, null, now);

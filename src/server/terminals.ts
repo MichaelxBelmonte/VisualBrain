@@ -25,6 +25,7 @@ export type SpawnOptions = LaunchOptions & { id?: string; resumeId?: string; cre
 /** The API works with either local PTYs (unit tests) or the persistent terminal service. */
 export interface TerminalStore {
   readonly persistent?: boolean;
+  onTurnIdle?: (id: string) => void;
   list(): TerminalInfo[];
   get(id: string): Term | undefined;
   env(vars?: Record<string, string>): NodeJS.ProcessEnv;
@@ -35,7 +36,7 @@ export interface TerminalStore {
   kill(id: string): void;
   killAll(): void;
   flush?(): Promise<void>;
-  /** Atomically records and pastes a board notification in the surviving host, including its delayed Enter. */
+  /** Submit the notice and its terminator together and remember its cursor in the surviving host. */
   deliver?(id: string, notice: string, cursor: number, now: number): boolean;
 }
 
@@ -65,6 +66,7 @@ export function replayState(buffer: string[]): { prefix: string; fullScreen: boo
 }
 
 export class Terminals {
+  onTurnIdle?: (id: string) => void;
   private readonly terms = new Map<string, Term>();
   private readonly onExit: (id: string, code: number) => void;
 
@@ -109,7 +111,12 @@ export class Terminals {
       for (const l of term.listeners) l(data);
       const a = term.activity;
       if (appendOutput(a, data)) {
-        a.timer = setTimeout(() => { a.timer = null; scanOutput(a, term.info); }, SCAN_EVERY_MS);
+        a.timer = setTimeout(() => {
+          a.timer = null;
+          const wasBusy = a.cliBusy;
+          scanOutput(a, term.info);
+          if (wasBusy && a.cliBusy === false) this.onTurnIdle?.(id);
+        }, SCAN_EVERY_MS);
         a.timer.unref();
       }
     });
