@@ -1454,6 +1454,16 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 #work-node-rail .tone-flag { font-style: normal; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; color: color-mix(in srgb, var(--tone, var(--g5)) 75%, var(--fg)); background: color-mix(in srgb, var(--tone, var(--g4)) 14%, transparent); white-space: nowrap; }
 #work-node-rail .work-list-empty { padding: 16px 10px; font-size: 12px; color: var(--g4); }
 #work-node-rail .work-rail-links { margin: 0 8px 8px; border-radius: 8px; }
+/* Compact preview of the session highlighted from the keyboard, docked under the list so the rows never move. */
+#work-node-rail .work-rail-preview { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; max-height: 45%; margin: 0 8px 8px; padding: 8px; overflow: hidden; border: 1px solid var(--g2); border-radius: 8px; }
+#work-node-rail .work-rail-preview[hidden], .work-rail-preview [hidden] { display: none; }
+.work-rail-preview-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 11.5px; }
+.work-rail-preview-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.work-rail-preview small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; color: var(--g4); }
+.work-rail-preview pre { flex: 0 1 auto; min-height: 2.8em; max-height: 8.4em; margin: 0; padding: 6px 7px; overflow: auto; border-radius: 5px; background: var(--g1); color: var(--g5); font: 10.5px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.work-rail-preview-actions { display: flex; flex-direction: column; gap: 4px; }
+.work-rail-preview-actions .btn { width: 100%; min-height: 26px; padding: 3px 8px; justify-content: flex-start; font-size: 11px; text-align: left; white-space: normal; }
+#work-node-rail .work-session.previewed { background: var(--rail-hover); box-shadow: inset 2px 0 var(--fg); }
 
 /* Launch window (src/ui/work-launcher.ts): objective first, one agent line for everyone, the rest folded. One background
    level, wide radii, grey labels, a hairline at most between member lines. Tokens only: holds in light and dark. */

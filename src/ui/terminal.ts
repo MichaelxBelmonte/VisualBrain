@@ -116,6 +116,9 @@ export class Terminals {
   private pollSignature = '';
   private pollReasons = '';
 
+  private railPreview!: HTMLElement;
+  private railPreviewId: string | null = null;
+  private railPreviewRequest = 0;
   private control<T extends Element = HTMLElement>(selector: string): T | null { return this.root.querySelector<T>(selector) ?? document.querySelector<T>(selector); }
 
   constructor(root: HTMLElement, cb: Callbacks) {
@@ -168,6 +171,28 @@ export class Terminals {
     this.control('#work-brain')!.addEventListener('click', () => { if (this.selectedNode !== null) { this.show(false); this.cb.reveal(this.selectedNode); } });
     bindRailSearch(this.control<HTMLInputElement>('#work-filter')!);
     this.listEl.addEventListener('keydown', e => this.railKey(e));
+    const preview = this.railPreview = document.createElement('section');
+    preview.id = 'work-rail-preview'; preview.className = 'work-rail-preview'; preview.hidden = true;
+    preview.setAttribute('aria-label', tr('Anteprima del terminale'));
+    preview.innerHTML = ui`<div class="work-rail-preview-head"><strong></strong><small data-preview-launch-model></small></div><pre></pre><div class="work-rail-preview-actions"><button type="button" class="btn" data-preview-native>Copia /model e apri</button><button type="button" class="btn" data-preview-model>Nuova sessione con un altro modello</button></div><small data-preview-hint></small>`;
+    this.listEl.insertAdjacentElement('afterend', preview);
+    // The preview follows the keyboard highlight and goes away with it; it never follows the pointer.
+    this.listEl.addEventListener('focusin', e => this.showRailPreview((e.target as HTMLElement).closest<HTMLElement>('.work-session')?.dataset.sid ?? null));
+    const left = () => setTimeout(() => {
+      const at = document.activeElement;
+      if (!(at instanceof HTMLElement) || !(at.closest('#work-list .work-session') || preview.contains(at))) this.showRailPreview(null);
+    }, 0);
+    this.listEl.addEventListener('focusout', left); preview.addEventListener('focusout', left);
+    const highlighted = () => this.listEl.querySelector<HTMLElement>(`button[data-session="${this.railPreviewId}"]`);
+    preview.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'Escape') return;
+      e.preventDefault(); e.stopPropagation(); highlighted()?.focus({ preventScroll: true });
+    });
+    preview.addEventListener('click', e => {
+      const button = (e.target as HTMLElement).closest('button'), id = this.railPreviewId;
+      if (!button || !id) return;
+      if (button.hasAttribute('data-preview-native')) this.nativeModel(id); else this.changeModel(id);
+    });
     this.listEl.addEventListener('paste', e => {
       const t = this.railOpenRow(e.target), text = e.clipboardData?.getData('text');
       if (!t || !text) return;
@@ -233,6 +258,7 @@ export class Terminals {
         else tab.info = info;
       }
       for (const tab of this.tabs.values()) if (!list.some(info => info.id === tab.info.id)) tab.info.alive = false;
+      if (this.railPreviewId) this.showRailPreview(this.railPreviewId); // the last lines of the highlighted session move on
       this.sel = reconcileTiles(this.sel, new Set(this.tabs.keys()));
       const sessions = [...this.tabs.values()].map(tab => tab.info);
       const now = Date.now();
@@ -378,7 +404,8 @@ export class Terminals {
 
   /** ↑/↓ and Home/End move the keyboard highlight across the visible sessions of the rail without opening any; Enter opens
    *  the highlighted one and gives it the keyboard. A character typed on the row of the open session goes to its terminal,
-   *  so "click a session, then type" still works. Alt+arrows keep reordering (see bindNodeDrag). */
+   *  so "click a session, then type" still works. → reaches the model actions in the preview of the highlighted session.
+   *  Alt+arrows keep reordering (see bindNodeDrag). */
   private railKey(e: KeyboardEvent): void {
     if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
     const from = e.target instanceof HTMLElement ? e.target : null;
@@ -394,6 +421,12 @@ export class Terminals {
       if (at === 'search') { this.control<HTMLInputElement>('#work-filter')?.focus(); return; }
       if (at === null) return;
       rows[at].focus({ preventScroll: true }); rows[at].scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (!e.shiftKey && e.key === 'ArrowRight' && from.closest('.work-session')) {
+      // The model actions of the highlighted session live in the preview under the list; ← or Esc come back.
+      const action = this.railPreview.hidden ? null : this.railPreview.querySelector<HTMLElement>('.work-rail-preview-actions:not([hidden]) button:not([hidden])');
+      if (action) { e.preventDefault(); action.focus({ preventScroll: true }); }
       return;
     }
     const t = e.key.length === 1 ? this.railOpenRow(from) : null;
@@ -657,30 +690,65 @@ export class Terminals {
     const anchor = this.control<HTMLButtonElement>('#work-quick-menu')!;
     if (anchor.getAttribute('aria-expanded') === 'true') { this.dismissQuickMenu?.(); return; }
     if (this.root.classList.contains('rail-collapsed')) this.control<HTMLElement>('#work-toggle-rail')!.click();
-    const agents = this.cb.agents();
-    const items = [...this.tabs.values()].map(tab => ({
+    const items = [...this.tabs.values()].map(tab => this.quickItem(tab));
+    this.dismissQuickMenu = openTerminalQuickMenu({ anchor, items, selectedId: this.active,
+      onOpen: id => this.activate(id), onNativeModel: id => this.nativeModel(id), onModel: id => this.changeModel(id) });
+  }
+
+  /** What the quick menu and the rail preview say about a session, and which model actions it supports. */
+  private quickItem(tab: Tab) {
+    return {
       id: tab.info.id,
       label: [tab.info.code ?? tab.info.id, tab.info.name || labels[tab.info.agent], this.nodeLabel(tab.info.nodeId ?? null)].join(' · '),
       model: tab.info.model,
-      canChangeModel: tab.info.agent !== 'shell' && tab.info.nodeId != null && agents[tab.info.agent],
+      canChangeModel: tab.info.agent !== 'shell' && tab.info.nodeId != null && !!this.cb.agents()[tab.info.agent],
       nativeModel: tab.info.alive && tab.info.agent !== 'shell',
       preview: () => this.quickPreview(tab),
-    }));
-    this.dismissQuickMenu = openTerminalQuickMenu({ anchor, items, selectedId: this.active,
-      onOpen: id => this.activate(id),
-      onNativeModel: id => {
-        this.activate(id);
-        void navigator.clipboard?.writeText('/model').catch(() => {});
-        this.message(tr('Usa /model nel terminale per scegliere il modello.'));
-      },
-      onModel: id => {
-        const info = this.tabs.get(id)?.info;
-        if (!info || info.agent === 'shell' || info.nodeId == null) return;
-        this.openLauncher(info.agent, 'embedded', '', false, info.nodeId, {
-          teamId: info.role === 'brain' ? 'new' : info.teamId,
-          initialModel: info.model ?? '', initialEffort: info.effort,
-        });
-      },
+    };
+  }
+  /** The CLI's own model picker: the session opens with /model ready to paste. */
+  private nativeModel(id: string): void {
+    this.activate(id);
+    void navigator.clipboard?.writeText('/model').catch(() => {});
+    this.message(tr('Usa /model nel terminale per scegliere il modello.'));
+  }
+  /** A new session of the same agent in the same node and squad, with the model to choose in the launcher. */
+  private changeModel(id: string): void {
+    const info = this.tabs.get(id)?.info;
+    if (!info || info.agent === 'shell' || info.nodeId == null) return;
+    this.openLauncher(info.agent, 'embedded', '', false, info.nodeId, {
+      teamId: info.role === 'brain' ? 'new' : info.teamId,
+      initialModel: info.model ?? '', initialEffort: info.effort,
+    });
+  }
+
+  /** The row the preview talks about stays marked while the keyboard is on the preview's own buttons. */
+  private markPreviewRow(): void {
+    for (const row of this.listEl.querySelectorAll<HTMLElement>('.work-session')) row.classList.toggle('previewed', row.dataset.sid === this.railPreviewId);
+  }
+
+  /** The compact preview docked under the rail list, for the session the keyboard highlights (null: nothing highlighted).
+   *  It says which session it is, its launch model, its last lines, and offers the model actions of the quick menu. */
+  private showRailPreview(id: string | null): void {
+    const tab = id ? this.tabs.get(id) : undefined;
+    const box = this.railPreview;
+    if (!tab) { this.railPreviewId = null; this.railPreviewRequest++; box.hidden = true; this.markPreviewRow(); return; }
+    const item = this.quickItem(tab), changed = this.railPreviewId !== item.id;
+    this.railPreviewId = item.id; box.hidden = false; this.markPreviewRow();
+    box.querySelector('strong')!.textContent = item.label;
+    const model = box.querySelector<HTMLElement>('[data-preview-launch-model]')!;
+    model.hidden = !item.model; model.textContent = item.model ? `${tr('Modello all’avvio')}: ${item.model}` : '';
+    const native = box.querySelector<HTMLElement>('[data-preview-native]')!, other = box.querySelector<HTMLElement>('[data-preview-model]')!;
+    native.hidden = !item.nativeModel; other.hidden = !item.canChangeModel;
+    box.querySelector<HTMLElement>('.work-rail-preview-actions')!.hidden = native.hidden && other.hidden;
+    box.querySelector<HTMLElement>('[data-preview-hint]')!.textContent = tr(native.hidden && other.hidden ? 'Invio apre la sessione' : 'Invio apre la sessione · → modello');
+    const text = box.querySelector('pre')!;
+    if (changed) text.textContent = '';
+    const request = ++this.railPreviewRequest;
+    void item.preview().catch(() => '').then(lines => {
+      if (request !== this.railPreviewRequest) return;
+      const shown = lines || tr('Nessuna anteprima disponibile');
+      if (text.textContent !== shown) { text.textContent = shown; text.scrollTop = text.scrollHeight; }
     });
   }
 
@@ -882,6 +950,7 @@ export class Terminals {
         const rows = focusedAt < 0 ? [] : this.listEl.querySelectorAll<HTMLElement>('button[data-session]');
         (this.listEl.querySelector<HTMLElement>(focusKey) ?? rows[Math.min(focusedAt, rows.length - 1)])?.focus({ preventScroll: true });
       }
+      this.markPreviewRow();
     }
     this.renderRailLinks();
     this.renderNodeMenu();

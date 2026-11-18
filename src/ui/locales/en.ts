@@ -586,6 +586,8 @@ export const en: Record<string, string> = {
   "Nessun terminale disponibile": "No terminals available",
   "Modello all’avvio": "Model at launch",
   "Copia /model e apri": "Copy /model and open",
+  "Invio apre la sessione": "Enter opens the session",
+  "Invio apre la sessione · → modello": "Enter opens the session · → model",
   "Usa /model nel terminale per scegliere il modello.": "Use /model in the terminal to choose the model.",
   "Caricamento anteprima…": "Loading preview…",
   "Menu rapido terminali": "Terminal quick menu",

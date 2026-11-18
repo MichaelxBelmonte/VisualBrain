@@ -55,6 +55,15 @@ try {
     assert.match(key, /t\.term!\.focus\(\); t\.term!\.input\(e\.key, true\)/, 'a character typed on the open session row reaches its terminal');
     assert.match(source, /const id = el\.dataset\.session!, stay = e\.detail > 0 && !window\.matchMedia\('\(max-width: 760px\)'\)\.matches;\n\s+this\.activate\(id, !stay\);/, 'a pointer click keeps the keyboard in the list; Enter gives it to the terminal');
     assert.match(source, /\?\? rows\[Math\.min\(focusedAt, rows\.length - 1\)\]\)\?\.focus\(\{ preventScroll: true \}\)/, 'the highlight keeps its place when its session leaves the list');
+    // The preview of the highlighted session lives in the rail and reuses what the quick menu already supports.
+    assert.match(source, /this\.listEl\.insertAdjacentElement\('afterend', preview\);/, 'the preview is part of the rail, not a popup');
+    assert.match(source, /this\.listEl\.addEventListener\('focusin', e => this\.showRailPreview\(\(e\.target as HTMLElement\)\.closest<HTMLElement>\('\.work-session'\)\?\.dataset\.sid \?\? null\)\);/, 'the preview follows the keyboard highlight');
+    assert.match(source, /const items = \[\.\.\.this\.tabs\.values\(\)\]\.map\(tab => this\.quickItem\(tab\)\);/, 'the quick menu and the rail preview describe a session the same way');
+    assert.match(source, /onNativeModel: id => this\.nativeModel\(id\), onModel: id => this\.changeModel\(id\)/);
+    assert.match(source, /if \(button\.hasAttribute\('data-preview-native'\)\) this\.nativeModel\(id\); else this\.changeModel\(id\);/, 'same model actions as the quick menu');
+    assert.match(key, /e\.key === 'ArrowRight' && from\.closest\('\.work-session'\)/, '→ reaches the model actions of the highlighted session');
+    const english = readFileSync(new URL('../src/ui/locales/en.ts', import.meta.url), 'utf8');
+    for (const hint of ['"Invio apre la sessione": "Enter opens the session"', '"Invio apre la sessione · → modello": "Enter opens the session · → model"']) assert.ok(english.includes(hint), `the hint is translated: ${hint}`);
     const css = readFileSync(new URL('../src/ui/style.css', import.meta.url), 'utf8');
     assert.match(css, /\.work-session > button\[data-session\]:focus-visible \{ outline: 2px solid var\(--fg\); outline-offset: -2px;/, 'the highlight is drawn inside the clipped row');
   }
