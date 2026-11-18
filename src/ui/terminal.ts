@@ -113,6 +113,8 @@ export class Terminals {
   private dismissLauncher: (() => void) | null = null;
   private dismissQuickMenu?: () => void;
   private syncing = false;
+  private pollSignature = '';
+  private pollReasons = '';
 
   private control<T extends Element = HTMLElement>(selector: string): T | null { return this.root.querySelector<T>(selector) ?? document.querySelector<T>(selector); }
 
@@ -217,12 +219,40 @@ export class Terminals {
       for (const info of list) {
         const tab = this.tabs.get(info.id);
         if (!tab) this.attach(info, false);
-        else { tab.info = info; this.updateCard(tab); }
+        else tab.info = info;
       }
-      for (const tab of this.tabs.values()) if (!list.some(info => info.id === tab.info.id)) { tab.info.alive = false; this.updateCard(tab); }
+      for (const tab of this.tabs.values()) if (!list.some(info => info.id === tab.info.id)) tab.info.alive = false;
       this.sel = reconcileTiles(this.sel, new Set(this.tabs.keys()));
-      this.renderList();
-      if (this.tiled && this.isOpen()) this.renderBody();
+      const sessions = [...this.tabs.values()].map(tab => tab.info);
+      const now = Date.now();
+      // Tones and the active filter can change before the server sends different session data.
+      const signature = JSON.stringify([this.active, this.selectedNode, this.sel, sessions,
+        sessions.map(info => [sessionTone(info, now), sessionWorking(info, now)])]);
+      const reasons = JSON.stringify(sessions.map(info => toneReason(info, now)));
+      const changed = signature !== this.pollSignature;
+      if (changed || reasons !== this.pollReasons) {
+        for (const tab of this.tabs.values()) this.updateCard(tab);
+        if (changed) {
+          this.renderList();
+          if (this.tiled && this.isOpen()) this.renderBody();
+        } else {
+          for (const button of this.listEl.querySelectorAll<HTMLButtonElement>('button[data-session]')) {
+            const tab = this.tabs.get(button.dataset.session!);
+            if (!tab) continue;
+            const linked = !!button.closest<HTMLElement>('[data-connection-endpoint]');
+            const title = this.railSessionTitle(tab.info, linked);
+            if (button.title !== title) {
+              button.title = title;
+              delete this.listEl.dataset.signature; // The saved HTML includes the previous title.
+            }
+          }
+          this.renderTabs();
+        }
+        if (!document.body.classList.contains('reordering')) {
+          this.pollSignature = signature;
+          this.pollReasons = reasons;
+        }
+      }
       this.syncChannel(true);
       await this.refreshLinks();
     } catch (err) { this.message(ui`Aggiornamento sessioni: ${String(err)}`); }
@@ -722,7 +752,12 @@ export class Terminals {
     return ui`<div class="tile-picker-confirm" role="alert"><span>Per mostrare ${esc(this.sessionLabel(t))} (${esc(this.nodeLabel(t.info.nodeId ?? null))}) vicino a ${esc(this.nodeLabel(base))} i due orchestratori vengono collegati e iniziano a scambiarsi informazioni.</span><span><button class="btn small" data-link-confirm>Collega e aggiungi</button> <button class="btn small" data-link-cancel>Annulla</button></span></div>`;
   }
 
+  private railSessionTitle(info: TerminalInfo, linked: boolean): string {
+    return [info.code, labels[info.agent], info.model, info.effort, toneReason(info), linked ? tr('Canale collegato') : ''].filter(Boolean).join(' · ');
+  }
+
   private renderList(): void {
+    this.pollSignature = ''; // A direct UI action may have changed the rendered state between polls.
     if (document.body.classList.contains('reordering')) return;
     // "Lavoro" counts the sessions waiting on the person: a permission or a question, or blocked.
     const needs = [...this.tabs.values()].filter(t => t.info.alive && ['attention', 'blocked'].includes(sessionTone(t.info) ?? '')).length;
@@ -763,7 +798,7 @@ export class Terminals {
       const collapsed = id !== null && this.collapsedNodes.has(id) && !this.filter && !filteringState;
       const shown = [...matching].sort((a, b) => rank(a) - rank(b)); // stable: sessions never moved keep their creation order
       if ((!matchesNode || filteringState) && !shown.length) return '';
-      return ui`${clusterStart ? ui`<div class="work-cluster"${toneAttr(id)}>⇄ Collegati · ${clusterSize} nodi</div>` : ''}<section class="work-group ${this.selectedNode === id ? 'current-node' : ''}"${toneAttr(id)} ${id !== null ? `data-drag="${id}"` : ''}><div class="work-node-row">${id !== null ? ui`<button class="work-row-grip" data-node-grip="${id}" aria-label="Sposta ${esc(name)}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button>` : ''}${id !== null ? ui`<button class="work-fold" data-fold="${id}" aria-expanded="${!collapsed}" title="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}" aria-label="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}">${collapsed ? '›' : '⌄'}</button>` : ''}<button class="work-node ${this.selectedNode === id ? 'selected' : ''}" data-node="${id ?? ''}" aria-current="${this.selectedNode === id ? 'true' : 'false'}" title="${esc(path)}"><span class="work-node-icon" aria-hidden="true">${icon('folder')}</span><span><strong>${esc(name)}</strong>${id !== null && tones.has(id) ? ui` <span class="work-link-mark" title="Nodo con collegamenti" aria-hidden="true">⇄</span>` : ''}</span><span class="work-number">${sessions.length}</span></button>${id === null ? ui`<button class="work-rail-action" data-add-shell="" title="Nuovo terminale libero" aria-label="Nuovo terminale libero">${icon('terminal')}</button>` : ''}${id !== null ? ui`<button class="work-rail-action" data-add-agent="${id}" title="Aggiungi agente a ${esc(name)}" aria-label="Aggiungi agente a ${esc(name)}">${icon('plus')}</button><button class="work-rail-action" data-add-shell="${id}" title="Terminale in ${esc(name)}" aria-label="Terminale in ${esc(name)}">${icon('terminal')}</button><button class="work-rail-action" data-node-link="${id}" title="Collega ${esc(name)}" aria-label="Collega ${esc(name)}" aria-expanded="${this.railLinkSource === `node:${id}`}">${icon('connect')}</button>${tones.has(id) ? ui`<button class="work-rail-action" data-group="${id}" title="Affianca i nodi collegati" aria-label="Affianca i nodi collegati a ${esc(name)}">${icon('grid')}</button>` : ''}` : ''}${id !== null ? ui`<button class="work-remove" data-remove="${id}" title="${sessions.length ? tr('Chiudi il nodo e termina le sue sessioni') : tr('Rimuovi il nodo dalla vista Operativa')}" aria-label="Chiudi ${esc(name)}">×</button>` : ''}</div>${(collapsed ? [] : shown).map(t => ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${toneData(t.info)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}" title="${esc([t.info.code, labels[t.info.agent], t.info.model, t.info.effort, toneReason(t.info), endpoints.has(t.info.id) ? tr('Canale collegato') : ''].filter(Boolean).join(' · '))}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}${flag(t.info)}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button></div>`).join('')}</section>`;
+      return ui`${clusterStart ? ui`<div class="work-cluster"${toneAttr(id)}>⇄ Collegati · ${clusterSize} nodi</div>` : ''}<section class="work-group ${this.selectedNode === id ? 'current-node' : ''}"${toneAttr(id)} ${id !== null ? `data-drag="${id}"` : ''}><div class="work-node-row">${id !== null ? ui`<button class="work-row-grip" data-node-grip="${id}" aria-label="Sposta ${esc(name)}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button>` : ''}${id !== null ? ui`<button class="work-fold" data-fold="${id}" aria-expanded="${!collapsed}" title="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}" aria-label="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}">${collapsed ? '›' : '⌄'}</button>` : ''}<button class="work-node ${this.selectedNode === id ? 'selected' : ''}" data-node="${id ?? ''}" aria-current="${this.selectedNode === id ? 'true' : 'false'}" title="${esc(path)}"><span class="work-node-icon" aria-hidden="true">${icon('folder')}</span><span><strong>${esc(name)}</strong>${id !== null && tones.has(id) ? ui` <span class="work-link-mark" title="Nodo con collegamenti" aria-hidden="true">⇄</span>` : ''}</span><span class="work-number">${sessions.length}</span></button>${id === null ? ui`<button class="work-rail-action" data-add-shell="" title="Nuovo terminale libero" aria-label="Nuovo terminale libero">${icon('terminal')}</button>` : ''}${id !== null ? ui`<button class="work-rail-action" data-add-agent="${id}" title="Aggiungi agente a ${esc(name)}" aria-label="Aggiungi agente a ${esc(name)}">${icon('plus')}</button><button class="work-rail-action" data-add-shell="${id}" title="Terminale in ${esc(name)}" aria-label="Terminale in ${esc(name)}">${icon('terminal')}</button><button class="work-rail-action" data-node-link="${id}" title="Collega ${esc(name)}" aria-label="Collega ${esc(name)}" aria-expanded="${this.railLinkSource === `node:${id}`}">${icon('connect')}</button>${tones.has(id) ? ui`<button class="work-rail-action" data-group="${id}" title="Affianca i nodi collegati" aria-label="Affianca i nodi collegati a ${esc(name)}">${icon('grid')}</button>` : ''}` : ''}${id !== null ? ui`<button class="work-remove" data-remove="${id}" title="${sessions.length ? tr('Chiudi il nodo e termina le sue sessioni') : tr('Rimuovi il nodo dalla vista Operativa')}" aria-label="Chiudi ${esc(name)}">×</button>` : ''}</div>${(collapsed ? [] : shown).map(t => ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${toneData(t.info)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}" title="${esc(this.railSessionTitle(t.info, endpoints.has(t.info.id)))}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}${flag(t.info)}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button></div>`).join('')}</section>`;
     }).join('');
     const html = groups || tr('<div class="work-list-empty">Nessun nodo trovato.</div>');
     if (this.listEl.dataset.signature !== html) {
@@ -853,6 +888,7 @@ export class Terminals {
       tab.pane!.classList.remove('hidden');
       tab.pane!.classList.toggle('focused', id === this.active);
       tab.pane!.style.order = String(index);
+      this.updateCard(tab);
       this.updateTileHead(tab, index);
       this.updateConnection(tab);
     });
@@ -919,7 +955,7 @@ export class Terminals {
     t.observer = new ResizeObserver(() => { if (!pane.classList.contains('hidden') && this.isOpen()) this.fitTab(t); }); t.observer.observe(surface);
     if (t.info.nodeId != null) void this.renderContext(pane.querySelector('.session-context')!, t.info.nodeId);
     else pane.querySelector('.session-context')!.textContent = ui`Cartella di lavoro: ${short(t.info.cwd)}`;
-    this.connect(t); this.updateCard(t);
+    this.connect(t); // renderBody paints the header after showing the pane.
   }
 
   /** Session codes (OP3) and ids written in a terminal link to that session of the same node: a click opens it. */
@@ -965,8 +1001,12 @@ export class Terminals {
     } catch (err) { this.message(String(err)); } finally { if (button) button.disabled = false; }
   }
 
+  private paneVisible(pane: HTMLElement): boolean {
+    return this.isOpen() && !this.sideOpen && !pane.classList.contains('hidden');
+  }
+
   private updateCard(t: Tab): void {
-    if (!t.pane) return;
+    if (!t.pane || !this.paneVisible(t.pane)) return;
     t.pane.querySelector('.card-state')!.textContent = !t.info.alive || t.info.workState || t.info.attention || t.connected ? toneReason(t.info) : tr('Disconnesso');
     const label = t.pane.querySelector('.session-label')!;
     label.setAttribute('title', [this.generatedName(t), toneReason(t.info), tr('Doppio clic per rinominare')].join(' · '));
@@ -1102,9 +1142,14 @@ export class Terminals {
   }
   private renderRailLinks(): void {
     const box = this.control<HTMLElement>('#work-rail-links'); if (!box) return;
+    if (!this.railLinkSource && box.dataset.sig === undefined) return;
     const options = this.railLinkOptions(), source = options.find(o => o.key === this.railLinkSource);
     box.classList.toggle('hidden', !source);
-    if (!source) { this.railLinkSource = null; box.innerHTML = ''; delete box.dataset.sig; return; }
+    if (!source) {
+      this.railLinkSource = null;
+      if (box.dataset.sig !== undefined) { box.innerHTML = ''; delete box.dataset.sig; }
+      return;
+    }
     const candidates = options.filter(o => o.side.nodeId != null && o.side.nodeId !== source.side.nodeId && (o.key.startsWith('node:') || o.side.role !== 'orchestrator'));
     const html = ui`<header><strong>Collega ${esc(source.label)}</strong><button class="btn ghost icon-btn" data-dismiss-links aria-label="Chiudi collegamenti" title="Chiudi collegamenti">${icon('close')}</button></header><p>I nodi collegati possono scambiarsi messaggi.</p>${candidates.length ? candidates.map(o => {
       const link = linkBetween(this.links, source.side, o.side);
@@ -1131,7 +1176,7 @@ export class Terminals {
   }
   /** Tile number + shape (readable without colour) and the node the session belongs to, since a grid can mix nodes. */
   private updateTileHead(t: Tab, index: number): void {
-    if (!t.pane) return;
+    if (!t.pane || !this.paneVisible(t.pane)) return;
     const marker = tileMarker(index);
     const badge = t.pane.querySelector<HTMLElement>('.tile-badge')!;
     badge.textContent = String(marker.number); badge.title = ui`Terminale ${marker.number} (Ctrl+Alt+${marker.number})`;
@@ -1153,7 +1198,7 @@ export class Terminals {
 
   /** Same tone as the map and the rail for a linked node, the real endpoints marked, and one button per live direct peer. */
   private updateConnection(t: Tab): void {
-    const pane = t.pane; if (!pane) return;
+    const pane = t.pane; if (!pane || !this.paneVisible(pane)) return;
     const infos = [...this.tabs.values()].map(x => ({ id: x.info.id, nodeId: x.info.nodeId, alive: x.info.alive, createdAt: x.info.createdAt, role: x.info.role }));
     const group = t.info.nodeId != null ? connectionGroups(this.links).get(t.info.nodeId) : undefined;
     if (group) pane.dataset.connectionTone = String(group.tone); else delete pane.dataset.connectionTone;

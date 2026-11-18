@@ -52,12 +52,12 @@ const terminals = new Terminals(document.getElementById('terminals')!, {
   agents: () => store.status?.config.agents ?? { claude: false, codex: false, hermes: false, agy: false },
   sessionsChanged: (sessions, active) => {
     const priorNodes = new Set([...store.sessions.values()].filter(s => s.alive && s.nodeId != null).map(s => s.nodeId!));
+    const selectionChanged = store.activeSession !== active;
     const changed = store.setSessions(sessions, active);
     if (changed) {
       relayout();
       if (sessions.some(s => s.alive && s.nodeId != null && !priorNodes.has(s.nodeId))) void loadGraph();
-    }
-    graph.invalidate();
+    } else if (selectionChanged) graph.invalidate();
   },
   // the terminals already read the links with every session sync: the map reuses that read
   linksChanged: (links) => { store.sessionLinks = links; graph.invalidate(); },

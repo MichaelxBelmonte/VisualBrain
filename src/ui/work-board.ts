@@ -85,6 +85,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
   let error = '';
   let shell = '';
   let signature = '';
+  let memberClock = -1;
   let loading = false;
   let openCard: string | null = null;
   let youExpanded = false;
@@ -121,10 +122,10 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
         panel === 'link' ? api.teamLinks().catch(() => links) : Promise.resolve(links),
       ]);
       if (asked !== `${nodeId}:${team}`) return;
+      if (force || error) signature = '';
       view = next; links = nextLinks; error = '';
       if (rem) reminders = rem.filter(r => r.nodeId === nodeId);
       if (board) folders = new Map(board.folders.filter(f => !f.isInbox).map(f => [f.id, f.name]));
-      if (force) signature = '';
       paint();
     } catch (err) {
       // A squad archived or gone elsewhere: back to the first squad.
@@ -196,6 +197,10 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
 
   function bindShell(): void {
     const q = <T extends Element = HTMLElement>(s: string) => el.querySelector<T>(s);
+    el.querySelector('.lavoro')!.addEventListener('focusout', event => {
+      // A field may have held back a lane or a select while a newer response arrived.
+      if ((event.target as Element).matches('input,select,textarea')) signature = '';
+    });
     const node = q<HTMLSelectElement>('select[data-node]');
     if (node) node.onchange = () => { selectNode(Number(node.value)); paint(); void refresh(true); };
     const message = q<HTMLFormElement>('[data-message]');
@@ -279,8 +284,23 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     if (nodeId === null) { el.innerHTML = tr('<div class="board-empty muted">Aggiungi un nodo a Operativa per vederne il lavoro.</div>'); shell = ''; return; }
     paintShell();
     if (!view) return;
-    const sig = JSON.stringify([view, reminders, links, openCard, Math.floor(Date.now() / 30_000)]);
-    if (sig === signature) return;
+    const sig = JSON.stringify([view, reminders, [...folders], links, openCard]);
+    const clock = Math.floor(Date.now() / 30_000);
+    const tick = clock !== memberClock;
+    memberClock = clock;
+    if (sig === signature) {
+      // Only member tones and their relative time descriptions can age without a data change.
+      if (tick) {
+        for (const chip of el.querySelectorAll<HTMLElement>('[data-goal] .member-chip[data-goto]')) {
+          const member = named(chip.dataset.goto!);
+          if (!member) continue;
+          const tone = sessionTone(member) ?? '', title = memberTitle(member);
+          if (chip.dataset.tone !== tone) chip.dataset.tone = tone;
+          if (chip.title !== title) chip.title = title;
+        }
+      }
+      return;
+    }
     signature = sig;
     paintFilters(view.teamList ?? [], view.brain);
     paintGoal();
@@ -327,13 +347,17 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
   }
 
   /** One line under the filters: objective, summary, and who is on the squad. */
+  function memberTitle(s: TerminalInfo): string {
+    return [s.name || roleName(s), toneReason(s), s.agent, s.model, s.effort].filter(Boolean).join(' · ');
+  }
+
   function paintGoal(): void {
     const box = el.querySelector<HTMLElement>('[data-goal]')!;
     if (team === REMINDERS) { box.innerHTML = ui`<p class="muted">Promemoria del nodo: note per te, senza agenti. Si spostano con i pulsanti della scheda.</p>`; return; }
     const info = team === 'brain' ? null : view!.team;
     const objective = info?.objective || '', summary = view!.summary;
     const members = (team === 'brain' ? (view!.brain ? [view!.brain] : []) : view!.sessions).slice().sort((a, b) => Number(b.alive) - Number(a.alive) || Number(b.role === 'orchestrator') - Number(a.role === 'orchestrator'));
-    const memberHtml = members.map(s => ui`<button class="member-chip" data-goto="${s.id}" data-tone="${sessionTone(s) ?? ''}" title="${esc([s.name || roleName(s), toneReason(s), s.agent, s.model, s.effort].filter(Boolean).join(' · '))}"><i></i>${esc(s.code ?? s.id)}</button>`).join('');
+    const memberHtml = members.map(s => ui`<button class="member-chip" data-goto="${s.id}" data-tone="${sessionTone(s) ?? ''}" title="${esc(memberTitle(s))}"><i></i>${esc(s.code ?? s.id)}</button>`).join('');
     const html = `<div class="lavoro-objective">${objective ? `<p class="clamp" title="${esc(objective)}">${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? `<p class="muted">${esc(tr('Nessun obiettivo. Impostalo dal menu ···'))}</p>` : ''}</div><div class="lavoro-members">${memberHtml}${info ? ui`<button class="member-chip add" data-add-agent title="Aggiungi agente">＋</button>` : ''}</div>`;
     if (box.innerHTML !== html) box.innerHTML = html;
   }
