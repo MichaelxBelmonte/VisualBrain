@@ -62,7 +62,7 @@ const server = createServer(socket => {
       saveRecord();
       owner = socket; authenticated = true; clearTimeout(authTimer); clearTimeout(idleTimer); idleTimer = undefined;
       for (const info of terms.list()) sendFrame(socket, { event: 'term', term: snapshot(terms.get(info.id)!) });
-      sendFrame(socket, { event: 'ready', protocol: TERMINAL_PROTOCOL, pid: process.pid, noticeOnly: true, checkedNotices: true });
+      sendFrame(socket, { event: 'ready', protocol: TERMINAL_PROTOCOL, pid: process.pid, noticeOnly: true, checkedNotices: true, navigationAware: true });
       return;
     }
     if (owner !== socket) { socket.destroy(); return; }

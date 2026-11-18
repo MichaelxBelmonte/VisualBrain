@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Terminals, appendBuffer, type SpawnOptions, type Term, type TerminalStore } from './terminals.ts';
-import { appendOutput, noticeInput, noticeInputBlocked, noteInjected, noteInput, observedTurn, scanOutput, stripAnsi } from './activity.ts';
+import { appendOutput, confirmComposerReturn, noticeInput, noticeInputBlocked, noteInjected, noteInput, observedTurn, scanOutput, stripAnsi } from './activity.ts';
 import { TERMINAL_PROTOCOL, metadataFields, observe, readFrames, sendFrame, sendFrames, type HostRecord, type TermPatch, type TermSnapshot } from './terminal-wire.ts';
 
 const workStateFields = ['workState', 'stateSource', 'stateAt', 'idleSince'] as const;
@@ -70,6 +70,7 @@ export class TerminalService implements TerminalStore {
   private applying = false;
   private noticeOnly = false;
   private checkedNotices = false;
+  private navigationAware = false;
   private delivering = new Set<string>();
   onTurnIdle?: (id: string) => void;
   private closing = false;
@@ -147,10 +148,22 @@ export class TerminalService implements TerminalStore {
       });
       readFrames(socket, m => {
         if (m.error && !m.request) { this.failure = new Error(m.error); if (!ready) reject(this.failure); socket.destroy(); return; }
-        if (m.event === 'ready') { ready = true; this.connected = true; this.hostPid = m.pid; this.noticeOnly = m.noticeOnly === true; this.checkedNotices = m.checkedNotices === true; clearTimeout(timeout); resolve(); return; }
+        if (m.event === 'ready') {
+          ready = true; this.connected = true; this.hostPid = m.pid;
+          this.noticeOnly = m.noticeOnly === true; this.checkedNotices = m.checkedNotices === true;
+          this.navigationAware = m.navigationAware === true;
+          clearTimeout(timeout); resolve(); return;
+        }
         if (m.event === 'term') { this.add(m.term); return; }
         if (m.event === 'output') {
           const t = this.terms.get(m.id); if (!t) return;
+          this.applying = true;
+          let returned: boolean;
+          try { returned = confirmComposerReturn(t.activity, t.info, m.data); } finally { this.applying = false; }
+          if (returned) {
+            if (!this.navigationAware) this.command({ op: 'patch', id: m.id, patch: { section: 'activity', key: 'draft', value: false } });
+            setImmediate(() => this.onTurnIdle?.(m.id));
+          }
           if (!this.checkedNotices) {
             const wasBusy = t.activity.cliBusy;
             this.applying = true;
@@ -169,7 +182,8 @@ export class TerminalService implements TerminalStore {
             const target = t[m.patch.section as 'info' | 'activity'] as unknown as Record<string, unknown>;
             if (m.patch.value === undefined) delete target[m.patch.key]; else target[m.patch.key] = m.patch.value;
           } finally { this.applying = false; }
-          if (m.patch.section === 'activity' && m.patch.key === 'cliBusy' && m.patch.value === false)
+          if ((m.patch.section === 'activity' && m.patch.key === 'cliBusy' && m.patch.value === false)
+            || (m.patch.section === 'info' && m.patch.key === 'attention' && !m.patch.value))
             setImmediate(() => this.onTurnIdle?.(m.id));
         } else if (m.event === 'exit') {
           const t = this.terms.get(m.id); if (t) { t.info.alive = false; t.exitCode = m.code; this.onExit(m.id, m.code); }
@@ -196,7 +210,7 @@ export class TerminalService implements TerminalStore {
     };
     const t: Term = {
       info: observe(s.info, changed('info'), metadataFields.info),
-      activity: observe({ ...s.activity, draft: stranded || s.activity.draft, cliBusy: s.activity.cliBusy ?? observedTurn(screen, s.info.agent), timer: null }, changed('activity'), metadataFields.activity),
+      activity: observe({ ...s.activity, draft: stranded || s.activity.draft, escapeArmed: s.activity.escapeArmed ?? (s.info.lastInputAt !== undefined), cliBusy: s.activity.cliBusy ?? observedTurn(screen, s.info.agent), timer: null }, changed('activity'), metadataFields.activity),
       proc: { pid: s.pid, write: data => this.command({ op: 'write', id, data }), resize: (cols, rows) => this.resize(id, cols, rows), kill: () => this.kill(id) },
       buffer: s.buffer, bufferBytes: s.buffer.reduce((n, b) => n + b.length, 0), listeners: new Set(), exitCode: s.exitCode,
       teamToken: s.teamToken, seenMessage: s.seenMessage, injectedMessage: s.injectedMessage,
@@ -244,12 +258,17 @@ export class TerminalService implements TerminalStore {
   write(id: string, data: string) {
     const t = this.get(id);
     if (!t) return;
-    this.command({ op: 'write', id, data, input: true });
-    const previous = t.activity.draft;
+    const previous = !!(t.activity.draft || t.activity.navigation);
     this.applying = true;
-    try { noteInput(t.activity, t.info, data); } finally { this.applying = false; }
-    if (!this.checkedNotices && t.activity.draft !== previous)
-      this.command({ op: 'patch', id, patch: { section: 'activity', key: 'draft', value: t.activity.draft } });
+    let navigation: boolean;
+    try { navigation = noteInput(t.activity, t.info, data); } finally { this.applying = false; }
+    const input = { op: 'write', id, data, input: true };
+    const guarded = !!(t.activity.draft || t.activity.navigation);
+    if (!this.navigationAware && (navigation || guarded !== previous)) {
+      // Older hosts classify the same navigation bytes differently. Ship the correction with the key.
+      if (!this.connected || this.closing) throw this.failure ?? new Error('Terminal service disconnected');
+      sendFrames(this.socket, [input, { op: 'patch', id, patch: { section: 'activity', key: 'draft', value: guarded } }]);
+    } else this.command(input);
   }
   resize(id: string, cols: number, rows: number) { this.command({ op: 'resize', id, cols, rows }); }
   kill(id: string) { this.command({ op: 'kill', id }); this.terms.delete(id); }

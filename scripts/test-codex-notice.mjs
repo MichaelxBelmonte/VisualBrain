@@ -132,6 +132,24 @@ trust_level = "trusted"
   assert.equal(receipts.length, 2);
   assert.equal(submitted.length, 2);
   assert.ok(submitted.every(notice => !notice.includes('Fixture board text only')));
+  // Actual keys in the isolated recipient, without a human submit. A previous turn populated its history.
+  const to = 'orchestrator';
+  await until(() => !service.get(to).activity.cliBusy, 'previous turn finished');
+  for (const key of ['\x1b[C', '\x1b[B', '\x1b[Z', '\x1b']) service.write(to, key);
+  await service.flush();
+  const nav = await team('brain','message',{to,text:'After harmless navigation'});
+  await until(() => receipts.some(r=>r.to===to && r.id===nav.id),'automatic read after navigation');
+  await until(() => !service.get(to).activity.cliBusy, 'navigation turn finished');
+  service.write(to,'\x1b[A');
+  await service.flush(); await delay(200);
+  const history = await team('brain','message',{to,text:'Wait until history closes'});
+  await delay(300);
+  assert.ok(!receipts.some(r=>r.to===to && r.id===history.id),'never submit a recalled prompt');
+  service.write(to,'\x1b[B');
+  await until(() => receipts.some(r=>r.to===to && r.id===history.id),'read after returning to an empty composer');
+  assert.equal(receipts.length,4);
+  assert.equal(submitted.length,4);
+  console.log('PASS navigation, protected history and automatic delivery on return to the empty composer');
 } finally {
   stopWatch?.();
   if (service) {
