@@ -1,0 +1,7 @@
+# Visual Brain 0.2.56
+
+- **Cambia il modello dalla riga della sessione.** Nella lista laterale dell’Operativa la sessione aperta, o quella evidenziata con le frecce, mostra un piccolo selettore del modello. Scegli lì: il cambio avviene nella stessa sessione, con la stessa storia, e vale dal turno successivo. Non serve più copiare /model né aprire una nuova sessione. Funziona con Claude e Codex.
+- **Modello scelto e modello usato, distinti.** Accanto al selettore leggi «X dal prossimo turno» finché l’agente non ha risposto, poi «ultimo turno: X», cioè il modello che il CLI ha registrato davvero. Il modello predefinito delle nuove sessioni non cambia.
+- **Mai sopra quello che stai scrivendo.** Se nella sessione c’è una bozza, una richiesta di permesso o un turno in corso, il cambio aspetta in coda e lo puoi annullare dalla riga. Quando Claude chiede conferma perché la risposta successiva sarà più lenta e userà più token, la domanda compare sulla riga con Conferma e Annulla.
+- **Hermes e Antigravity.** Per questi agenti non c’è un cambio verificabile a sessione aperta: la riga lo dice, senza fingere il cambio.
+- **Anteprima sotto la riga.** L’anteprima non è più un riquadro in fondo alla lista: sono una o due righe sotto la sessione evidenziata, con l’ultima attività leggibile. Cornici, piè di pagina e scorciatoie del CLI restano fuori, gli errori veri restano; se non c’è nulla da leggere lo dice.
