@@ -52,6 +52,19 @@ execFileSync('/bin/sh', ['-n', '-c', again[1]]); checks++;
   eq(await shellGone, 'SIGTERM', 'once the server is gone the shell is ended');
   eq(await watcherDone, 0, 'and the watcher ends, opening nothing when there is no app to open');
 }
+{
+  // The real shell never waits on the server it started: the server that has exited stays a zombie, which `kill -0` still
+  // finds. The watcher must see it as gone, or "Riavvia" would wait 30 s and give up with the window still open.
+  const shell = spawn('/bin/sh', ['-c', 'sleep 0.3 & echo $!; exec sleep 40'], { stdio: ['ignore', 'pipe', 'ignore'] });
+  const zombie = Number(await new Promise(r => shell.stdout.once('data', d => r(String(d).trim()))));
+  const shellGone = new Promise(r => shell.once('exit', (_code, signal) => r(signal)));
+  const from = Date.now();
+  const watcher = spawn('/bin/sh', restartCommand(zombie, shell.pid, null), { stdio: 'ignore' });
+  const outcome = await Promise.race([shellGone, new Promise(r => setTimeout(() => r('still alive'), 8000))]);
+  shell.kill(); watcher.kill();
+  eq(outcome, 'SIGTERM', 'a server that exited but was never reaped by the shell counts as gone');
+  ok(Date.now() - from < 5000, 'and the shell is ended at once, not after the timeout');
+}
 ok(inApplications('/Applications/Visual Brain.app', ['/Applications', '/Users/me/Applications']) && inApplications('/Users/me/Applications/Visual Brain.app', ['/Applications', '/Users/me/Applications/']), 'a copy in either Applications folder is the installed one');
 ok(!inApplications('/Users/me/Desktop/vb/app/src-tauri/target/universal-apple-darwin/release/bundle/macos/Visual Brain.app', ['/Applications']) && !inApplications('/Applications/Sub/Visual Brain.app', ['/Applications']), 'a build folder or a subfolder is not');
 ok(!inApplications('/private/var/folders/x/T/AppTranslocation/0236/d/Visual Brain.app', ['/private/var/folders/x/T/AppTranslocation/0236/d']), 'a translocated copy never counts as installed');

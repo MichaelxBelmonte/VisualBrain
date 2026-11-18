@@ -144,9 +144,12 @@ export function reopenCommand(pid: number, app: string): string[] {
  * "Riavvia" after an installation. Waits for this server (`serverPid`) to finish its clean shutdown, ends the desktop shell,
  * which has nothing left to save, and opens `app` once it is gone. `app` is null when a reopen watcher already waits for the
  * shell (a relocated install). Gives up after 30 s instead of waiting for ever. Arguments for /bin/sh, never quoted in.
+ *
+ * "Gone" is read from the process state, not from `kill -0`: the shell starts the server and never waits on it, so the
+ * server that has exited stays a zombie, which still answers `kill -0`, for as long as the shell lives.
  */
 export function restartCommand(serverPid: number, shellPid: number, app: string | null): string[] {
-  const gone = (arg: string) => `n=0; while kill -0 "${arg}" 2>/dev/null; do n=$((n+1)); [ "$n" -gt 150 ] && exit 1; sleep 0.2; done`;
+  const gone = (arg: string) => `n=0; while /bin/ps -o stat= -p "${arg}" 2>/dev/null | /usr/bin/grep -qv '^ *Z'; do n=$((n+1)); [ "$n" -gt 150 ] && exit 1; sleep 0.2; done`;
   return ['-c', `${gone('$0')}; kill -TERM "$1" 2>/dev/null; ${gone('$1')}; [ -n "$2" ] && exec /usr/bin/open -n "$2"; exit 0`, String(serverPid), String(shellPid), app ?? ''];
 }
 
