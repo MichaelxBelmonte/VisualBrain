@@ -31,6 +31,7 @@ export const api = {
   updateState: () => call<import('./updates.ts').UpdateView>('GET', '/api/update'),
   updateCheck: () => call<import('./updates.ts').UpdateView>('POST', '/api/update/check', {}),
   updateInstall: () => call<import('./updates.ts').UpdateView>('POST', '/api/update/install', {}),
+  updateRestart: () => call<import('./updates.ts').UpdateView>('POST', '/api/update/restart', {}),
   access: () => call<import('./access.ts').AccessView>('GET', '/api/access'),
   accessSettings: () => call<{ ok: boolean }>('POST', '/api/access/settings', {}),
   graph: (q: { expanded: number[]; kinds: string[] | null; min: number; symlinks: boolean; externals: boolean; extra: number[] }) => {

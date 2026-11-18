@@ -3,12 +3,13 @@
 // Uso: node scripts/test-update.mjs — solo macOS per la parte di installazione (ditto, codesign).
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand } from '../src/server/updater.ts';
-import { bannerFor } from '../src/ui/updates.ts';
+import { Updater, UPDATE_REPO, appBundleOf, applicationsTarget, compareVersions, forget, inApplications, installedCopy, isTranslocated, parseFeed, reopenCommand, restartCommand } from '../src/server/updater.ts';
+import { bannerFor, noteLines, settingsRow } from '../src/ui/updates.ts';
+import { setLanguage } from '../src/ui/i18n.ts';
 import { UPDATE_PUBLIC_KEY } from '../src/server/update-key.ts';
 
 let checks = 0;
@@ -35,6 +36,22 @@ const cmd = reopenCommand(4242, '/Applications/Visual Brain.app');
 eq(cmd.slice(2), ['4242', '/Applications/Visual Brain.app'], 'the reopen watcher gets the shell pid and the app as arguments, never quoted into the script');
 ok(/kill -0 "\$0"/.test(cmd[1]) && /\/usr\/bin\/open "\$1"/.test(cmd[1]), 'it waits for the shell to exit, then opens the app');
 execFileSync('/bin/sh', ['-n', '-c', cmd[1]]); checks++;
+// "Riavvia": the watcher lets the server finish, ends the shell and opens the app; here two sleeping processes stand in for them
+const again = restartCommand(11, 22, '/Applications/Visual Brain.app');
+eq(again.slice(2), ['11', '22', '/Applications/Visual Brain.app'], 'the restart watcher gets server pid, shell pid and app as arguments');
+eq(restartCommand(11, 22, null)[4], '', 'no app to open when a reopen watcher already waits for the shell');
+execFileSync('/bin/sh', ['-n', '-c', again[1]]); checks++;
+{
+  const fakeServer = spawn('/bin/sleep', ['30'], { stdio: 'ignore' }), fakeShell = spawn('/bin/sleep', ['30'], { stdio: 'ignore' });
+  const shellGone = new Promise(r => fakeShell.once('exit', (_code, signal) => r(signal)));
+  const watcher = spawn('/bin/sh', restartCommand(fakeServer.pid, fakeShell.pid, null), { stdio: 'ignore' });
+  const watcherDone = new Promise(r => watcher.once('exit', r));
+  await new Promise(r => setTimeout(r, 600));
+  ok(fakeShell.exitCode === null && fakeShell.signalCode === null, 'the shell stays while the server is still closing');
+  fakeServer.kill();
+  eq(await shellGone, 'SIGTERM', 'once the server is gone the shell is ended');
+  eq(await watcherDone, 0, 'and the watcher ends, opening nothing when there is no app to open');
+}
 ok(inApplications('/Applications/Visual Brain.app', ['/Applications', '/Users/me/Applications']) && inApplications('/Users/me/Applications/Visual Brain.app', ['/Applications', '/Users/me/Applications/']), 'a copy in either Applications folder is the installed one');
 ok(!inApplications('/Users/me/Desktop/vb/app/src-tauri/target/universal-apple-darwin/release/bundle/macos/Visual Brain.app', ['/Applications']) && !inApplications('/Applications/Sub/Visual Brain.app', ['/Applications']), 'a build folder or a subfolder is not');
 ok(!inApplications('/private/var/folders/x/T/AppTranslocation/0236/d/Visual Brain.app', ['/private/var/folders/x/T/AppTranslocation/0236/d']), 'a translocated copy never counts as installed');
@@ -82,6 +99,36 @@ eq(bannerFor(view({ outsideApplications: true, status: 'ready', latest: '0.2.6' 
 eq(bannerFor(view({ enabled: false, outsideApplications: true }), null), null, 'a development run never shows it');
 const erofs = bannerFor(view({ status: 'error', error: "Installazione non riuscita: EROFS: read-only file system, rename '/private/var/folders/x/T/AppTranslocation/0236/d/Visual Brain.app' -> '/Users/x/…'" }), null);
 ok(/sola lettura/.test(erofs.text) && /spostala in Applicazioni/.test(erofs.text) && !/EROFS/.test(erofs.text), 'a read-only location is explained, not shown as an errno');
+
+// --- Impostazioni → Aggiornamenti: one sentence and one button per state ------------------------------------------------
+const row = (o = {}, restarting = false) => settingsRow(view(o), restarting);
+eq(row().action, { id: 'check', label: 'Verifica aggiornamenti', primary: false }, 'idle: the button checks');
+eq([row().tone, row().progress], ['quiet', null], 'before the first check nothing is claimed');
+eq([row({ checkedAt: 1 }).text, row({ checkedAt: 1 }).tone], ['Sei aggiornato: la 0.2.5 è l’ultima versione.', 'ok'], 'after a check that found nothing: up to date, with the version');
+eq([row({ status: 'checking' }).action, row({ status: 'checking' }).progress], [null, 'unknown'], 'checking: no button, work without a measure');
+eq(row({ status: 'downloading', latest: '0.2.6', progress: { received: 250, total: 1000 } }).progress, 0.25, 'downloading: the real fraction received');
+eq(row({ status: 'downloading', latest: '0.2.6' }).progress, 'unknown', 'a server that reports no bytes shows work without a measure');
+ok(!/%|\d{2,}/.test(row({ status: 'downloading', latest: '0.2.6', progress: { received: 250, total: 1000 } }).text.replace('0.2.6', '')), 'the sentence never carries the percentage: it is announced once');
+eq(row({ status: 'ready', latest: '0.2.6' }).action, { id: 'install', label: 'Aggiorna alla 0.2.6', primary: true }, 'ready: the button updates to that version');
+ok(/non chiude nessun terminale/.test(row({ status: 'ready', latest: '0.2.6' }).text), 'and says what installing costs: nothing');
+eq(row({ status: 'installing', latest: '0.2.6' }).action, null, 'installing: no button');
+eq(row({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true, liveSessions: 3 }).action, { id: 'restart', label: 'Riavvia ora', primary: true }, 'installed: restart, when the terminals survive it');
+ok(/in Applicazioni/.test(row({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true, relocated: true }).text), 'a relocated install says where the app went');
+eq(row({ status: 'installed', latest: '0.2.6', persistentTerminals: true }).action, null, 'a server that cannot restart leaves ⌘Q to the person');
+ok(/⌘Q/.test(row({ status: 'installed', latest: '0.2.6', persistentTerminals: true }).text), 'and says so');
+const costly = row({ status: 'installed', latest: '0.2.6', canRestart: true, liveSessions: 3 });
+ok(costly.action === null && /3 terminali attivi si chiuderanno/.test(costly.text), 'no restart button when it would close terminals');
+eq([row({ status: 'error', error: 'Boom' }).text, row({ status: 'error', error: 'Boom' }).action.label, row({ status: 'error', error: 'Boom' }).tone], ['Boom', 'Riprova', 'error'], 'error: the reason and a way to try again');
+ok(/sola lettura/.test(row({ status: 'error', error: 'EROFS: read-only file system' }).text), 'a read-only location is explained here too');
+eq([row({ enabled: false }).action, row({ enabled: false }).tone], [null, 'quiet'], 'a development run has no button');
+ok(/solo nell’app installata/.test(row({ enabled: false }).text), 'and says why');
+eq([settingsRow(null).tone, settingsRow(null).action.id], ['error', 'check'], 'a server that does not answer: say it, offer to try again');
+eq([row({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true }, true).action, row({}, true).progress], [null, 'unknown'], 'once restart is accepted the button goes');
+eq(noteLines('- **Menu rapido.** Apri il menu.\n\n- Scelta del *modello*\n'), ['Menu rapido. Apri il menu.', 'Scelta del *modello*'], 'release notes become plain lines');
+setLanguage('en');
+eq([row().action.label, row({ status: 'ready', latest: '0.2.6' }).action.label, row({ checkedAt: 1 }).text], ['Check for updates', 'Update to 0.2.6', 'You are up to date: 0.2.5 is the latest version.'], 'the row in English');
+ok(/^Version 0\.2\.6 installed\. Restart/.test(row({ status: 'installed', latest: '0.2.6', canRestart: true, persistentTerminals: true }).text), 'installed, in English');
+setLanguage('it');
 
 // --- the whole flow with fake network and a synthetic app --------------------------------------------------------------
 if (process.platform === 'darwin') {
@@ -161,6 +208,19 @@ if (process.platform === 'darwin') {
     eq(readdirSync(join(temp, 'good/running-app-backups')).length, 0, 'it is removed once no process uses it: always one app on disk');
     ok(!existsSync(join(temp, 'good/updates', 'Visual-Brain-0.2.6-mac-universal.zip')), 'the downloaded package is removed after installing');
     await rejects(u.install(), /Nessun aggiornamento pronto/, 'installing twice is refused');
+    eq(u.snapshot.progress, null, 'no progress is left behind after the download');
+    // progress: the bytes really received, from the first chunk to the verified package
+    let release; const gate = new Promise(r => { release = r; });
+    const half = Math.floor(zipBytes.length / 2);
+    const slow = async url => String(url).endsWith('.zip')
+      ? new Response(new ReadableStream({ async start(c) { c.enqueue(new Uint8Array(zipBytes.subarray(0, half))); await gate; c.enqueue(new Uint8Array(zipBytes.subarray(half))); c.close(); } }))
+      : network()(url);
+    const slowDown = make('progress', slow);
+    await slowDown.check();
+    for (let i = 0; i < 300 && slowDown.state.progress?.received !== half; i++) await new Promise(r => setTimeout(r, 10));
+    eq([slowDown.state.status, slowDown.snapshot.progress], ['downloading', { received: half, total: zipBytes.length }], 'while downloading the state carries the bytes received and the signed size');
+    release(); eq(await settle(slowDown, 'ready'), 'ready', 'the rest arrives and the package is verified');
+    eq(slowDown.snapshot.progress, null, 'ready: no progress to show');
     // a package whose app does not match the announced version is refused and the install is untouched
     const mismatchZip = join(temp, 'Visual-Brain-0.2.7-mac-universal.zip');
     makeApp(join(newDir, '..'), '0.2.6', 'liar'); // 0.2.6 app announced as 0.2.7
@@ -192,6 +252,38 @@ if (process.platform === 'darwin') {
     ok(!existsSync(appsB), 'the first writable Applications folder is used, no other is created');
     eq(reopen, [['/bin/sh', reopenCommand(4242, dest)]], 'a reopen watcher waits for the desktop shell and opens the app from Applications');
     eq(t1.snapshot.relocated, true, 'the API snapshot says it was relocated');
+
+    // --- "Riavvia" after an installation ----------------------------------------------------------------------------------
+    const throws = (fn, re, m) => { checks++; assert.throws(fn, re, m); };
+    const appsR = join(temp, 'appsR'); mkdirSync(appsR);
+    const appR = makeApp(appsR, '0.2.5', 'restart');
+    const startedR = []; let quits = 0;
+    const r1 = await ready('restart', appR, { applicationFolders: [appsR], spawnImpl: (c, a) => startedR.push([c, a]), shellPid: 4242, persistentTerminals: true, quit: () => { quits++; } });
+    eq(r1.snapshot.canRestart, true, 'inside the real app (shell, reopen watcher, clean exit) a restart is possible');
+    throws(() => r1.restart(), /Nessun aggiornamento installato/, 'but there is nothing to restart into before an installation');
+    await r1.install();
+    r1.quit(); eq(quits, 0, 'the server never quits unless a restart was accepted');
+    r1.restart();
+    eq(startedR, [['/bin/sh', restartCommand(process.pid, 4242, appR)]], 'restart: one watcher that waits for this server, ends the shell and opens the installed app');
+    eq(quits, 0, 'the server stays until the answer is out'); r1.quit(); eq(quits, 1, 'then it closes cleanly');
+    r1.restart(); eq(startedR.length, 1, 'a second request starts nothing more');
+    // relocated: the watcher of the installation already opens the app in Applications when the shell exits
+    const appsS = join(temp, 'appsS'); mkdirSync(appsS);
+    const startedS = [];
+    const r2 = await ready('restart-relocated', translocated, { applicationFolders: [appsS], spawnImpl: (c, a) => startedS.push([c, a]), shellPid: 4242, persistentTerminals: true, quit: () => {} });
+    await r2.install(); r2.restart();
+    eq(startedS, [['/bin/sh', reopenCommand(4242, join(appsS, 'Visual Brain.app'))], ['/bin/sh', restartCommand(process.pid, 4242, null)]], 'a relocated install is opened once, by the watcher it already has');
+    // terminals that would not survive: refused, the person quits when done
+    const appsT = join(temp, 'appsT'); mkdirSync(appsT);
+    const r3 = await ready('restart-live', makeApp(appsT, '0.2.5', 'live'), { applicationFolders: [appsT], spawnImpl: () => {}, shellPid: 4242, quit: () => {} });
+    await r3.install();
+    throws(() => r3.restart(), /2 terminali attivi/, 'without the terminal host a restart with live terminals is refused');
+    // not the real app (no shell to end, no clean exit): the button is not offered and the route refuses
+    const appsU = join(temp, 'appsU'); mkdirSync(appsU);
+    const r4 = await ready('restart-none', makeApp(appsU, '0.2.5', 'none'), { applicationFolders: [appsU], persistentTerminals: true });
+    await r4.install();
+    eq(r4.snapshot.canRestart, false, 'outside the real app no restart is offered');
+    throws(() => r4.restart(), /Riavvio non disponibile/, 'and asking for one is refused');
 
     // an existing app in one of the Applications folders is preferred and swapped
     const appsC = join(temp, 'appsC'), appsD = join(temp, 'appsD'); mkdirSync(appsC); mkdirSync(appsD);
@@ -253,5 +345,7 @@ if (process.platform === 'darwin') {
 const src = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 ok(/VISUAL_BRAIN_UPDATES/.test(src('app/src-tauri/src/main.rs')) && /!TRIAL/.test(src('app/src-tauri/src/main.rs')), 'only the installed regular app enables updates');
 ok(/\/api\/update\/install/.test(src('src/server/api.ts')) && /updater\.start\(\)/.test(src('src/server/server.ts')), 'API and background check are wired');
-ok(!/killTerminal|killAll|\.kill\(/.test(src('src/server/updater.ts')), 'the updater never kills a terminal or process');
+ok(/\/api\/update\/restart/.test(src('src/server/api.ts')) && /updater\.quit\(\)/.test(src('src/server/api.ts')) && /quit: /.test(src('src/server/server.ts')), 'restart is wired: route, clean exit after the answer');
+ok(!/killTerminal|killAll|\.kill\(/.test(src('src/server/updater.ts')), 'the updater never kills a terminal; the only process it ends is the app shell, on "Riavvia"');
+ok(/mountUpdates/.test(src('src/ui/settings.ts')) && /mountSettings/.test(src('src/ui/main.ts')), 'the settings row is mounted from Impostazioni');
 console.log(`test-update: ${checks} controlli ok`);

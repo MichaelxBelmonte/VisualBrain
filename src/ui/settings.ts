@@ -11,7 +11,8 @@ export interface SettingsHooks {
   openTerminal(info: TerminalInfo): void;
   onThemeChange(): void;
   zoom(step: 1 | -1 | 0): void;
-  checkUpdates(): Promise<string>;
+  /** The "Aggiornamenti" row: version, state and the one action that fits it. */
+  mountUpdates(root: HTMLElement): void;
   appVersion(): string;
 }
 let hooks: SettingsHooks | null = null;
@@ -207,10 +208,9 @@ async function github(root: HTMLElement, ctx: Ctx): Promise<void> {
 }
 
 async function updates(root: HTMLElement): Promise<void> {
-  const version = hooks?.appVersion() ?? '';
-  root.innerHTML = ui`<div class="settings-row"><div><b>Visual Brain</b><small>${version ? ui`versione ${esc(version)}` : tr('versione di sviluppo')}</small></div><button class="btn small" data-check>Cerca aggiornamenti</button></div><p class="muted" data-result role="status"></p><p class="muted">Quando una versione è pronta compare un avviso in alto. Installarla non chiude i terminali.</p>`;
-  const button = root.querySelector<HTMLButtonElement>('[data-check]')!;
-  button.onclick = async () => { button.disabled = true; root.querySelector('[data-result]')!.textContent = await (hooks?.checkUpdates() ?? Promise.resolve('')); button.disabled = false; };
+  // its own element: the row stops following the server when another section replaces it
+  const row = root.appendChild(document.createElement('div'));
+  hooks?.mountUpdates(row);
 }
 
 async function shortcuts(root: HTMLElement): Promise<void> {

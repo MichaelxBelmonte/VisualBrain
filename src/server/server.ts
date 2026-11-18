@@ -201,7 +201,7 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     ctx.startupMap = openStartupMap();
   };
 
-  const updater = new Updater({ dataDir: cfg.dataDir, version, liveSessions: () => terms.list().filter(t => t.alive).length, persistentTerminals: true });
+  const updater = new Updater({ dataDir: cfg.dataDir, version, liveSessions: () => terms.list().filter(t => t.alive).length, persistentTerminals: true, quit: () => { process.kill(process.pid, 'SIGTERM'); } });
   // A folder macOS refused is mapped again as soon as the user allows it in System Settings.
   const access = folderAccess(() => cfg.setupComplete ? cfg.roots : [], () => { startIndex(); });
   let stats: MegaStats | undefined;

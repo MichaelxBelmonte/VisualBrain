@@ -62,6 +62,8 @@ export interface UpdateState {
   outsideApplications: boolean;
   /** The copy in Applications, when there is one. */
   applicationsCopy: string | null;
+  /** Bytes of the package received so far, only while it downloads. */
+  progress: { received: number; total: number } | null;
 }
 
 /** -1 / 0 / 1 for numeric dotted versions ("0.2.10" > "0.2.9"). Anything that is not dotted numbers compares as unknown (NaN). */
@@ -139,6 +141,16 @@ export function reopenCommand(pid: number, app: string): string[] {
 }
 
 /**
+ * "Riavvia" after an installation. Waits for this server (`serverPid`) to finish its clean shutdown, ends the desktop shell,
+ * which has nothing left to save, and opens `app` once it is gone. `app` is null when a reopen watcher already waits for the
+ * shell (a relocated install). Gives up after 30 s instead of waiting for ever. Arguments for /bin/sh, never quoted in.
+ */
+export function restartCommand(serverPid: number, shellPid: number, app: string | null): string[] {
+  const gone = (arg: string) => `n=0; while kill -0 "${arg}" 2>/dev/null; do n=$((n+1)); [ "$n" -gt 150 ] && exit 1; sleep 0.2; done`;
+  return ['-c', `${gone('$0')}; kill -TERM "$1" 2>/dev/null; ${gone('$1')}; [ -n "$2" ] && exec /usr/bin/open -n "$2"; exit 0`, String(serverPid), String(shellPid), app ?? ''];
+}
+
+/**
  * Checks the signature of the feed text (Ed25519 over its exact bytes) and its content. Throws on anything unexpected:
  * a wrong signature, another app, a download outside the releases repository, a size or hash that cannot be right.
  */
@@ -176,15 +188,20 @@ export interface UpdaterOptions {
   shellPid?: number;
   /** Starts the detached reopen watcher. Default: only in the real app (VISUAL_BRAIN_UPDATES=1), never in tests. */
   spawnImpl?: ((command: string, args: string[]) => void) | null;
+  /** Clean shutdown of this server, for "Riavvia". Without it the user quits with ⌘Q as before. */
+  quit?: (() => void) | null;
 }
 
 const spawnDetached = (command: string, args: string[]): void => { spawn(command, args, { detached: true, stdio: 'ignore' }).unref(); };
 
 export class Updater {
-  private readonly o: Required<Omit<UpdaterOptions, 'liveSessions' | 'bundle' | 'spawnImpl'>> & Pick<UpdaterOptions, 'liveSessions' | 'spawnImpl'>;
+  private readonly o: Required<Omit<UpdaterOptions, 'liveSessions' | 'bundle' | 'spawnImpl' | 'quit'>> & Pick<UpdaterOptions, 'liveSessions' | 'spawnImpl' | 'quit'>;
   private readonly bundle: string | null;
   private feed: Feed | null = null;
   private busy = false;
+  /** A watcher already opens the installed app when the shell exits. */
+  private reopening = false;
+  private restarting = false;
   private timer: NodeJS.Timeout | null = null;
   state: UpdateState;
 
@@ -201,11 +218,13 @@ export class Updater {
     this.state = {
       enabled, current: options.version, status: 'idle', latest: null, notes: '', error: '', checkedAt: null, installedTo: null, relocated: false,
       outsideApplications: enabled && !inApplications(this.bundle!, this.o.applicationFolders),
-      applicationsCopy: enabled ? installedCopy(this.o.applicationFolders) : null,
+      applicationsCopy: enabled ? installedCopy(this.o.applicationFolders) : null, progress: null,
     };
   }
 
-  get snapshot(): UpdateState & { liveSessions: number; persistentTerminals: boolean; app: string | null } { return { ...this.state, liveSessions: this.o.liveSessions?.() ?? 0, persistentTerminals: this.o.persistentTerminals, app: this.state.enabled ? this.bundle : null }; }
+  get snapshot(): UpdateState & { liveSessions: number; persistentTerminals: boolean; app: string | null; canRestart: boolean } { return { ...this.state, liveSessions: this.o.liveSessions?.() ?? 0, persistentTerminals: this.o.persistentTerminals, app: this.state.enabled ? this.bundle : null, canRestart: this.canRestart }; }
+  /** "Riavvia" needs the real app around this server: a shell to end, a way to reopen it and a clean exit. */
+  private get canRestart(): boolean { return this.state.enabled && !!this.o.spawnImpl && !!this.o.quit && Number.isInteger(this.o.shellPid) && this.o.shellPid > 1; }
   private get updatesDir(): string { return join(this.o.dataDir, 'updates'); }
   private get asideDir(): string { return join(this.o.dataDir, 'running-app-backups'); }
 
@@ -220,7 +239,7 @@ export class Updater {
   stop(): void { if (this.timer) clearInterval(this.timer); this.timer = null; }
 
   private fail(error: unknown): never {
-    this.state = { ...this.state, status: 'error', error: error instanceof Error ? error.message : String(error) };
+    this.state = { ...this.state, status: 'error', progress: null, error: error instanceof Error ? error.message : String(error) };
     throw error instanceof Error ? error : new Error(String(error));
   }
 
@@ -252,7 +271,7 @@ export class Updater {
     const feed = this.feed;
     if (!feed || this.busy) return this.state;
     this.busy = true;
-    this.state = { ...this.state, status: 'downloading', error: '' };
+    this.state = { ...this.state, status: 'downloading', error: '', progress: { received: 0, total: feed.archive.size } };
     const target = join(this.updatesDir, feed.archive.name), part = `${target}.part`;
     try {
       mkdirSync(this.updatesDir, { recursive: true, mode: 0o700 });
@@ -261,11 +280,15 @@ export class Updater {
       const hash = createHash('sha256');
       let bytes = 0;
       const source = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
-      source.on('data', (chunk: Buffer) => { bytes += chunk.length; hash.update(chunk); if (bytes > feed.archive.size) source.destroy(new Error('Il pacchetto è più grande del previsto.')); });
+      source.on('data', (chunk: Buffer) => {
+        bytes += chunk.length; hash.update(chunk);
+        if (bytes > feed.archive.size) source.destroy(new Error('Il pacchetto è più grande del previsto.'));
+        else this.state.progress = { received: bytes, total: feed.archive.size };
+      });
       await pipeline(source, createWriteStream(part, { mode: 0o600 }));
       if (bytes !== feed.archive.size || hash.digest('hex') !== feed.archive.sha256) { rmSync(part, { force: true }); throw new Error('Il pacchetto scaricato non corrisponde al checksum firmato.'); }
       renameSync(part, target);
-      this.state = { ...this.state, status: 'ready' };
+      this.state = { ...this.state, status: 'ready', progress: null };
     } catch (error) { rmSync(part, { force: true }); this.busy = false; this.fail(error); }
     this.busy = false;
     return this.state;
@@ -339,8 +362,26 @@ export class Updater {
   private scheduleReopen(dest: string): void {
     const pid = this.o.shellPid;
     if (!this.o.spawnImpl || !Number.isInteger(pid) || pid <= 1) return;
-    try { this.o.spawnImpl('/bin/sh', reopenCommand(pid, dest)); } catch { /* the user can open it from Applications */ }
+    try { this.o.spawnImpl('/bin/sh', reopenCommand(pid, dest)); this.reopening = true; } catch { /* the user can open it from Applications */ }
   }
+
+  /**
+   * "Riavvia" after an installation: starts the watcher that reopens the installed app. The caller then calls `quit()`.
+   * Terminals live in their own host and are found again; without that host a restart would close them, so it is refused.
+   */
+  restart(): void {
+    const dest = this.state.installedTo;
+    if (this.state.status !== 'installed' || !dest) throw new Error('Nessun aggiornamento installato da avviare.');
+    if (!this.canRestart) throw new Error('Riavvio non disponibile: chiudi Visual Brain con ⌘Q e riaprila.');
+    if (this.restarting) return;
+    const live = this.o.liveSessions?.() ?? 0;
+    if (!this.o.persistentTerminals && live > 0) throw new Error(`Ci sono ${live} terminali attivi che si chiuderebbero: chiudi Visual Brain con ⌘Q quando hai finito.`);
+    this.o.spawnImpl!('/bin/sh', restartCommand(process.pid, this.o.shellPid, this.reopening ? null : dest));
+    this.restarting = true;
+  }
+
+  /** Ends this server cleanly once the answer to "Riavvia" is out. */
+  quit(): void { if (this.restarting) this.o.quit?.(); }
 
   /**
    * Removes what installations leave behind: moved-aside apps that no process uses any more (one that a running server still

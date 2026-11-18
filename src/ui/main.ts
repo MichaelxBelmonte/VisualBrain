@@ -73,7 +73,7 @@ setSettingsHooks({
   openTerminal: (info) => terminals.attach(info),
   onThemeChange: () => { graph.readColors(); terminals.retheme(); relayout(); },
   zoom: (step) => terminals.zoom(step),
-  checkUpdates: () => updates.checkNow(),
+  mountUpdates: (root) => updates.mountSettings(root),
   appVersion: () => updates.current,
 });
 
