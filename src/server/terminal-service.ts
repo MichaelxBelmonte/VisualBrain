@@ -182,7 +182,8 @@ export class TerminalService implements TerminalStore {
             const target = t[m.patch.section as 'info' | 'activity'] as unknown as Record<string, unknown>;
             if (m.patch.value === undefined) delete target[m.patch.key]; else target[m.patch.key] = m.patch.value;
           } finally { this.applying = false; }
-          if (m.patch.section === 'activity' && m.patch.key === 'cliBusy' && m.patch.value === false)
+          if ((m.patch.section === 'activity' && m.patch.key === 'cliBusy' && m.patch.value === false)
+            || (m.patch.section === 'info' && m.patch.key === 'attention' && !m.patch.value))
             setImmediate(() => this.onTurnIdle?.(m.id));
         } else if (m.event === 'exit') {
           const t = this.terms.get(m.id); if (t) { t.info.alive = false; t.exitCode = m.code; this.onExit(m.id, m.code); }

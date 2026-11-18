@@ -141,6 +141,10 @@ console.log('PASS lastInputAt on every key from the person; drafts tracked until
   assert.equal(confirmComposerReturn(a,info,empty),false,'history navigation never releases a real draft');
   assert.ok(noticeInputBlocked(a,info));
   const other = fresh();
+  noteInput(other.a,other.info,'\x1b',900);
+  setAttention(other.a,other.info,'input',920);
+  assert.ok(confirmComposerReturn(other.a,other.info,empty),'notify a waiting reader when the selector was reported after Esc');
+  assert.equal(other.info.attention,undefined);
   feed(other.a,other.info,[CLAUDE_QUESTION,empty],1000);
   assert.equal(other.info.attention,undefined,'a fully repainted composer supersedes the earlier selector in the same scan');
   feed(other.a,other.info,[empty,CODEX_APPROVAL],1500);

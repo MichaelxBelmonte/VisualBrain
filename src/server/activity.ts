@@ -166,7 +166,9 @@ function composerEnd(raw: string, agent: TerminalInfo['agent']): number {
 }
 
 export function confirmComposerReturn(a: Activity, info: TerminalInfo, raw: string): boolean {
-  if (a.navigation !== 'return' || a.draft || info.attention === 'permission') return false;
+  // Esc may close a selector before the scan or host mirror has reported that it opened.
+  const escaped = a.escapeArmed && !a.navigation && info.agent === 'codex';
+  if ((!escaped && a.navigation !== 'return') || a.draft || info.attention === 'permission') return false;
   const frame = ((returnFrames.get(a) ?? '') + raw).slice(-16_000);
   const end = composerEnd(frame, info.agent);
   const confirmed = info.agent === 'codex'

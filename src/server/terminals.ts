@@ -111,8 +111,9 @@ export class Terminals {
         a.timer = setTimeout(() => {
           a.timer = null;
           const wasBusy = a.cliBusy;
+          const wasSelecting = term.info.attention === 'input';
           scanOutput(a, term.info);
-          if (wasBusy && a.cliBusy === false) this.onTurnIdle?.(id);
+          if ((wasBusy && a.cliBusy === false) || (wasSelecting && !term.info.attention)) this.onTurnIdle?.(id);
         }, SCAN_EVERY_MS);
         a.timer.unref();
       }
