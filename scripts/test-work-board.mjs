@@ -2,7 +2,7 @@
 // Uso: node scripts/test-work-board.mjs — nessun server, nessuna app.
 import assert from 'node:assert/strict';
 import { setLanguage } from '../src/ui/i18n.ts';
-import { boardHint, inboxLane, taskLane, taskStatus, youDisclosure } from '../src/ui/work-board.ts';
+import { addAgentChip, boardHint, inboxLane, taskLane, taskStatus, youDisclosure } from '../src/ui/work-board.ts';
 
 setLanguage('it');
 const op = (alive = true) => ({ code: 'OP3', alive });
@@ -37,6 +37,14 @@ assert.deepEqual(boardHint([t('working', 'a'), t('done', 'a')], 2), { text: 'In 
 assert.match(boardHint([t('pending'), t('pending', 'a')], 2).text, /^Da assegnare: 1\. /);
 assert.deepEqual(boardHint([t('pending', 'a')], 2), { text: 'In attesa di partire: 1.' });
 assert.deepEqual(boardHint([t('done', 'a')], 1), { text: 'Tutti gli incarichi sono completati.' });
+
+// «+ Agente» once: the hint offers it with no agent running and nothing waiting; otherwise the + beside the members does.
+const member = (alive, role = 'operator') => ({ alive, role });
+assert.equal(addAgentChip([], 0), false, 'empty squad, empty «Serve te»: the hint has the button');
+assert.equal(addAgentChip([member(false)], 0), false, 'ended agents only: still the hint');
+assert.equal(addAgentChip([member(true)], 0), true, 'agents running: the hint has no button, the chip does');
+assert.equal(addAgentChip([{ alive: true }], 0), false, 'a plain shell is not an agent of the squad');
+assert.equal(addAgentChip([member(false)], 2), true, 'requests waiting and no agent: the hint is hidden, the chip stays');
 
 setLanguage('en');
 assert.equal(taskStatus({ status: 'working', assignedTo: 'a' }, op()).text, 'OP3 is working on it');

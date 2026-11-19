@@ -54,6 +54,12 @@ export function taskStatus(t: Pick<TeamTask, 'status' | 'assignedTo' | 'blockedO
   return t.assignedTo ? { text: ui`Assegnato a ${code} · non ancora iniziato`, tone: 'idle' } : { text: tr('Da assegnare'), tone: 'idle' };
 }
 
+/** The + beside the members: the «Serve te» hint offers «+ Agente» itself when no agent runs and nothing waits
+ * on the person; in every other case the chip is the visible way to add one. Pure. */
+export function addAgentChip(members: Array<Pick<TerminalInfo, 'alive' | 'role'>>, waiting: number): boolean {
+  return waiting > 0 || members.some(member => member.alive && !!member.role);
+}
+
 /** When nothing waits on the person: what the squad is doing and, with no agent running, the button to add one.
  * «+ Incarico» is not repeated here: it is always in the board header. Pure. */
 export function boardHint(tasks: Array<Pick<TeamTask, 'status' | 'assignedTo'>>, live: number): { text: string; action?: 'agent' } {
@@ -341,7 +347,6 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     }
     signature = sig;
     paintFilters(view.teamList ?? [], view.brain);
-    paintGoal();
     paintPanelData();
     const lanes: Record<LaneId, string[]> = { todo: [], doing: [], you: [], done: [] };
     if (team === REMINDERS) {
@@ -370,6 +375,8 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
       lane.classList.toggle('alert', id === 'you' && lanes.you.length > 0);
       if (!typing || !lane.contains(typing)) lane.querySelector('.lavoro-cards')!.innerHTML = cards.join('') || (id === 'you' ? hintLine() : `<p class="kanban-empty muted">${esc(empty[id])}</p>`);
     }
+    // After the lanes: whether «Serve te» shows the hint decides where «+ Agente» goes.
+    paintGoal(lanes.you.length);
     el.querySelector('.lavoro')!.setAttribute('aria-busy', 'false');
     updateDisclosure();
     if (focusedCard && document.activeElement === document.body) el.querySelector<HTMLElement>(`[data-card="${CSS.escape(focusedCard)}"]:not([hidden])`)?.focus({ preventScroll: true });
@@ -397,8 +404,8 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     }
   }
 
-  /** One line under the filters: objective, summary, and who is on the squad. */
-  function paintGoal(): void {
+  /** One line under the filters: objective, summary, and who is on the squad. `waiting` counts the «Serve te» cards. */
+  function paintGoal(waiting: number): void {
     const box = el.querySelector<HTMLElement>('[data-goal]')!;
     if (team === REMINDERS) {
       reconcileWorkList(box, [{ key: 'reminders', html: ui`<p class="muted">Promemoria del nodo: note per te, senza agenti. Si spostano con i pulsanti della scheda.</p>` }]);
@@ -410,8 +417,8 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     const chips: WorkListItem[] = members.map(member => ({
       key: member.id, html: ui`<button class="member-chip" data-goto="${esc(member.id)}"><i></i>${esc(member.code ?? member.id)}</button>`,
     }));
-    // With no agent running the hint under the goal already offers «+ Agente»: one button, not two.
-    if (info && members.some(member => member.alive && member.role)) chips.push({ key: 'action:add', html: ui`<button class="member-chip add" data-add-agent title="Aggiungi agente" aria-label="Aggiungi agente">＋</button>` });
+    // «+ Agente» appears once: in the «Serve te» hint while no agent runs and nothing waits on the person, here otherwise.
+    if (info && addAgentChip(members, waiting)) chips.push({ key: 'action:add', html: ui`<button class="member-chip add" data-add-agent title="Aggiungi agente" aria-label="Aggiungi agente">＋</button>` });
     reconcileWorkList(box, [
       { key: 'objective', html: `<div class="lavoro-objective">${objective ? `<p class="clamp" title="${esc(objective)}">${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? ui`<button type="button" class="btn small ghost lavoro-set-goal" data-panel="settings">Imposta obiettivo</button>` : ''}</div>` },
       { key: 'members', html: '<div class="lavoro-members"></div>', children: chips },
