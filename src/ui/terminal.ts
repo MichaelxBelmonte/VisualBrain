@@ -860,9 +860,16 @@ export class Terminals {
 
   /** "Operatore 3" from the session code; sessions older than codes are numbered by position among their node's operators. */
   private roleName(t: Tab): string {
-    if (!t.info.role) return labels[t.info.agent];
+    if (!t.info.role) return this.agentLabel(t);
     const position = t.info.role === 'operator' ? String([...this.tabs.values()].filter(tab => tab.info.nodeId === t.info.nodeId && tab.info.role === 'operator' && tab.info.alive === t.info.alive).indexOf(t) + 1) : '';
     return roleName(t.info, position);
+  }
+  /** «Terminale», then «Terminale 2», «Terminale 3»… for the later sessions of the same agent without a role in the node,
+   * in order of creation: the rail and the tabs tell them apart, and the first keeps its plain name. */
+  private agentLabel(t: Tab): string {
+    const position = [...this.tabs.values()].filter(tab => !tab.info.role && tab.info.agent === t.info.agent && (tab.info.nodeId ?? null) === (t.info.nodeId ?? null))
+      .sort((a, b) => a.info.createdAt - b.info.createdAt).indexOf(t);
+    return position > 0 ? `${labels[t.info.agent]} ${position + 1}` : labels[t.info.agent];
   }
   private nodeLabel(nodeId: number | null): string {
     const node = nodeId !== null ? this.nodes.get(nodeId) : null;
@@ -1324,7 +1331,7 @@ export class Terminals {
 
   /** Generated label (agent, model, effort), used when the user has not named the session. */
   private generatedName(t: Tab): string {
-    return ui`${labels[t.info.agent]}${t.info.model ? ' · ' + t.info.model : ''}${t.info.effort ? ' / ' + t.info.effort : ''}${t.info.branch ? ' · ⑂ ' + t.info.branch : ''}`;
+    return ui`${this.agentLabel(t)}${t.info.model ? ' · ' + t.info.model : ''}${t.info.effort ? ' / ' + t.info.effort : ''}${t.info.branch ? ' · ⑂ ' + t.info.branch : ''}`;
   }
   private sessionLabel(t: Tab): string {
     return ui`${t.info.role ? this.roleName(t) + ' · ' : ''}${t.info.name || this.generatedName(t)}`;

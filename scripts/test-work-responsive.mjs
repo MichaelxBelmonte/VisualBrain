@@ -89,3 +89,8 @@ console.log('PASS board actions: one button per action, empty objective as a but
 assert.match(terminal, /if \(e\.key !== 'Escape'\) return;\n\s*const open = \[\.\.\.document\.querySelectorAll<HTMLDetailsElement>\('\.work-overflow\[open\]'\)\];/);
 assert.match(css, /^\.lavoro-tools \{[^}]*margin-left: auto;/m, 'the squad ··· stays on the right, so its menu opens inside the window');
 console.log('PASS Operativa menus: Escape closes them, the squad menu opens inside the window');
+
+// Shells: the later plain sessions of an agent in a node are numbered, the first keeps its name.
+assert.match(terminal, /if \(!t\.info\.role\) return this\.agentLabel\(t\);/, 'two plain shells of a node are «Terminale» and «Terminale 2»');
+assert.match(terminal, /return position > 0 \? `\$\{labels\[t\.info\.agent\]\} \$\{position \+ 1\}` : labels\[t\.info\.agent\];/, 'the first keeps its plain name');
+console.log('PASS plain sessions: the second and later are numbered in rail and tabs');
