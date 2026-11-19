@@ -70,3 +70,10 @@ assert.match(css, /^\.work-main \{ grid-column: 2; grid-row: 1;/m, 'the main are
 assert.match(css, /^\.needs-badge\[hidden\] \{ display: none; \}/m, '«Lavoro» shows no 0 when nothing waits on the person');
 assert.match(css, /max-width: 480px\) \{\n  \.work-new > summary \.control-label, \.work-new > summary \.chevron \{ display: none; \}/, 'at phone width «Nuovo» is only its +');
 console.log('PASS narrow Operativa: main area visible, no 0 badge, «Nuovo» fits the bar');
+
+// Board: placeholder cards until the first response, then aria-busy goes back to false; an error removes them.
+assert.match(board, /<div class="board lavoro" aria-busy="true">/);
+assert.match(board, /<div class="lavoro-cards">\$\{SKELETON\}<\/div>/);
+assert.match(board, /if \(error && !view\) \{ el\.querySelectorAll\('\.lavoro-skeleton'\)\.forEach\(card => card\.remove\(\)\);/);
+assert.match(css, /\.lavoro-skeleton > i \{[^}]*animation: loading-pulse/);
+console.log('PASS board loading: placeholder cards, aria-busy, removed on error');
