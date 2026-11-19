@@ -27,7 +27,13 @@ Le sessioni già avviate dalle versioni precedenti appartengono al vecchio proce
 
 Durante la chiusura dell’app il servizio continua a leggere i terminali, ma le API del grafo e della squadra non sono disponibili. Gli agenti devono ritentare le richieste dopo la riapertura; le istruzioni delle nuove sessioni lo indicano. Non vengono riprodotte automaticamente richieste HTTP non confermate.
 
-Questa persistenza copre chiusura, aggiornamento e crash del processo app/server. Non copre riavvio del computer, logout o arresto forzato del servizio terminali stesso. Il servizio ignora i segnali ordinari di chiusura mentre possiede sessioni vive; i terminali si chiudono dall’interfaccia tramite le API esistenti.
+Questa persistenza copre chiusura, aggiornamento e crash del processo app/server. Con il Mac in stop i processi restano sospesi e riprendono al risveglio. Il riavvio del computer, il logout o l’arresto forzato del servizio terminali chiudono invece i processi: per questi casi c’è il registro delle sessioni descritto sotto. Il servizio ignora i segnali ordinari di chiusura mentre possiede sessioni vive; i terminali si chiudono dall’interfaccia tramite le API esistenti.
+
+## Dopo un riavvio del computer
+
+`session-registry.ts` avvolge il servizio terminali e scrive in `<profilo>/sessions.json` (permessi `0600`) le ultime 64 sessioni Claude, Codex e shell: id, cartella, nome, nodo, ruolo, modello, ragionamento, incarico, ramo, id della conversazione, token della squadra e cursore della bacheca. Lo stato del momento (attenzione, attività) non viene scritto. Il file si aggiorna quando una sessione si apre, si chiude, termina o cambia nome, e ogni cinque secondi solo se qualcosa è cambiato.
+
+All’avvio, le sessioni del registro che il servizio non conosce (cioè dopo un riavvio, quando il servizio è nuovo) tornano nella lista come **concluse**, con lo stesso id, codice, nome, ruolo, nodo e squadra. «Riprendi» le riavvia come una qualsiasi sessione conclusa: Claude con `--resume`, Codex dai suoi registri, la shell nella sua cartella. La chiusura esplicita di una sessione ricordata la toglie dal registro. Se il servizio è sopravvissuto (solo l’app è stata chiusa), il registro non aggiunge copie. Prova: `node scripts/test-session-registry.mjs`.
 
 Un cambio incompatibile del protocollo richiede una migrazione esplicita: il client rifiuta di collegarsi con una versione diversa senza interrompere le sessioni. I runtime privati delle versioni precedenti possono rimanere nella directory del profilo; non sono ulteriori applicazioni registrate nel Dock.
 

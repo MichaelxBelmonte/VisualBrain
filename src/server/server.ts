@@ -9,6 +9,7 @@ import type { Db } from './db.ts';
 import { PROJECT_ROOT, savePreferences, type Config } from './config.ts';
 import { GraphCache } from './cache.ts';
 import { TerminalService } from './terminal-service.ts';
+import { RememberedSessions } from './session-registry.ts';
 import { replayState } from './terminals.ts';
 import { Teams } from './team.ts';
 import { Updater, startedByShell } from './updater.ts';
@@ -104,12 +105,15 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   // An existing preview lets the server open its port before SQLite starts streaming the nodes.
   let mapLoaded = preview ? undefined : loadMap();
   const teams = new Teams(cfg.dataDir);
-  let terms: TerminalService;
-  terms = await TerminalService.open(cfg.dataDir, cfg.port, (id, code) => {
+  let terms: RememberedSessions<TerminalService>;
+  const service = await TerminalService.open(cfg.dataDir, cfg.port, (id, code) => {
     const nodeId = terms?.get(id)?.info.nodeId;
     if (nodeId != null) teams.release(nodeId, id);
     events.send({ type: 'term:exit', id, code });
+    terms?.save();
   });
+  // The service survives the app, not the computer: after a restart its sessions come back as ended, ready to resume.
+  terms = new RememberedSessions(service, cfg.dataDir, cfg.language).watch();
   for (const nodeId of new Set(terms.list().map(t => t.nodeId))) {
     if (nodeId != null) teams.recover(nodeId, terms.list().filter(t => t.nodeId === nodeId));
   }
