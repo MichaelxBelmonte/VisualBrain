@@ -54,17 +54,18 @@ export function taskStatus(t: Pick<TeamTask, 'status' | 'assignedTo' | 'blockedO
   return t.assignedTo ? { text: ui`Assegnato a ${code} · non ancora iniziato`, tone: 'idle' } : { text: tr('Da assegnare'), tone: 'idle' };
 }
 
-/** When nothing waits on the person: what the squad is doing and the one useful next move. Pure. */
-export function boardHint(tasks: Array<Pick<TeamTask, 'status' | 'assignedTo'>>, live: number): { text: string; action?: 'agent' | 'task' } {
+/** When nothing waits on the person: what the squad is doing and, with no agent running, the button to add one.
+ * «+ Incarico» is not repeated here: it is always in the board header. Pure. */
+export function boardHint(tasks: Array<Pick<TeamTask, 'status' | 'assignedTo'>>, live: number): { text: string; action?: 'agent' } {
   const count = (s: TeamTask['status']) => tasks.filter(t => t.status === s).length;
   const pending = count('pending'), working = count('working');
   const unassigned = tasks.filter(t => t.status === 'pending' && !t.assignedTo).length;
   if (!live) return { text: tr('Squadra ferma: nessun agente attivo.'), action: 'agent' };
-  if (!tasks.length) return { text: tr('Nessun incarico ancora. Creane uno o scrivi all’orchestratore.'), action: 'task' };
+  if (!tasks.length) return { text: tr('Nessun incarico ancora.') };
   if (working) return { text: pending ? ui`In corso: ${working} · in coda: ${pending}. Nessuna azione per te.` : ui`In corso: ${working}. Nessuna azione per te.` };
   if (unassigned) return { text: ui`Da assegnare: ${unassigned}. Apri la scheda per scegliere l’agente, o attendi l’orchestratore.` };
   if (pending) return { text: ui`In attesa di partire: ${pending}.` };
-  return { text: tr('Tutti gli incarichi sono completati.'), action: 'task' };
+  return { text: tr('Tutti gli incarichi sono completati.') };
 }
 
 export interface BoardCallbacks {
@@ -380,7 +381,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
   function hintLine(): string {
     if (team === 'brain') return ui`<p class="lavoro-hint"><span>✓ Niente per te: nessuna proposta da valutare.</span></p>`;
     const hint = boardHint(view!.tasks, view!.sessions.filter(s => s.alive && s.role).length);
-    const button = hint.action === 'agent' ? ui`<button class="btn small primary" data-add-agent>＋ Agente</button>` : hint.action === 'task' ? ui`<button class="btn small" data-new>＋ Incarico</button>` : '';
+    const button = hint.action === 'agent' ? ui`<button class="btn small primary" data-add-agent>＋ Agente</button>` : '';
     return `<p class="lavoro-hint"><span>${hint.action === 'agent' ? '' : '✓ '}${esc(hint.text)}</span>${button}</p>`;
   }
 
@@ -409,9 +410,10 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     const chips: WorkListItem[] = members.map(member => ({
       key: member.id, html: ui`<button class="member-chip" data-goto="${esc(member.id)}"><i></i>${esc(member.code ?? member.id)}</button>`,
     }));
-    if (info) chips.push({ key: 'action:add', html: ui`<button class="member-chip add" data-add-agent title="Aggiungi agente">＋</button>` });
+    // With no agent running the hint under the goal already offers «+ Agente»: one button, not two.
+    if (info && members.some(member => member.alive && member.role)) chips.push({ key: 'action:add', html: ui`<button class="member-chip add" data-add-agent title="Aggiungi agente" aria-label="Aggiungi agente">＋</button>` });
     reconcileWorkList(box, [
-      { key: 'objective', html: `<div class="lavoro-objective">${objective ? `<p class="clamp" title="${esc(objective)}">${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? `<p class="muted">${esc(tr('Nessun obiettivo. Impostalo dal menu ···'))}</p>` : ''}</div>` },
+      { key: 'objective', html: `<div class="lavoro-objective">${objective ? `<p class="clamp" title="${esc(objective)}">${esc(objective)}</p>` : ''}${summary ? `<p class="muted clamp" title="${esc(summary)}">${esc(summary)}</p>` : ''}${!objective && !summary && info ? ui`<button type="button" class="btn small ghost lavoro-set-goal" data-panel="settings">Imposta obiettivo</button>` : ''}</div>` },
       { key: 'members', html: '<div class="lavoro-members"></div>', children: chips },
     ]);
     paintMemberStates();

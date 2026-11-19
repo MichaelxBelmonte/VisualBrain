@@ -1340,6 +1340,7 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .lavoro-skeleton > i { display: block; height: 9px; width: 72%; border-radius: 4px; background: var(--g2); animation: loading-pulse 1.4s ease-in-out infinite; }
 .lavoro-skeleton > i + i { width: 38%; animation-delay: .2s; }
 @media (prefers-reduced-motion: reduce) { .lavoro-skeleton > i { animation: none; opacity: .6; } }
+.lavoro-set-goal { margin-left: -10px; }
 .lavoro-card { background: var(--bg); border: 1px solid var(--g2); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.4; cursor: default; }
 .lavoro-card[data-card] { cursor: pointer; }
 .lavoro-card[data-card]:hover { border-color: var(--g4); }

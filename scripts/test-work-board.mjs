@@ -30,12 +30,13 @@ console.log('PASS task status line: unassigned, waiting, working, stopped, block
 // "Serve te" empty: the squad state in one sentence and the next useful move.
 const t = (status, assignedTo) => ({ status, assignedTo });
 assert.deepEqual(boardHint([t('working', 'a')], 0), { text: 'Squadra ferma: nessun agente attivo.', action: 'agent' });
-assert.equal(boardHint([], 2).action, 'task');
+// «+ Incarico» stays in the header: the hint never repeats it.
+assert.deepEqual(boardHint([], 2), { text: 'Nessun incarico ancora.' });
 assert.deepEqual(boardHint([t('working', 'a'), t('pending')], 2), { text: 'In corso: 1 · in coda: 1. Nessuna azione per te.' });
 assert.deepEqual(boardHint([t('working', 'a'), t('done', 'a')], 2), { text: 'In corso: 1. Nessuna azione per te.' });
 assert.match(boardHint([t('pending'), t('pending', 'a')], 2).text, /^Da assegnare: 1\. /);
 assert.deepEqual(boardHint([t('pending', 'a')], 2), { text: 'In attesa di partire: 1.' });
-assert.deepEqual(boardHint([t('done', 'a')], 1), { text: 'Tutti gli incarichi sono completati.', action: 'task' });
+assert.deepEqual(boardHint([t('done', 'a')], 1), { text: 'Tutti gli incarichi sono completati.' });
 
 setLanguage('en');
 assert.equal(taskStatus({ status: 'working', assignedTo: 'a' }, op()).text, 'OP3 is working on it');

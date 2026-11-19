@@ -77,3 +77,10 @@ assert.match(board, /<div class="lavoro-cards">\$\{SKELETON\}<\/div>/);
 assert.match(board, /if \(error && !view\) \{ el\.querySelectorAll\('\.lavoro-skeleton'\)\.forEach\(card => card\.remove\(\)\);/);
 assert.match(css, /\.lavoro-skeleton > i \{[^}]*animation: loading-pulse/);
 console.log('PASS board loading: placeholder cards, aria-busy, removed on error');
+
+// One button per action: «+ Incarico» lives in the header, «+ Agente» in the hint only while no agent runs.
+assert.doesNotMatch(board, /data-new>＋ Incarico/, 'the hint does not repeat «+ Incarico»');
+assert.match(board, /if \(info && members\.some\(member => member\.alive && member\.role\)\) chips\.push/, 'the + member chip appears only with agents running');
+assert.doesNotMatch(board, /Impostalo dal menu/, 'an empty objective is a button, not an instruction');
+assert.match(board, /data-panel="settings">Imposta obiettivo<\/button>/);
+console.log('PASS board actions: one button per action, empty objective as a button');
