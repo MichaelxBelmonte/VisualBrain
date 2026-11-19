@@ -84,3 +84,8 @@ assert.match(board, /if \(info && members\.some\(member => member\.alive && memb
 assert.doesNotMatch(board, /Impostalo dal menu/, 'an empty objective is a button, not an instruction');
 assert.match(board, /data-panel="settings">Imposta obiettivo<\/button>/);
 console.log('PASS board actions: one button per action, empty objective as a button');
+
+// Menus: every Operativa menu closes with Escape and gives the focus back to its button; the squad ··· stays on the right.
+assert.match(terminal, /if \(e\.key !== 'Escape'\) return;\n\s*const open = \[\.\.\.document\.querySelectorAll<HTMLDetailsElement>\('\.work-overflow\[open\]'\)\];/);
+assert.match(css, /^\.lavoro-tools \{[^}]*margin-left: auto;/m, 'the squad ··· stays on the right, so its menu opens inside the window');
+console.log('PASS Operativa menus: Escape closes them, the squad menu opens inside the window');

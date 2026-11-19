@@ -227,6 +227,15 @@ export class Terminals {
       const target = e.target as HTMLElement;
       document.querySelectorAll<HTMLDetailsElement>('.work-overflow[open]').forEach(menu => { if (!menu.contains(target)) menu.open = false; });
     });
+    // Escape closes the open Operativa menu (Nuovo, node, squad ···) before anything else, and gives the focus back to its button.
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const open = [...document.querySelectorAll<HTMLDetailsElement>('.work-overflow[open]')];
+      if (!open.length) return;
+      e.preventDefault(); e.stopPropagation();
+      for (const menu of open) menu.open = false;
+      open[open.length - 1].querySelector<HTMLElement>('summary')?.focus();
+    }, true);
     new ResizeObserver(() => this.fitVisible()).observe(this.bodyEl);
     this.splitHandles = { col: this.splitHandle('col'), row: this.splitHandle('row') };
     this.applySplit();
@@ -865,7 +874,6 @@ export class Terminals {
     picker.className = 'work-overflow tile-picker';
     picker.innerHTML = ui`<summary aria-label="Scegli i terminali da affiancare" title="Scegli i terminali da affiancare (Ctrl+Alt+G)"><span class="control-label">Seleziona</span>${icon('chevron')}</summary><div role="group" aria-label="Terminali da affiancare"></div>`;
     picker.addEventListener('toggle', () => { if (picker.open) this.renderPicker(); else { this.suggested.clear(); this.pickerHtml = ''; } });
-    picker.addEventListener('keydown', e => { if (e.key === 'Escape' && picker.open) { e.stopPropagation(); picker.open = false; picker.querySelector('summary')!.focus(); } });
     picker.addEventListener('change', e => {
       const input = e.target as HTMLInputElement;
       const id = input.dataset.tile; if (!id) return;

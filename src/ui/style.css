@@ -1301,7 +1301,8 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .needs-badge[hidden] { display: none; }
 .squad-tab .needs-badge { grid-row: 1 / span 2; grid-column: 3; }
 #work-board .needs-badge { margin-left: 4px; }
-.lavoro-tools { display: flex; gap: 6px; align-items: center; }
+/* Always on the right, also when the filters wrap under the node name: the ··· menu opens leftwards from there. */
+.lavoro-tools { display: flex; gap: 6px; align-items: center; margin-left: auto; }
 .lavoro-menu > div { width: 240px; }
 .lavoro-goal { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 6px 16px; font-size: 13px; line-height: 1.45; }
 .lavoro-objective .clamp { -webkit-line-clamp: 2; white-space: normal; }
