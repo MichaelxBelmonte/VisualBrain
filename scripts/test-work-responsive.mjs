@@ -58,3 +58,15 @@ field.value = 'a node'; escapeKey(); assert.equal(field.value, ''); assert.equal
 escapeKey(); assert.equal(filters, 1, 'an empty search lets Escape through');
 unbind(); field.value = 'x'; escapeKey(); assert.equal(field.value, 'x');
 console.log('PASS rail search: always visible, Escape clears it, cleanup');
+
+// Narrow window, from the sources the app ships.
+import { readFileSync } from 'node:fs';
+const css = readFileSync(new URL('../src/ui/style.css', import.meta.url), 'utf8');
+const board = readFileSync(new URL('../src/ui/work-board.ts', import.meta.url), 'utf8');
+const terminal = readFileSync(new URL('../src/ui/terminal.ts', import.meta.url), 'utf8');
+// Under 760 px the rail is an absolute drawer: without an explicit track the main area fell into the 0 px column
+// and Lavoro, Terminali and Codice were blank.
+assert.match(css, /^\.work-main \{ grid-column: 2; grid-row: 1;/m, 'the main area always takes the second track');
+assert.match(css, /^\.needs-badge\[hidden\] \{ display: none; \}/m, '«Lavoro» shows no 0 when nothing waits on the person');
+assert.match(css, /max-width: 480px\) \{\n  \.work-new > summary \.control-label, \.work-new > summary \.chevron \{ display: none; \}/, 'at phone width «Nuovo» is only its +');
+console.log('PASS narrow Operativa: main area visible, no 0 badge, «Nuovo» fits the bar');
