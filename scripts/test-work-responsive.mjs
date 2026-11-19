@@ -98,3 +98,8 @@ console.log('PASS plain sessions: the second and later are numbered in rail and 
 // The node is named once: above 760 px the bar's node menu has the name and «Mostra nella mappa».
 assert.match(css, /@media \(min-width: 761px\) \{ \.lavoro-head > \.lavoro-node, \.lavoro-menu \[data-reveal\] \{ display: none; \} \}/, 'with the bar node menu visible, the board repeats neither the node name nor «Mostra nella mappa»');
 console.log('PASS node named once, «Mostra nella mappa» once');
+
+// Launcher: a short placeholder, the keys in the title.
+const launcher = readFileSync(new URL('../src/ui/work-launcher.ts', import.meta.url), 'utf8');
+assert.match(launcher, /placeholder="Obiettivo \(facoltativo\)" title="Invio avvia · Maiusc\+Invio va a capo"/);
+console.log('PASS launcher: short objective placeholder');
