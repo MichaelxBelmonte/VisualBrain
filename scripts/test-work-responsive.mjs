@@ -94,3 +94,7 @@ console.log('PASS Operativa menus: Escape closes them, the squad menu opens insi
 assert.match(terminal, /if \(!t\.info\.role\) return this\.agentLabel\(t\);/, 'two plain shells of a node are «Terminale» and «Terminale 2»');
 assert.match(terminal, /return position > 0 \? `\$\{labels\[t\.info\.agent\]\} \$\{position \+ 1\}` : labels\[t\.info\.agent\];/, 'the first keeps its plain name');
 console.log('PASS plain sessions: the second and later are numbered in rail and tabs');
+
+// The node is named once: above 760 px the bar's node menu has the name and «Mostra nella mappa».
+assert.match(css, /@media \(min-width: 761px\) \{ \.lavoro-head > \.lavoro-node, \.lavoro-menu \[data-reveal\] \{ display: none; \} \}/, 'with the bar node menu visible, the board repeats neither the node name nor «Mostra nella mappa»');
+console.log('PASS node named once, «Mostra nella mappa» once');

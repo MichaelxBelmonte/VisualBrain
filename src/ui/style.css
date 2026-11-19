@@ -1291,6 +1291,9 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .lavoro-head { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 .lavoro-node { font-size: 14px; font-weight: 600; max-width: 220px; }
 select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radius: 6px; background: var(--bg); color: var(--fg); font-weight: 500; font-size: 13px; }
+/* Above 760 px the bar's node menu already names the node and opens it in the map: the board repeats neither.
+   In the narrow window that menu is hidden, so the board keeps both. */
+@media (min-width: 761px) { .lavoro-head > .lavoro-node, .lavoro-menu [data-reveal] { display: none; } }
 .lavoro-filters { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
 .lavoro-filters .squad-tab { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 220px; padding: 4px 11px; border: 0; border-radius: 999px; background: none; color: var(--g5); }
 .lavoro-filters .squad-tab:hover { background: var(--g1); color: var(--fg); }
