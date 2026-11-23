@@ -159,14 +159,15 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
       const detail = ui`<dl class="cli-detail"><dt>Eseguibile</dt><dd><code>${esc(c.path ?? c.command)}</code></dd><dt>Installazione</dt><dd><code>${esc(c.installCommand)}</code></dd>${c.account ? ui`<dt>Account</dt><dd>${esc(c.account)}</dd>` : ''}<dt>Usato da</dt><dd>${used ? ui`${used} sessioni attive` : tr('nessuna sessione')}</dd></dl>
         <div class="cli-more">${c.path ? ui`<button class="btn small ghost" data-act="login" data-cli="${c.id}">${c.signedIn === true ? tr('Cambia account') : tr('Accedi')}</button>` : ''}${c.path && c.canLogout && c.signedIn !== false ? ui`<button class="btn small ghost" data-act="logout" data-cli="${c.id}">Esci</button>` : ''}<button class="btn small ghost" data-copy="${c.id}">Copia diagnostica</button></div>
         ${used && c.path ? ui`<p class="muted">Aggiornare non interrompe le ${used} sessioni aperte: continuano con la versione attuale finché non le riavvii.</p>` : ''}
-        ${c.path && (c.id === 'claude' || c.id === 'codex') ? ui`<form class="cli-add-account" data-add-account="${c.id}"><input name="label" maxlength="40" required placeholder="Nome del nuovo account (es. Lavoro)" aria-label="Nome del nuovo account"><button class="btn small" type="submit">Aggiungi account</button></form><p class="muted">Un altro abbonamento da usare insieme a quello principale: nel lancio lo scegli dal menu Agente. Ha impostazioni, memoria e cronologia proprie.</p>` : ''}`;
-      return `<div class="cli-row" data-row="${c.id}"><button type="button" class="cli-summary" data-toggle="${c.id}" aria-expanded="${open === c.id}"><span class="cli-dot" data-tone="${s.tone}"></span><span class="cli-name"><b>${esc(c.label)}</b><small>${esc(c.version ? `v${c.version}` : c.command)}</small></span><span class="cli-state" data-tone="${s.tone}">${esc(s.text)}</span></button><span class="cli-actions">${actions}</span>${open === c.id ? `<div class="cli-open">${detail}</div>` : ''}</div>` + accounts.filter(a => a.agent === c.id).map(accountRow).join('');
+`;
+      return `<div class="cli-row" data-row="${c.id}"><button type="button" class="cli-summary" data-toggle="${c.id}" aria-expanded="${open === c.id}"><span class="cli-dot" data-tone="${s.tone}"></span><span class="cli-name"><b>${esc(c.label)}</b><small>${esc(c.version ? `v${c.version}` : c.command)}</small></span><span class="cli-state" data-tone="${s.tone}">${esc(s.text)}</span></button><span class="cli-actions">${actions}</span>${open === c.id ? `<div class="cli-open">${detail}</div>` : ''}</div>`;
     };
     // An extra account under its CLI: the name chosen by the person, the email the CLI reports, sign-in and removal.
     const accountRow = (a: AgentAccountStatus) => {
       const tone = a.signedIn === false ? 'warn' : 'ok';
       const state = a.signedIn === false ? tr('Accesso richiesto') : a.signedIn === true ? tr('Pronto') : tr('Stato sconosciuto');
-      const sub = a.email ?? (a.sessions ? ui`${a.sessions} sessioni attive` : tr('Account aggiuntivo'));
+      const cli = clis.find(c => c.id === a.agent)?.label ?? a.agent;
+      const sub = `${cli} · ${a.email ?? (a.sessions ? ui`${a.sessions} sessioni attive` : tr('accesso da completare'))}`;
       const actions = (a.signedIn === false ? ui`<button class="btn small primary" data-account="${a.id}" data-account-act="login">Accedi</button>` : ui`<button class="btn small ghost" data-account="${a.id}" data-account-act="logout">Esci</button>`)
         + ui`<button class="btn small ghost" data-account-adv="${a.id}" aria-expanded="${advanced === a.id}">Avanzate</button>`
         + ui`<button class="btn small ghost" data-account="${a.id}" data-account-act="remove" ${a.sessions ? ui`disabled title="Chiudi prima le sessioni attive di questo account"` : ''}>Rimuovi</button>`;
@@ -187,9 +188,16 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
       const button = installing ? '' : !h.installed ? ui`<button class="btn small primary" data-harness="${h.id}" ${h.canInstall ? '' : 'disabled'}>Installa</button>` : h.outdated ? ui`<button class="btn small" data-harness="${h.id}">Aggiorna</button>` : '';
       return `<div class="cli-row"><div class="cli-summary static"><span class="cli-dot" data-tone="${tone}"></span><span class="cli-name"><b>${esc(h.label)}</b><small>${esc(h.version ? String(h.version).slice(0, 12) : tr('nel profilo di Visual Brain'))}</small></span><span class="cli-state" data-tone="${tone}" title="${esc(h.install?.error ? tr(h.install.error) : '')}">${esc(text)}</span></div><span class="cli-actions">${button}</span></div>`;
     };
+    // Extra accounts: a section of their own, always visible, with the form to add one and the accounts already added.
+    const addable = clis.filter(c => c.path && (c.id === 'claude' || c.id === 'codex'));
+    const accountSection = !addable.length && !accounts.length ? '' : ui`<div class="settings-subhead"><h4>Account aggiuntivi</h4></div>
+      <p class="muted">Un altro abbonamento da usare insieme a quello principale, anche nello stesso momento. Dopo l’accesso lo scegli dal menu Agente quando avvii un agente. In Avanzate puoi fargli usare memoria, skill e plugin dell’account principale.</p>`
+      + (accounts.length ? `<div class="cli-list">${accounts.map(accountRow).join('')}</div>` : '')
+      + (addable.length ? `<form class="cli-add-account" data-add-account><select name="agent" aria-label="${esc(tr('Agente'))}">${addable.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}</select>`
+        + ui`<input name="label" maxlength="40" required placeholder="Nome del nuovo account (es. Lavoro)" aria-label="Nome del nuovo account"><button class="btn small primary" type="submit">Aggiungi account</button></form>` : '');
     root.innerHTML = ui`<div class="settings-subhead"><h4>CLI degli agenti</h4><button class="btn small ghost" data-refresh>Ricontrolla</button></div>
       <p class="muted">Installazione e accesso usano i comandi ufficiali in un terminale visibile: le CLI funzionano anche fuori da Visual Brain. Le credenziali restano alla CLI.</p>
-      <div class="cli-list">${clis.map(row).join('')}</div>
+      <div class="cli-list">${clis.map(row).join('')}</div>${accountSection}
       <div class="settings-subhead"><h4>Harness</h4></div><p class="muted">Esecuzioni a tempo dal nodo. Si installano nel profilo di Visual Brain, senza chiamate ai modelli.</p>
       <div class="cli-list">${harnesses.map(harnessRow).join('')}</div><p class="work-launch-error" role="alert"></p>`;
     const error = root.querySelector('[role=alert]')!;
@@ -203,9 +211,10 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
     root.querySelectorAll<HTMLFormElement>('[data-add-account]').forEach(form => form.addEventListener('submit', async e => {
       e.preventDefault();
       const button = form.querySelector<HTMLButtonElement>('button')!, label = form.querySelector<HTMLInputElement>('input')!.value.trim();
+      const agent = form.querySelector<HTMLSelectElement>('select')!.value as 'claude' | 'codex';
       if (!label) return;
       button.disabled = true;
-      try { const r = await api.addAccount(form.dataset.addAccount as 'claude' | 'codex', label); ctx.terminal(r.info); await draw(false); }
+      try { const r = await api.addAccount(agent, label); ctx.terminal(r.info); await draw(false); }
       catch (err) { error.textContent = String(err); button.disabled = false; }
     }));
     root.querySelectorAll<HTMLButtonElement>('[data-account-adv]').forEach(b => b.addEventListener('click', () => { advanced = advanced === b.dataset.accountAdv ? null : b.dataset.accountAdv!; void draw(false); }));
