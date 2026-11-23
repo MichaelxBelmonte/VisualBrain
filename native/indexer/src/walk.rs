@@ -78,6 +78,8 @@ struct Listing {
     /// aggregate mode: kept regular files of this folder, counted instead of stored
     agg_files: u64,
     agg_bytes: u64,
+    /// a virtualenv, or a linked Git worktree of a mapped repository: one node with totals, like a vendor folder
+    collapsed: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -145,6 +147,40 @@ impl Options {
     }
 }
 
+/// The main checkout of a linked Git worktree, from the text of its `.git` file (`gitdir: <main>/.git/worktrees/<name>`).
+/// None for a submodule (`.git/modules/`) and for the worktree of a bare repository. Same rule as worktreeMain() in scan.ts.
+fn worktree_main(git_file: &str, dir: &str) -> Option<String> {
+    let line = git_file.lines().find(|l| l.starts_with("gitdir:"))?;
+    let target = line["gitdir:".len()..].trim_matches(|c| c == ' ' || c == '\t' || c == '\r');
+    if target.is_empty() {
+        return None;
+    }
+    let git_dir = if target.starts_with('/') { resolve("/", target) } else { resolve(dir, target) };
+    let at = git_dir.find("/.git/worktrees/")?;
+    if at == 0 {
+        return None;
+    }
+    Some(git_dir[..at].to_string())
+}
+
+/// A linked worktree whose main checkout is under a mapped root: a second copy of files already on the map.
+/// A root the person chose is always walked.
+fn mapped_worktree(dir: &str, opts: &Options) -> bool {
+    if opts.configured_roots.iter().any(|r| r == dir) {
+        return false;
+    }
+    let mut head = [0u8; 1024];
+    let read = match fs::File::open(join(dir, ".git")).and_then(|mut f| std::io::Read::read(&mut f, &mut head)) {
+        Ok(n) => n,
+        Err(_) => return false,
+    };
+    let text = String::from_utf8_lossy(&head[..read]);
+    match worktree_main(&text, dir) {
+        Some(main) => opts.configured_roots.iter().any(|r| main == *r || main.starts_with(&format!("{}/", r))),
+        None => false,
+    }
+}
+
 fn list(dir: &str, mode: Mode, opts: &Options) -> Listing {
     let mut out = Listing::default();
     let lst = fs::symlink_metadata(dir);
@@ -170,7 +206,9 @@ fn list(dir: &str, mode: Mode, opts: &Options) -> Listing {
     }
     out.raw_count = raw.len();
     raw.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
-    let venv = raw.iter().any(|r| r.0 == "pyvenv.cfg");
+    let venv = raw.iter().any(|r| r.0 == "pyvenv.cfg")
+        || (mode == Mode::Walk && raw.iter().any(|r| r.0 == ".git" && r.2 == Kind::File) && mapped_worktree(dir, opts));
+    out.collapsed = mode == Mode::Walk && venv;
     for (name, valid, kind) in raw {
         if mode == Mode::Aggregate {
             if !valid || !opts.keep(dir, &name) {
@@ -218,7 +256,7 @@ fn subdirs(dir: &str, l: &Listing, mode: Mode, opts: &Options) -> Vec<(String, M
     if !l.readdir_ok {
         return Vec::new();
     }
-    let venv = mode == Mode::Walk && l.children.iter().any(|c| c.name == "pyvenv.cfg");
+    let venv = mode == Mode::Walk && l.collapsed;
     let mut out = Vec::new();
     for c in &l.children {
         if c.kind != Kind::Dir || !opts.keep(dir, &c.name) {
@@ -355,7 +393,7 @@ impl Builder<'_> {
         let meta = l.meta.unwrap();
         self.entries[idx].mtime = meta.mtime;
         self.entries[idx].inode = meta.ino;
-        if l.children.iter().any(|c| c.name == "pyvenv.cfg") {
+        if l.collapsed {
             let count = l.raw_count as u64;
             let (files, bytes) = self.aggregate(dir);
             stats.files = files;

@@ -32,6 +32,10 @@ function fixture(root) {
   put(root, 'proj/node_modules/dep/index.js', 'module.exports = 1;');
   put(root, 'venv1/pyvenv.cfg', 'home = /usr');
   put(root, 'venv1/lib/x.py', 'print(1)');
+  // a linked Git worktree of proj: `.git` is a file pointing into proj/.git/worktrees/
+  put(root, 'proj-wt/.git', `gitdir: ${join(root, 'proj/.git/worktrees/proj-wt')}\n`);
+  put(root, 'proj-wt/package.json', '{"name":"proj"}');
+  put(root, 'proj-wt/src/main.ts', 'export const a = 2;\n');
   put(root, 'deep/one/two/three.txt', 'three');
   put(root, 'deep/one/note.txt', 'note');
 }
@@ -56,6 +60,8 @@ try {
   ok(!live(db, join(root, 'proj/node_modules/dep/index.js')), 'vendor contents are not nodes');
   ok(!live(db, join(root, 'venv1/lib')), 'virtualenv contents are not nodes');
   ok(live(db, join(root, 'venv1')).aggregate === 1, 'venv1 is an aggregate');
+  ok(live(db, join(root, 'proj-wt')).aggregate === 1 && live(db, join(root, 'proj-wt')).files === 2, 'a worktree of a mapped repository is one total');
+  ok(!live(db, join(root, 'proj-wt/src')) && !live(db, join(root, 'proj-wt/package.json')), 'its files are not nodes');
 
   // wildcard folder: scanning a_b must not touch axb (LIKE '_' would match 'x')
   const axbId = live(db, join(root, 'axb/file2.txt')).id;
@@ -87,6 +93,9 @@ try {
   await scan(db, cfg, { subtrees: [nm, vp] });
   ok(!live(db, nm) && !live(db, vp), 'vendor/venv paths are not indexed by a partial scan');
   ok(live(db, join(root, 'venv1')).aggregate === 1 && !live(db, join(root, 'venv1/lib')), 'venv stays aggregated');
+  const wp = put(root, 'proj-wt/src/new.ts', 'y');
+  await scan(db, cfg, { subtrees: [wp] });
+  ok(!live(db, wp) && live(db, join(root, 'proj-wt')).aggregate === 1, 'a change inside a worktree does not create nodes');
 
   // delete a file, then a folder: tombstones only the right rows, totals follow
   rmSync(join(root, 'deep/one/note.txt'));
