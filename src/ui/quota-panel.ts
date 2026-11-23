@@ -56,7 +56,8 @@ function providerRow(q: QuotaGroup) {
   const head = tag('span', undefined, 'mega-quota-title');
   const state = tag('strong', t(statuses[q.status]));
   state.dataset.status = q.status;
-  const title = tag('span', names[q.provider] + ' · ' + q.group);
+  // The default group says nothing to the person: the account the quota belongs to does.
+  const title = tag('span', names[q.provider] + ' · ' + (q.group === 'default' ? q.account || t('Principale') : q.group));
   head.append(title, state);
   const observed = tag('span', undefined, 'mega-stats-meta');
   observed.append(q.source ?? t('Fonte sconosciuta'), ' · ', clock(q.observedAt));
@@ -203,7 +204,7 @@ export function mountQuotaPanel(root: HTMLElement) {
         }, () => body.querySelector<HTMLButtonElement>('[data-quota-focus="edit"]')?.focus({preventScroll:true}));
       });
       edit.dataset.quotaFocus = 'edit'; info.append(edit);
-    } else info.append(tag('p',t('Seleziona una squadra per consultare e modificare la regola applicata.'),'mega-stats-meta'));
+    } else info.append(tag('p',t('Scegli una squadra nei filtri per vedere e cambiare come distribuisce il lavoro tra i provider.'),'mega-stats-meta'));
     if (view.decisions.length) {
       const decisions = tag('details');
       decisions.dataset.provider = 'decisions'; decisions.open = expanded.has('decisions');
@@ -219,7 +220,7 @@ export function mountQuotaPanel(root: HTMLElement) {
     } else if (scope && scope.id !== 'brain') info.append(tag('p', t('Nessuna decisione di instradamento registrata.'), 'mega-stats-meta'));
     body.replaceChildren(rows,info);
     if (focusKey) [...body.querySelectorAll<HTMLElement>('[data-quota-focus]')].find(e=>e.dataset.quotaFocus===focusKey)?.focus({preventScroll:true});
-    context.replaceChildren(scope?.name ?? t('Profilo'), ' · ', t('Ultimo aggiornamento'), ' ', clock(view.updatedAt));
+    context.replaceChildren(...(scope ? [scope.name, ' · '] : []), t('Ultimo aggiornamento'), ' ', clock(view.updatedAt));
   }
   async function load() {
     if (disposed) return;
