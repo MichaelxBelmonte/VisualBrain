@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { AgentName, AgentRole, ClaudeMemory, InboxColumn, InboxItem, InboxKind, SavedSquad, SwarmProposal, TeamBoard, TeamInfo, TeamLink, TeamMessage, TeamSummary, TeamTask, TerminalInfo } from '../shared/types.ts';
+import type { AgentName, AgentRole, BoardColumn, ClaudeMemory, InboxColumn, InboxItem, InboxKind, SavedSquad, SwarmProposal, TeamBoard, TeamInfo, TeamLink, TeamMessage, TeamSummary, TeamTask, TerminalInfo } from '../shared/types.ts';
 
 export class TeamError extends Error {
   status: number;
@@ -19,8 +19,8 @@ export function boundedText(value: unknown, max: number, required = false): stri
  * The fields of a task the person and the orchestrator may write, checked here so a board file never holds odd values.
  * Empty description, normal priority and no labels are stored as absent. Pure, apart from throwing.
  */
-export function taskFields(body: { title?: unknown; description?: unknown; scope?: unknown; priority?: unknown; labels?: unknown; order?: unknown }): Partial<Pick<TeamTask, 'title' | 'description' | 'scope' | 'priority' | 'labels' | 'order'>> & { clear?: Array<'description' | 'priority' | 'labels'> } {
-  const out: ReturnType<typeof taskFields> = {}, clear: Array<'description' | 'priority' | 'labels'> = [];
+export function taskFields(body: { title?: unknown; description?: unknown; scope?: unknown; priority?: unknown; labels?: unknown; order?: unknown; column?: unknown }): Partial<Pick<TeamTask, 'title' | 'description' | 'scope' | 'priority' | 'labels' | 'order' | 'column'>> & { clear?: Array<'description' | 'priority' | 'labels' | 'column'> } {
+  const out: ReturnType<typeof taskFields> = {}, clear: Array<'description' | 'priority' | 'labels' | 'column'> = [];
   if (body.title !== undefined) out.title = boundedText(body.title, 1000, true);
   if (body.description !== undefined) { const text = boundedText(body.description, 4000); if (text) out.description = text; else clear.push('description'); }
   if (body.scope !== undefined) {
@@ -37,8 +37,32 @@ export function taskFields(body: { title?: unknown; description?: unknown; scope
     if (labels.length) out.labels = labels; else clear.push('labels');
   }
   if (body.order !== undefined) { if (typeof body.order !== 'number' || !Number.isFinite(body.order)) throw new TeamError(400, 'Ordine non valido'); out.order = body.order; }
+  if (body.column !== undefined) {
+    if (body.column === null || body.column === '') clear.push('column');
+    else if (typeof body.column === 'string' && COLUMN_ID.test(body.column)) out.column = body.column;
+    else throw new TeamError(400, 'Colonna non valida');
+  }
   if (clear.length) out.clear = clear;
   return out;
+}
+
+const COLUMN_ID = /^c[a-z0-9]{1,12}$/;
+/**
+ * The columns a person adds to a squad board: at most 4, a name of up to 24 characters, each resting on a status.
+ * New ones get an id here. Pure, so the rules are testable.
+ */
+export function boardColumns(value: unknown): BoardColumn[] {
+  if (!Array.isArray(value) || value.length > 4) throw new TeamError(400, 'Colonne: al massimo 4');
+  const seen = new Set<string>();
+  return value.map(c => {
+    const name = typeof c?.name === 'string' ? c.name.trim() : '';
+    if (!name || name.length > 24) throw new TeamError(400, 'Nome della colonna: da 1 a 24 caratteri');
+    if (!['pending', 'working', 'done'].includes(c.status)) throw new TeamError(400, 'Stato della colonna: pending, working o done');
+    let id = typeof c.id === 'string' && COLUMN_ID.test(c.id) ? c.id : '';
+    while (!id || seen.has(id)) id = 'c' + randomUUID().replace(/-/g, '').slice(0, 8);
+    seen.add(id);
+    return { id, name, status: c.status as BoardColumn['status'] };
+  });
 }
 
 /** Codes name team sessions for people and agents alike: one prefix per role and a number that is never reused in the node. */
@@ -206,7 +230,7 @@ export class Teams {
     return this.teams(nodeId).some(t => t.worktree && (cwd === t.worktree.path || cwd.startsWith(t.worktree.path + '/')));
   }
 
-  update(nodeId: number, body: { summary?: unknown; autoSpawn?: unknown; maxAgents?: unknown; worktrees?: unknown; delivery?: unknown; memory?: unknown }, team = DEFAULT_TEAM): TeamBoard {
+  update(nodeId: number, body: { summary?: unknown; autoSpawn?: unknown; maxAgents?: unknown; worktrees?: unknown; delivery?: unknown; memory?: unknown; columns?: unknown }, team = DEFAULT_TEAM): TeamBoard {
     const b = structuredClone(this.get(nodeId, team));
     if (body.summary !== undefined) b.summary = boundedText(body.summary, 4000);
     if (body.autoSpawn !== undefined) {
@@ -228,6 +252,12 @@ export class Teams {
     if (body.maxAgents !== undefined) {
       if (!Number.isInteger(body.maxAgents) || Number(body.maxAgents) < 1 || Number(body.maxAgents) > 8) throw new TeamError(400, 'Limite agenti: da 1 a 8');
       b.policy.maxAgents = Number(body.maxAgents);
+    }
+    if (body.columns !== undefined) {
+      const columns = boardColumns(body.columns);
+      if (columns.length) b.policy.columns = columns; else delete b.policy.columns;
+      // A task left in a removed column goes back to the column of its status.
+      for (const t of b.tasks) if (t.column && !columns.some(c => c.id === t.column)) delete t.column;
     }
     this.save(nodeId, b, team); return b;
   }
@@ -292,7 +322,7 @@ export class Teams {
     for (const key of clear) delete task[key];
     if (JSON.stringify(task) === prior) return { task, content: false };
     // Moving a card is not news for the agent; a new title or description is.
-    if (content || fields.priority !== undefined || fields.labels !== undefined || clear.length) task.updatedAt = Date.now();
+    if (content || fields.priority !== undefined || fields.labels !== undefined || clear.some(k => k !== 'column')) task.updatedAt = Date.now();
     this.save(nodeId, b, team);
     return { task, content };
   }
@@ -337,6 +367,8 @@ export class Teams {
     if (task.status === 'blocked' && task.assignedTo) {
       task.blockedOwnerCode = this.get(nodeId).codes?.ids[task.assignedTo];
     } else delete task.blockedOwnerCode;
+    // An agent changing the status takes the card out of the person's column; the person's own moves set it (editTask).
+    if (actor !== 'user' && task.status !== prior.status) delete task.column;
     task.updatedAt = Date.now(); this.save(nodeId, b, team); return task;
   }
   release(nodeId: number, sessionId: string, team?: string): void {

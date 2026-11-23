@@ -1,12 +1,10 @@
 // Cards of the Lavoro board dragged between and inside columns. Pointer events, not HTML5 drag: the Tauri shell takes
 // drags over for file drops (see work-reorder.ts). A copy of the card follows the pointer, a line shows where it lands;
 // Esc, a lost window or a cancelled pointer put everything back. The keyboard equivalent lives in work-board.ts.
-import type { Column } from './work-tasks.ts';
-
-export interface LaneBox { lane: Column; left: number; right: number; top: number; bottom: number; mids: number[] }
+export interface LaneBox { lane: string; left: number; right: number; top: number; bottom: number; mids: number[] }
 
 /** The column under the point (the nearest one when between them) and the index among its cards. Pure. */
-export function laneDropTarget(lanes: LaneBox[], x: number, y: number): { lane: Column; index: number } | null {
+export function laneDropTarget(lanes: LaneBox[], x: number, y: number): { lane: string; index: number } | null {
   if (!lanes.length) return null;
   const distance = (b: LaneBox) => Math.hypot(x < b.left ? b.left - x : x > b.right ? x - b.right : 0, y < b.top ? b.top - y : y > b.bottom ? y - b.bottom : 0);
   const box = lanes.reduce((best, b) => distance(b) < distance(best) ? b : best);
@@ -17,7 +15,7 @@ export function laneDropTarget(lanes: LaneBox[], x: number, y: number): { lane: 
 export function bindLaneDrag(root: HTMLElement, opts: {
   /** The card under a pointerdown that may be dragged, or null. */
   card(target: HTMLElement): HTMLElement | null;
-  onDrop(cardId: string, lane: Column, index: number): void;
+  onDrop(cardId: string, lane: string, index: number): void;
   /** True while a card is in the air: the board must not repaint under it. */
   onState(dragging: boolean): void;
 }): () => void {
@@ -29,17 +27,17 @@ export function bindLaneDrag(root: HTMLElement, opts: {
     const card = opts.card(target);
     if (!card) return;
     const startX = event.clientX, startY = event.clientY;
-    let ghost: HTMLElement | null = null, line: HTMLElement | null = null, drop: { lane: Column; index: number } | null = null, dx = 0, dy = 0;
+    let ghost: HTMLElement | null = null, line: HTMLElement | null = null, drop: { lane: string; index: number } | null = null, dx = 0, dy = 0;
     const boxes = (): LaneBox[] => [...root.querySelectorAll<HTMLElement>('[data-drop-lane]')].map(section => {
       const r = section.getBoundingClientRect();
       const cards = [...section.querySelectorAll<HTMLElement>('.lavoro-cards > .lavoro-card:not(.dragging):not([hidden])')];
-      return { lane: section.dataset.dropLane as Column, left: r.left, right: r.right, top: r.top, bottom: r.bottom, mids: cards.map(c => { const b = c.getBoundingClientRect(); return b.top + b.height / 2; }) };
+      return { lane: section.dataset.dropLane!, left: r.left, right: r.right, top: r.top, bottom: r.bottom, mids: cards.map(c => { const b = c.getBoundingClientRect(); return b.top + b.height / 2; }) };
     });
     const place = (x: number, y: number) => {
       drop = laneDropTarget(boxes(), x, y);
       root.querySelectorAll('.lane-target').forEach(s => s.classList.remove('lane-target'));
       if (!drop || !line) return;
-      const section = root.querySelector<HTMLElement>(`[data-drop-lane="${drop.lane}"]`)!;
+      const section = root.querySelector<HTMLElement>(`[data-drop-lane="${CSS.escape(drop.lane)}"]`)!;
       section.classList.add('lane-target');
       const list = section.querySelector('.lavoro-cards')!;
       const cards = [...list.querySelectorAll<HTMLElement>(':scope > .lavoro-card:not(.dragging):not([hidden])')];

@@ -283,7 +283,11 @@ export interface TeamTask {
   /** Position chosen by the person inside its column (smaller first); absent: priority, then age. */
   order?: number;
   createdAt?: number;
+  /** A column of the squad's own (policy.columns) inside the task's status; ignored when the status no longer matches. */
+  column?: string;
 }
+/** A column the person adds to a squad board. It rests on one of the statuses, so agents and Stats see no difference. */
+export interface BoardColumn { id: string; name: string; status: 'pending' | 'working' | 'done' }
 /** What reaches the sorting board instead of the orchestrator, classified by rule (no model call). */
 export type InboxKind = 'result' | 'blocked' | 'question' | 'note';
 export type InboxColumn = 'new' | 'ready' | 'forwarded' | 'archived';
@@ -330,7 +334,7 @@ export interface TeamBoard {
   /** worktrees: each operator and reviewer works in its own Git worktree and branch (off by default).
    *  delivery: manual sends what operators report to the sorting board; the person forwards it to the orchestrator.
    *  memory: which Claude sessions use Claude Code's auto memory (default "leaders"). */
-  policy: { autoSpawn: boolean; maxAgents: number; worktrees?: boolean; delivery?: 'auto' | 'manual'; memory?: ClaudeMemory };
+  policy: { autoSpawn: boolean; maxAgents: number; worktrees?: boolean; delivery?: 'auto' | 'manual'; memory?: ClaudeMemory; columns?: BoardColumn[] };
   /** Session codes of this node: the last number given per role and the code of each session id. Never reused. */
   codes?: { next: Partial<Record<AgentRole, number>>; ids: Record<string, string> };
   /** Sorting board: operator reports held for the person (manual delivery). */

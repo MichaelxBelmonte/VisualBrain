@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
 import { handleApi } from '../src/server/api.ts';
-import { Teams, taskFields } from '../src/server/team.ts';
+import { Teams, boardColumns, taskFields } from '../src/server/team.ts';
 import { setWorkState } from '../src/server/team-delivery.ts';
 import { newActivity } from '../src/server/activity.ts';
 import { DEFAULTS } from '../src/server/config.ts';
@@ -23,6 +23,17 @@ assert.throws(() => taskFields({ title: '   ' }), /Testo richiesto/);
 assert.throws(() => taskFields({ order: Number.NaN }), /Ordine/);
 assert.throws(() => taskFields({ description: 'x'.repeat(4001) }));
 console.log('PASS task fields: trimmed, bounded, empty values stored as absent');
+
+// --- Columns of the person's own (pure).
+const cols = boardColumns([{ name: ' Revisione ', status: 'working' }, { id: 'cdemo', name: 'Bozze', status: 'pending' }]);
+assert.equal(cols[0].name, 'Revisione'); assert.match(cols[0].id, /^c[a-z0-9]{8}$/); assert.equal(cols[1].id, 'cdemo');
+assert.notEqual(boardColumns([{ id: 'cx', name: 'A', status: 'done' }, { id: 'cx', name: 'B', status: 'done' }])[1].id, 'cx', 'ids stay unique');
+assert.throws(() => boardColumns(Array(5).fill({ name: 'x', status: 'pending' })), /al massimo 4/);
+assert.throws(() => boardColumns([{ name: 'x', status: 'blocked' }]), /Stato della colonna/);
+assert.throws(() => boardColumns([{ name: '', status: 'done' }]), /Nome della colonna/);
+assert.deepEqual(taskFields({ column: null }), { clear: ['column'] });
+assert.throws(() => taskFields({ column: '../x' }), /Colonna/);
+console.log('PASS own columns: at most 4, named, resting on pending/working/done, ids made here');
 
 const dir = mkdtempSync(join(tmpdir(), 'vb-team-edit-'));
 try {
@@ -114,6 +125,26 @@ try {
   assert.match((await messagesTo(op)).at(-1), /eliminato dall’utente\. Interrompi/);
   assert.equal((await call('DELETE', path, { from: 'user' })).status, 404);
   console.log('PASS delete: removed for good, the owner stops, a second delete is 404');
+
+  // Columns of the person's own: only the person sets them; a card keeps its column while the person moves it and
+  // leaves it when an agent changes the status or the column goes.
+  assert.equal((await call('PATCH', '/api/work/7', { columns: [{ name: 'Revisione', status: 'working' }] }, orc)).status, 403);
+  await ok('PATCH', '/api/work/7', { from: 'user', columns: [{ name: 'Revisione', status: 'working' }] });
+  const [review] = (await ok('GET', '/api/work/7')).policy.columns;
+  assert.equal(review.name, 'Revisione');
+  const card = await ok('POST', '/api/work/7/tasks', { from: 'user', title: 'Da rivedere', assignedTo: op });
+  const cardPath = '/api/work/7/tasks/' + card.id;
+  const inReview = await ok('PATCH', cardPath, { from: 'user', status: 'working', column: review.id });
+  assert.equal(inReview.status, 'working'); assert.equal(inReview.column, review.id);
+  const finished = await ok('PATCH', cardPath, { status: 'done', result: 'Fatto' }, op);
+  assert.equal(finished.column, undefined, 'the agent finishing takes the card out of the person’s column');
+  await ok('PATCH', cardPath, { from: 'user', column: review.id });
+  await ok('PATCH', '/api/work/7', { from: 'user', columns: [] });
+  const cleared = await ok('GET', '/api/work/7');
+  assert.equal(cleared.policy.columns, undefined);
+  assert.equal(cleared.tasks.find(t => t.id === card.id).column, undefined, 'a removed column leaves no card behind');
+  assert.equal((await call('PATCH', cardPath, { from: 'user', column: 'nope!' })).status, 400);
+  console.log('PASS own columns on the board: person only, kept on the person’s moves, cleared by agents and on removal');
 
   assert.ok(saved.includes('7:1'), 'every save is heard, for the board event');
 } finally {

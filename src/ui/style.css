@@ -1431,7 +1431,7 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .lavoro-you.alert > .lavoro-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; align-items: start; }
 .lavoro-you.alert .lavoro-card { border-color: color-mix(in srgb, var(--role-attention) 45%, var(--g2)); }
 .lavoro-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; padding: 2px 0; font-size: 13px; color: var(--g5); }
-.lavoro-lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start; border-top: 1px solid var(--g2); padding-top: 14px; }
+.lavoro-lanes { display: grid; grid-template-columns: repeat(var(--lanes, 3), minmax(0, 1fr)); gap: 24px; align-items: start; border-top: 1px solid var(--g2); padding-top: 14px; }
 .lavoro-lane { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: -6px; padding: 6px; border-radius: 10px; transition: background .12s; }
 .lavoro-lane h3 { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--g4); padding: 0 2px 2px; }
 .lavoro-lane .kanban-count { background: none; padding: 0; font-weight: 500; color: var(--g4); }
@@ -1538,6 +1538,79 @@ body.board-dragging, body.board-dragging * { cursor: grabbing !important; user-s
 .work-new button { display: flex; flex-direction: column; }
 .work-new button:has(kbd) { flex-direction: row; justify-content: space-between; align-items: center; }
 @media (max-width: 900px) { .lavoro-lanes { grid-template-columns: minmax(0, 1fr); gap: 18px; } }
+
+/* 0.2.66: a simpler header (squads · Vista · Messaggi · ···), columns of the squad's own, list view, compact cards,
+   the person's reminders in the columns, messages in a side panel. */
+.segmented > button[aria-checked="true"] { background: var(--bg); color: var(--fg); box-shadow: var(--shadow-sm); }
+/* More than four columns: each keeps a readable width and the row scrolls sideways. */
+@media (min-width: 901px) { .lavoro-lanes[style*="--lanes:5"], .lavoro-lanes[style*="--lanes:6"], .lavoro-lanes[style*="--lanes:7"] { grid-template-columns: repeat(var(--lanes), minmax(220px, 1fr)); overflow-x: auto; padding-bottom: 6px; } }
+.lavoro-lane[data-custom] h3::before { content: ''; width: 6px; height: 6px; border-radius: 1px; background: var(--g4); }
+.lavoro-msg-toggle .msg-count:not(:empty) { min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--role-attention); color: var(--bg); font-size: 10.5px; line-height: 16px; font-weight: 600; text-align: center; }
+.view-count { min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--fg); color: var(--bg); font-size: 10.5px; line-height: 16px; font-weight: 600; text-align: center; }
+.view-count[hidden] { display: none; }
+.lavoro-view > .lavoro-view-pop { width: 300px; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+.view-sec { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.view-key { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--g4); }
+.view-sec .segmented { align-self: flex-start; }
+.view-sec select, .view-sec .col-name { width: 100%; min-width: 0; padding: 5px 7px; border: 1px solid var(--g3); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 12px; }
+.work-overflow .view-sec button.link-btn, .link-btn { all: unset; cursor: pointer; font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--fg); text-decoration: underline; text-underline-offset: 2px; }
+.view-lanes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.view-lanes li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
+.view-lanes li > label { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.view-lanes select { width: auto; max-width: 112px; }
+.work-overflow .view-lanes .btn, .work-overflow .view-sec > .btn { width: auto; padding: 3px 8px; }
+.view-sec > small { font-size: 11px; line-height: 1.35; }
+/* The one-line entry: the field, and for whom it creates (the squad or you). */
+.lavoro-quick { display: flex; align-items: center; gap: 6px; }
+.lavoro-quick input { flex: 1; min-width: 0; }
+.quick-for { display: inline-flex; flex: none; padding: 2px; gap: 2px; border-radius: 7px; background: var(--g1); }
+.quick-for > button { border: 0; padding: 2px 7px; border-radius: 5px; background: none; color: var(--g4); font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.quick-for > button:hover { color: var(--fg); }
+.quick-for > button[aria-checked="true"] { background: var(--bg); color: var(--fg); box-shadow: var(--shadow-sm); }
+.task-label.mine { background: color-mix(in srgb, var(--role-orch) 16%, transparent); color: var(--fg); }
+/* Compact cards: one line each (title and status dot); opening a card shows everything as before. */
+.lavoro[data-density="compact"] .lavoro-lanes .lavoro-card:not(.open) { flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px; }
+.lavoro[data-density="compact"] .lavoro-lanes .lavoro-card:not(.open) > :not(strong):not(.lavoro-status) { display: none; }
+.lavoro[data-density="compact"] .lavoro-lanes .lavoro-card:not(.open) > strong { flex: 1; min-width: 0; -webkit-line-clamp: 1; font-weight: 500; }
+.lavoro[data-density="compact"] .lavoro-lanes .lavoro-card:not(.open) > .lavoro-status { order: -1; font-size: 0; gap: 0; }
+.lavoro[data-density="compact"] .lavoro-lanes .lavoro-card[data-priority="high"]:not(.open) > strong::before { content: '↑ '; color: var(--role-blocked); font-weight: 700; }
+.lavoro[data-density="compact"] .lavoro-cards { gap: 4px; }
+/* List view: one table, sortable by any column; a row opens into the card editor. */
+.lavoro-work { display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--g2); padding-top: 14px; }
+.lavoro-work > .lavoro-lanes { border-top: 0; padding-top: 0; }
+.lavoro-work > .lavoro-quick { max-width: 720px; }
+@media (min-width: 901px) { .lavoro.drawer-open .lavoro-lanes { grid-template-columns: repeat(var(--lanes, 3), minmax(190px, 1fr)); overflow-x: auto; padding-bottom: 6px; } }
+.lavoro-list { overflow-x: auto; }
+.lavoro-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.lavoro-table th { text-align: left; font-weight: 600; border-bottom: 1px solid var(--g2); padding: 0; white-space: nowrap; }
+.lavoro-table th button { all: unset; display: inline-flex; gap: 4px; padding: 6px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--g4); cursor: pointer; }
+.lavoro-table th button:hover, .lavoro-table th[aria-sort="ascending"] button, .lavoro-table th[aria-sort="descending"] button { color: var(--fg); }
+.lavoro-table td { padding: 7px 8px; border-bottom: 1px solid var(--g2); vertical-align: middle; }
+.lavoro-table tbody tr[data-card] { cursor: pointer; }
+.lavoro-table tbody tr[data-card]:hover > td { background: var(--g1); }
+.lavoro-table tbody tr[data-card]:focus-visible { outline: 2px solid var(--fg); outline-offset: -2px; }
+.lavoro-table tr[data-status="done"] .list-title > span:first-child { color: var(--g5); }
+.lavoro-table .list-title { width: 50%; }
+.lavoro-table .list-title > span:first-child { font-weight: 500; margin-right: 6px; overflow-wrap: anywhere; }
+.lavoro-table .list-title .task-label { margin-right: 3px; }
+.lavoro-table .lavoro-status { display: inline-flex; white-space: nowrap; }
+.lavoro-table tr.list-open > td { padding: 6px 0 10px; background: none; }
+@media (max-width: 760px) { .lavoro-table th:nth-child(3), .lavoro-table td:nth-child(3), .lavoro-table th:nth-child(5), .lavoro-table td:nth-child(5) { display: none; } }
+/* Messages: a side panel beside the board; in a narrow window a sheet from the bottom. Esc closes it. */
+.lavoro.drawer-open { display: grid; grid-template-columns: minmax(0, 1fr) 320px; column-gap: 24px; align-items: start; }
+.lavoro.drawer-open > :not(.lavoro-drawer) { grid-column: 1; }
+.lavoro-drawer { grid-column: 2; grid-row: 1 / span 30; position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 150px); min-height: 260px; padding: 12px; border: 1px solid var(--g2); border-radius: 10px; background: var(--bg); }
+.lavoro-drawer[hidden] { display: none; }
+.lavoro-drawer > header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.lavoro-drawer .board-messages { flex: 1; max-height: none; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.lavoro-drawer form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.lavoro-drawer form select { grid-column: 1 / -1; padding: 5px 7px; border: 1px solid var(--g3); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12px; }
+.lavoro-drawer textarea { resize: vertical; min-height: 34px; padding: 6px 8px; border: 1px solid var(--g3); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 12.5px; }
+.lavoro-drawer form .btn { align-self: end; }
+@media (max-width: 900px) {
+  .lavoro.drawer-open { display: flex; }
+  .lavoro-drawer { position: fixed; inset: auto 0 0 0; z-index: 30; max-height: 70vh; border-radius: 12px 12px 0 0; box-shadow: var(--shadow-pop); }
+}
 @media (max-width: 640px) { .lavoro { padding: 12px; } .lavoro-filters { flex-basis: 100%; order: 3; } }
 
 .dev-gap { flex: 1; }

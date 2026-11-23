@@ -674,7 +674,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       }
       if (!action && method === 'PATCH') {
         if (!canManage) throw new HttpError(403, 'Solo l’orchestratore aggiorna il riepilogo');
-        const settings = ['autoSpawn', 'maxAgents', 'worktrees', 'delivery', 'memory', 'name', 'objective', 'archived'].some(k => b[k] !== undefined);
+        const settings = ['autoSpawn', 'maxAgents', 'worktrees', 'delivery', 'memory', 'columns', 'name', 'objective', 'archived'].some(k => b[k] !== undefined);
         if (actor !== 'user' && settings) throw new HttpError(403, 'Solo l’utente cambia i limiti della squadra');
         if (actor === 'user' && !isBrain && (b.name !== undefined || b.objective !== undefined || b.archived !== undefined)) {
           const patch: { name?: string; objective?: string; archived?: boolean } = {};
@@ -761,7 +761,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       if (action === 'tasks' && taskId && method === 'PATCH') {
         if (isBrain) throw new HttpError(403, 'Il Main Brain non ha incarichi');
         // Title, description, files, priority, labels, position: written first; the status rules below are untouched.
-        const EDITS = ['title', 'description', 'scope', 'priority', 'labels', 'order'] as const;
+        const EDITS = ['title', 'description', 'scope', 'priority', 'labels', 'order', 'column'] as const;
         if (EDITS.some(k => b[k] !== undefined)) {
           const edited = ctx.teams.editTask(nodeId, taskId, actor, member?.info.role, b, team);
           const owner = edited.task.assignedTo;

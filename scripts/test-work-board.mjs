@@ -120,3 +120,47 @@ const sessions = [tone({ workState: 'working', lastOutputAt: now - 1000 }), tone
 assert.deepEqual(railCounts(sessions, now), { all: 5, active: 1, needs: 2, ended: 1 });
 assert.ok(inRailFilter('all', { alive: false }, now) && !inRailFilter('needs', sessions[0], now));
 console.log('PASS rail filters: Tutti, Attivi, Per te and Chiusi count what each would list');
+
+// --- Board of one's own (0.2.66): stored preferences, the squad's columns, filters, the list's order.
+import { activeFilters, boardLanes, laneOf, passes, readPrefs, sortRows } from '../src/ui/work-prefs.ts';
+
+assert.deepEqual(readPrefs(null), { view: 'columns', density: 'comfortable', hidden: [], filter: {}, sort: { key: 'status', desc: false }, quickMine: false });
+assert.deepEqual(readPrefs('not json').view, 'columns', 'broken storage: defaults');
+const kept = readPrefs(JSON.stringify({ view: 'list', density: 'compact', hidden: ['done', 7], filter: { agent: 'OP1', priority: 'urgent', mine: 'yes' }, sort: { key: 'owner', desc: true }, quickMine: true }));
+assert.deepEqual(kept, { view: 'list', density: 'compact', hidden: ['done'], filter: { agent: 'OP1' }, sort: { key: 'owner', desc: true }, quickMine: true }, 'each unknown value falls back on its own');
+console.log('PASS preferences: whatever is stored, a valid one comes back, value by value');
+
+const review = { id: 'crev', name: 'Revisione', status: 'working' }, drafts = { id: 'cdraft', name: 'Bozze', status: 'pending' };
+assert.deepEqual(boardLanes([review, drafts], []).map(l => l.id), ['todo', 'cdraft', 'doing', 'crev', 'done'], 'each squad column right after the column of its status');
+assert.deepEqual(boardLanes([review], ['todo', 'done']).map(l => l.id), ['doing', 'crev']);
+assert.deepEqual(boardLanes([], ['todo', 'doing', 'done']).map(l => l.id), ['todo'], 'never an empty board');
+assert.equal(laneOf({ status: 'working', column: 'crev' }, [review]), 'crev');
+assert.equal(laneOf({ status: 'done', column: 'crev' }, [review]), 'done', 'status moved on: the plain column');
+assert.equal(laneOf({ status: 'working', column: 'gone' }, [review]), 'doing', 'a removed column');
+assert.equal(laneOf({ status: 'blocked', column: 'crev' }, [review]), 'you');
+console.log('PASS squad columns: placed after their status, hidden ones left out, a card leaves one when its status moves on');
+
+const card = { mine: false, owner: 'OP1', priority: 'high', labels: ['UI'] }, nobody = { mine: false, owner: '' }, note = { mine: true, owner: '' };
+assert.ok(passes(card, {}) && passes(note, {}));
+assert.ok(passes(card, { agent: 'OP1', label: 'ui', priority: 'high' }), 'labels match regardless of case');
+assert.ok(!passes(card, { agent: 'OP2' }) && !passes(card, { priority: 'normal' }) && !passes(card, { label: 'server' }));
+assert.ok(passes(nobody, { agent: '-' }) && !passes(card, { agent: '-' }), '«Da assegnare»');
+assert.ok(passes(nobody, { priority: 'normal' }), 'no priority is normal');
+assert.ok(passes(note, { mine: true }) && !passes(card, { mine: true }), '«Solo i miei promemoria»');
+assert.ok(!passes(note, { label: 'ui' }), 'a reminder has no labels');
+assert.equal(activeFilters({ agent: 'OP1', mine: true }), 2);
+console.log('PASS filters: agent (or nobody), label, priority, only my reminders; the count on «Vista»');
+
+const rows = [
+  { id: 'a', title: 'beta', status: 'done', owner: 'OP2', updatedAt: 5 },
+  { id: 'b', title: 'Alfa', status: 'blocked', priority: 'low', owner: '', updatedAt: 1 },
+  { id: 'c', title: 'gamma', status: 'working', priority: 'high', owner: 'OP10', updatedAt: 9 },
+  { id: 'd', title: 'delta', status: 'pending', owner: 'OP2', updatedAt: 3 },
+];
+const order = (key, desc = false) => sortRows(rows, key, desc).map(r => r.id).join('');
+assert.equal(order('status'), 'bcda', 'what needs you first, done last');
+assert.equal(order('title'), 'badc');
+assert.equal(order('priority'), 'cadb', 'high, normal (latest first), low');
+assert.equal(order('owner'), 'adcb', 'codes in number order, nobody last');
+assert.equal(order('updated', true), 'cadb');
+console.log('PASS list order: status, title, priority, who, latest change; ties by latest change');
