@@ -244,6 +244,13 @@ function connectEvents(): void {
       case 'stats:changed':
         window.dispatchEvent(new Event('vb:stats-changed'));
         break;
+      // The open Lavoro board reads its squad (or the reminders) again at once.
+      case 'team:changed':
+        window.dispatchEvent(new CustomEvent('vb:team-changed', { detail: { nodeId: m.nodeId, team: m.team } }));
+        break;
+      case 'reminders:changed':
+        window.dispatchEvent(new Event('vb:reminders-changed'));
+        break;
       case 'index:progress':
         indexing = true; indexNote = ui`${tr('Indicizzazione')} · ${m.done.toLocaleString(tr('it-IT'))}${m.total ? '/' + m.total.toLocaleString(tr('it-IT')) : ''}`; syncLoader();
         indexDot(indexNote);

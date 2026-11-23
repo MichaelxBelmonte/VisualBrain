@@ -31,8 +31,9 @@ Base: `http://127.0.0.1:4747`. Tutte le risposte sono JSON. I tipi sono in `src/
 | POST | `/api/work/:nodeId/records` | `{from?, entryId, kind, decision, nextOwner, taskId?, sha?, artifact?}` | Voce idempotente con autore e data attribuiti dal server. |
 | PATCH | `/api/work/:nodeId` | `{ from?, summary?, autoSpawn?, maxAgents?, worktrees? }` | bacheca; riepilogo aggiornabile dall’orchestratore, policy solo dall’utente |
 | POST | `/api/work/:nodeId/messages` | `{ from?, to?: termId | null, text }` | messaggio; destinatari di altri nodi richiedono un canale esplicito |
-| POST | `/api/work/:nodeId/tasks` | `{ from?, title, scope?: string[], assignedTo?: termId | null }` | incarico; utente o orchestratore |
-| PATCH | `/api/work/:nodeId/tasks/:id` | `{ from?, status?, result?, assignedTo? }` | incarico; rivendicazione esclusiva; riassegnazione solo utente/orchestratore |
+| POST | `/api/work/:nodeId/tasks` | `{ from?, title, scope?: string[], assignedTo?: termId | null, description?, priority?: 'high' \| 'low', labels?: string[] }` | incarico; utente o orchestratore |
+| PATCH | `/api/work/:nodeId/tasks/:id` | `{ from?, status?, result?, assignedTo?, title?, description?, scope?, priority?: 'high' \| 'normal' \| 'low', labels?, order? }` | incarico; rivendicazione esclusiva; riassegnazione e modifica dei campi solo utente/orchestratore (dalla 0.2.65). Se titolo, descrizione o file cambiano, l’assegnatario vivo riceve un messaggio. La persona può avviare un incarico già assegnato: resta `working` e l’assegnatario viene avvisato |
+| DELETE | `/api/work/:nodeId/tasks/:id` | – | `{deleted}`; solo la persona (403 agli agenti e sul Main Brain); l’assegnatario vivo riceve l’ordine di fermarsi |
 | POST | `/api/work/:nodeId/state` | `{ from: termId, state: 'working' | 'idle' | 'blocked' }` | stato; sessione autenticata |
 | POST | `/api/work/:nodeId/spawn` | `{ from: termId, agent, model?, effort?, role: 'operator' | 'reviewer', task }` | sessione; orchestratore autenticato, delegazione abilitata e limite squadra |
 | GET / POST | `/api/team-links` | POST: `{ srcNodeId, dstNodeId, srcSessionId?: termId | null, dstSessionId?: termId | null }` | canali bidirezionali, separati dagli archi dei file; null collega l’orchestratore del nodo |
@@ -41,6 +42,7 @@ Base: `http://127.0.0.1:4747`. Tutte le risposte sono JSON. I tipi sono in `src/
 | GET | `/api/reminders` | – | `NodeReminder[]`: promemoria personali, aperti prima dei completati |
 | POST | `/api/reminders` | `{nodeId, title, status?: 'pending' \| 'working' \| 'done', notes?}` | `NodeReminder`; nodo richiesto, titolo massimo 1000, appunti massimo 10000 caratteri |
 | PATCH | `/api/reminders/:id` | `{nodeId?, title?, status?, notes?}` | `NodeReminder`; aggiorna, riassegna, completa o riapre |
+| DELETE | `/api/reminders/:id` | – | `{deleted}`; solo la persona, 404 se non esiste (dalla 0.2.65) |
 | GET | `/api/terminals` | – | `TerminalInfo[]` |
 | GET | `/api/mega-stats?hours=24` | filtri opzionali `project` (nodo progetto), `team` (nodo:squadra), `session` | Stats di tutte le sessioni del periodo (finestre 1, 24 o 168 ore): stato attuale, richieste e token letti dai registri di Claude Code e Codex, account, incarichi delle squadre per stato, `quality` (passaggi degli incarichi registrati da Visual Brain dalla 0.2.63: tempo fino a «fatto», riaperture, blocchi, riassegnazioni; attese per permessi e domande; righe per agente·modello·ruolo e per squadra; chiamate non riuscite per percorso, senza id), misure tecniche. Solo conteggi e tempi, mai titoli o contenuti. |
 | GET / PUT | `/api/mega-stats/routing?node=N&team=T` | PUT della regola completa | Regola effettiva per squadra, quote e motivi delle assegnazioni. Senza parametri GET mostra il profilo. |

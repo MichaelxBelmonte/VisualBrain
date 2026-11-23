@@ -12,7 +12,7 @@ import { bindReorder } from './work-reorder.ts';
 import { connectionGroups, linkBetween, linkRequest, moveNode, orderNodes, type LinkSide } from './work-links.ts';
 import { WorkChannel } from './work-channel.ts';
 import { clampSplit, moveTile, orderTiles, MAX_TILES, connectionEndpoints, defaultTiles, directPeers, pairTiles, focusIndex, focusTile, gridColumns, groupSuggestion, pickerGroups, reconcileTiles, removeTile, stepFocus, stepTab, tabStepKey, tileKeyAction, tileMarker, toggleTile, type TileSelection, clampPage, emptyNodeView, needsLink, nodePickerGroups, nodeViewIds, orchestratorLink, pageCount, pageIds, pageOfId, type NodeView, type PickerItem } from './work-tiles.ts';
-import { CODE_IN_TEXT, resumable, roleName, sessionTone, sessionWorking, toneFlag, toneReason, type SessionTone, ROLE_WORDS } from './work-roles.ts';
+import { CODE_IN_TEXT, inRailFilter, railCounts, resumable, roleName, sessionTone, sessionWorking, toneFlag, toneReason, type RailFilter, type SessionTone, ROLE_WORDS } from './work-roles.ts';
 import { DEFAULT_FONT_SIZE, dropText, fontZoomKey, isNewTerminalKey, isPlainTerminalKey, parseFileDrop, zoomFont } from './work-input.ts';
 import { api } from './api.ts';
 import { accountTag, refreshAccountNames } from './account-names.ts';
@@ -959,15 +959,16 @@ export class Terminals {
     const needs = [...this.tabs.values()].filter(t => t.info.alive && ['attention', 'blocked'].includes(sessionTone(t.info) ?? '')).length;
     const badge = this.control('#work-needs');
     if (badge) { badge.hidden = !needs; badge.textContent = String(needs); badge.title = needs === 1 ? tr('1 sessione aspetta te') : ui`${needs} sessioni aspettano te`; }
-    // The rail's "Serve te" filter carries the same count, so what waits on the person is visible without filtering.
-    const needsFilter = this.control('#work-state-filter [data-state="needs"]');
-    if (needsFilter?.dataset) {
-      if (needs) needsFilter.dataset.count = String(needs); else delete needsFilter.dataset.count;
-      // the dot has no text of its own: its name carries the count for the tooltip and the screen reader
-      const said = needs ? `${tr('Serve te')}: ${needs === 1 ? tr('1 sessione aspetta te') : ui`${needs} sessioni aspettano te`}` : '';
-      needsFilter.title = said || tr('Serve te: permessi, domande e bloccati');
-      needsFilter.setAttribute('aria-label', said || tr('Serve te'));
-    }
+    // Each rail filter shows how many sessions it would list; «Per te» is coloured only when something waits.
+    const counts = railCounts([...this.tabs.values()].map(t => t.info));
+    const names: Record<RailFilter, string> = { all: tr('Tutti'), active: tr('Attivi'), needs: tr('Per te'), ended: tr('Chiusi') };
+    this.control('#work-state-filter')?.querySelectorAll<HTMLElement>('[data-state]').forEach(button => {
+      const id = button.dataset.state as RailFilter, n = counts[id] ?? 0;
+      const count = button.querySelector('b');
+      if (count && count.textContent !== String(n)) count.textContent = String(n);
+      button.dataset.zero = String(!n);
+      button.setAttribute('aria-label', `${names[id]}: ${n}`);
+    });
     this.syncSel();
     this.renderTabs();
     const sessionsInfo = [...this.tabs.values()].map(t => ({ ...t.info }));
@@ -989,10 +990,7 @@ export class Terminals {
       const path = node?.path ?? sessions[0]?.info.cwd ?? '';
       const matchesNode = ui`${name} ${path}`.toLowerCase().includes(this.filter);
       const matching = sessions.filter(t => {
-        const state = sessionTone(t.info, now) ?? (t.info.alive ? 'terminal' : 'ended');
-        const stateMatch = this.stateFilter === 'needs' ? state === 'attention' || state === 'blocked'
-          : this.stateFilter === 'active' ? state === 'active' || (state === 'orchestrator' && sessionWorking(t.info, now))
-          : state === this.stateFilter;
+        const stateMatch = inRailFilter(this.stateFilter, t.info, now);
         return (!filteringState || stateMatch) && (matchesNode || ui`${labels[t.info.agent]} ${t.info.role ? roles[t.info.role] : ''} ${t.info.code || ''} ${t.info.model || ''} ${t.info.name || ''} ${t.info.title} ${t.info.id}`.toLowerCase().includes(this.filter));
       });
       const rank = (t: Tab) => { const at = this.sessionOrder.indexOf(t.info.id); return at < 0 ? Infinity : at; };

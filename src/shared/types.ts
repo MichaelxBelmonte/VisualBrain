@@ -275,6 +275,14 @@ export interface TeamTask {
   held?: boolean;
   /** Display code for a blocked task even after its owner's terminal has been removed. */
   blockedOwnerCode?: string;
+  /** Written by the person or the orchestrator; agents may ignore them. Absent in boards from before 0.2.65. */
+  description?: string;
+  /** Absent means normal. */
+  priority?: 'high' | 'low';
+  labels?: string[];
+  /** Position chosen by the person inside its column (smaller first); absent: priority, then age. */
+  order?: number;
+  createdAt?: number;
 }
 /** What reaches the sorting board instead of the orchestrator, classified by rule (no model call). */
 export type InboxKind = 'result' | 'blocked' | 'question' | 'note';
@@ -377,7 +385,10 @@ export type EventMessage =
   | { type: 'analyze:done'; runId: number; summary: string }
   | { type: 'analyze:error'; runId: number; error: string }
   | { type: 'graph:changed'; reason: string }
-  | { type: 'term:exit'; id: string; code: number };
+  | { type: 'term:exit'; id: string; code: number }
+  /** A squad's board was saved (tasks, messages, settings): the open board reads it again at once. */
+  | { type: 'team:changed'; nodeId: number; team: string }
+  | { type: 'reminders:changed' };
 
 /** Personal reminders, independent of team assignments and terminal lifetimes. */
 export interface NodeReminder {

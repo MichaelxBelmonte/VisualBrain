@@ -216,11 +216,20 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   catch { console.warn('[stats] Archivio locale non disponibile.'); }
   // Task transitions for «Qualità»: a comparison in memory at each board save, a row only when a task changes.
   teams.onTasks = (node, team, before, after) => stats?.capture(() => stats!.tasks(node, team, before, after));
+  // The open board reads a squad again as soon as it is saved, rather than at its next poll. A burst of saves (a
+  // message, then the task it announces) makes one event per board.
+  const boardEvents = new Map<string, ReturnType<typeof setTimeout>>();
+  teams.onSave = (nodeId, team) => {
+    const key = `${nodeId}:${team}`;
+    if (boardEvents.has(key)) return;
+    boardEvents.set(key, setTimeout(() => { boardEvents.delete(key); events.send({ type: 'team:changed', nodeId, team }); }, 150));
+  };
   const routing = new QuotaRouter(cfg.dataDir);
   const ctx: ApiCtx = {
     db, cfg, cache, startupMap, terms, teams, updater, access, state, startIndex, startAnalyze, configure, stats, routing,
     previewAnalyze: (consent) => buildPayload(db, cfg, cache, consent),
     changed: (reason) => events.send({ type: 'graph:changed', reason }),
+    remindersChanged: () => events.send({ type: 'reminders:changed' }),
   };
   const heartbeat = () => stats?.capture(() => stats!.heartbeat(ctx));
   heartbeat();

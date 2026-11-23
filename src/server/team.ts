@@ -15,6 +15,32 @@ export function boundedText(value: unknown, max: number, required = false): stri
   return text;
 }
 
+/**
+ * The fields of a task the person and the orchestrator may write, checked here so a board file never holds odd values.
+ * Empty description, normal priority and no labels are stored as absent. Pure, apart from throwing.
+ */
+export function taskFields(body: { title?: unknown; description?: unknown; scope?: unknown; priority?: unknown; labels?: unknown; order?: unknown }): Partial<Pick<TeamTask, 'title' | 'description' | 'scope' | 'priority' | 'labels' | 'order'>> & { clear?: Array<'description' | 'priority' | 'labels'> } {
+  const out: ReturnType<typeof taskFields> = {}, clear: Array<'description' | 'priority' | 'labels'> = [];
+  if (body.title !== undefined) out.title = boundedText(body.title, 1000, true);
+  if (body.description !== undefined) { const text = boundedText(body.description, 4000); if (text) out.description = text; else clear.push('description'); }
+  if (body.scope !== undefined) {
+    if (!Array.isArray(body.scope) || body.scope.length > 16 || body.scope.some(p => typeof p !== 'string' || p.length > 500)) throw new TeamError(400, 'scope: massimo 16 percorsi');
+    out.scope = (body.scope as string[]).map(p => p.trim()).filter(Boolean);
+  }
+  if (body.priority !== undefined) {
+    if (body.priority !== 'high' && body.priority !== 'low' && body.priority !== 'normal' && body.priority !== null) throw new TeamError(400, 'Priorità non valida');
+    if (body.priority === 'high' || body.priority === 'low') out.priority = body.priority; else clear.push('priority');
+  }
+  if (body.labels !== undefined) {
+    if (!Array.isArray(body.labels) || body.labels.length > 8 || body.labels.some(l => typeof l !== 'string' || !l.trim() || l.trim().length > 24)) throw new TeamError(400, 'Etichette: al massimo 8, di 24 caratteri');
+    const seen = new Set<string>(), labels = (body.labels as string[]).map(l => l.trim()).filter(l => !seen.has(l.toLowerCase()) && seen.add(l.toLowerCase()));
+    if (labels.length) out.labels = labels; else clear.push('labels');
+  }
+  if (body.order !== undefined) { if (typeof body.order !== 'number' || !Number.isFinite(body.order)) throw new TeamError(400, 'Ordine non valido'); out.order = body.order; }
+  if (clear.length) out.clear = clear;
+  return out;
+}
+
 /** Codes name team sessions for people and agents alike: one prefix per role and a number that is never reused in the node. */
 const CODE_PREFIX: Record<AgentRole, string> = { orchestrator: 'ORC', operator: 'OP', reviewer: 'REV', brain: 'BRAIN' };
 const KEEP_CODES = 300;
@@ -57,6 +83,8 @@ export class Teams {
   private links: TeamLink[] | null = null;
   /** Hears every saved board with its tasks before and after (local Stats). It must not throw, nor slow the save. */
   onTasks?: (nodeId: number, team: string, before: readonly TeamTask[], after: readonly TeamTask[]) => void;
+  /** Hears every saved board (the window shows it again at once). It must not throw. */
+  onSave?: (nodeId: number, team: string) => void;
   constructor(dataDir: string) { this.dir = join(dataDir, 'teams'); }
   getLinks(): TeamLink[] {
     if (this.links === null) {
@@ -125,6 +153,7 @@ export class Teams {
     const before = this.boards.get(key)?.tasks ?? [];
     this.boards.set(key, board);
     if (this.onTasks && before !== board.tasks) try { this.onTasks(nodeId, team, before, board.tasks); } catch { /* measurements never stop a board */ }
+    try { this.onSave?.(nodeId, team); } catch { /* the window catches up at its next read */ }
   }
 
   /** The node's squads, oldest first. The first squad exists implicitly: boards from before squads are its board. */
@@ -221,11 +250,13 @@ export class Teams {
     b.messages.push(m); b.messages = b.messages.slice(-500);
     this.save(nodeId, b, team); return m;
   }
-  createTask(nodeId: number, from: string, body: { title?: unknown; scope?: unknown; assignedTo?: string | null; routing?: TeamTask['routing'] }, team = DEFAULT_TEAM): TeamTask {
+  createTask(nodeId: number, from: string, body: { title?: unknown; scope?: unknown; description?: unknown; priority?: unknown; labels?: unknown; assignedTo?: string | null; routing?: TeamTask['routing'] }, team = DEFAULT_TEAM): TeamTask {
     const b = structuredClone(this.get(nodeId, team));
     if (b.tasks.filter(t => t.status !== 'done').length >= 100) throw new TeamError(409, 'Troppi incarichi aperti');
-    if (body.scope !== undefined && (!Array.isArray(body.scope) || body.scope.length > 16 || body.scope.some(p => typeof p !== 'string' || p.length > 500))) throw new TeamError(400, 'scope: massimo 16 percorsi');
-    const task: TeamTask = { id: randomUUID().slice(0, 8), title: boundedText(body.title, 1000, true), scope: body.scope as string[] ?? [], assignedTo: body.assignedTo ?? null, status: 'pending', result: '', createdBy: from, updatedAt: Date.now() };
+    const { clear: _clear, ...fields } = taskFields({ title: body.title ?? '', scope: body.scope, description: body.description, priority: body.priority, labels: body.labels });
+    const now = Date.now();
+    const task: TeamTask = { id: randomUUID().slice(0, 8), title: fields.title!, scope: fields.scope ?? [], assignedTo: body.assignedTo ?? null, status: 'pending', result: '', createdBy: from, updatedAt: now, createdAt: now,
+      ...(fields.description ? { description: fields.description } : {}), ...(fields.priority ? { priority: fields.priority } : {}), ...(fields.labels ? { labels: fields.labels } : {}) };
     if (body.routing) task.routing = body.routing;
     b.tasks.push(task);
     b.tasks = [...b.tasks.filter(t => t.status === 'done').slice(-100), ...b.tasks.filter(t => t.status !== 'done')];
@@ -246,6 +277,35 @@ export class Teams {
     }
     this.save(nodeId,b,team); return task;
   }
+  /** Title, description, files, priority, labels and position: the person and the orchestrator only. Status, owner and
+   *  result stay with changeTask and its rules. Returns the task and whether what the assignee reads has changed. */
+  editTask(nodeId: number, taskId: string, actor: string, role: AgentRole | undefined, body: Parameters<typeof taskFields>[0], team = DEFAULT_TEAM): { task: TeamTask; content: boolean } {
+    if (actor !== 'user' && role !== 'orchestrator') throw new TeamError(403, 'Solo l’utente o l’orchestratore modificano un incarico');
+    const b = structuredClone(this.get(nodeId, team));
+    const task = b.tasks.find(t => t.id === taskId);
+    if (!task) throw new TeamError(404, 'Incarico non trovato');
+    const { clear = [], ...fields } = taskFields(body);
+    const prior = JSON.stringify(task);
+    const content = (fields.title !== undefined && fields.title !== task.title) || (fields.description ?? (clear.includes('description') ? '' : task.description ?? '')) !== (task.description ?? '')
+      || (fields.scope !== undefined && fields.scope.join('\n') !== task.scope.join('\n'));
+    Object.assign(task, fields);
+    for (const key of clear) delete task[key];
+    if (JSON.stringify(task) === prior) return { task, content: false };
+    // Moving a card is not news for the agent; a new title or description is.
+    if (content || fields.priority !== undefined || fields.labels !== undefined || clear.length) task.updatedAt = Date.now();
+    this.save(nodeId, b, team);
+    return { task, content };
+  }
+  /** Removes a task from the board (the person only, checked by the route). Returns what it was. */
+  deleteTask(nodeId: number, taskId: string, team = DEFAULT_TEAM): TeamTask {
+    const b = structuredClone(this.get(nodeId, team));
+    const task = b.tasks.find(t => t.id === taskId);
+    if (!task) throw new TeamError(404, 'Incarico non trovato');
+    b.tasks = b.tasks.filter(t => t.id !== taskId);
+    if (b.inbox) b.inbox = b.inbox.filter(i => i.taskId !== taskId || i.column === 'forwarded' || i.column === 'archived');
+    this.save(nodeId, b, team);
+    return task;
+  }
   changeTask(nodeId: number, taskId: string, actor: string, role: AgentRole | undefined, body: { status?: unknown; result?: unknown; assignedTo?: string | null; held?: boolean }, team = DEFAULT_TEAM): TeamTask {
     const b = structuredClone(this.get(nodeId, team));
     const task = b.tasks.find(t => t.id === taskId);
@@ -265,8 +325,10 @@ export class Teams {
       if (!manages && body.status === 'pending') throw new TeamError(403, 'Solo l’orchestratore può riaprire');
       task.status = body.status as TeamTask['status'];
       if (task.assignedTo === null && (!manages || (body.status === 'working' && actor !== 'user'))) task.assignedTo = actor;
-      // A manager may unblock/assign on another member's behalf. The new owner still has to claim.
-      if (task.status === 'working' && task.assignedTo !== actor && (prior.status !== 'working' || prior.assignedTo !== task.assignedTo)) task.status = 'pending';
+      // A manager may unblock/assign on another member's behalf. The new owner still has to claim; only the person may
+      // start an assigned task for its owner (moving the card to «In corso»): the owner is told to begin.
+      if (task.status === 'working' && task.assignedTo !== actor && !(actor === 'user' && task.assignedTo && prior.assignedTo === task.assignedTo)
+        && (prior.status !== 'working' || prior.assignedTo !== task.assignedTo)) task.status = 'pending';
     }
     if (body.result !== undefined) task.result = boundedText(body.result, 2000);
     if (body.held !== undefined) { if (body.held) task.held = true; else delete task.held; }
@@ -487,7 +549,7 @@ export function teamInstructions(base: string, id: string, _token: string, role:
   lines.push(`${localTools ? 'HTTP' : words('Prima azione', 'First action')}: GET ${base}?session=${id} · Authorization: Bearer $VB_TEAM_TOKEN · JSON from="${id}".`);
   if (!localTools) {
     const routes = role === 'brain' ? 'POST /proposals; PATCH / {summary}'
-      : role === 'orchestrator' ? 'POST /tasks {title,scope,assignedTo}; PATCH /tasks/:id {status,result}; PATCH / {summary}; POST /spawn'
+      : role === 'orchestrator' ? 'POST /tasks {title,scope,assignedTo,description?,priority?,labels?}; PATCH /tasks/:id {status,result} or {title,description,scope,priority,labels}; PATCH / {summary}; POST /spawn'
       : 'PATCH /tasks/:id {status:"working"|"blocked"|"done",result?}';
     lines.push(`${base} → POST /messages {to,text}; POST /state {state}; ${routes}.`);
   }

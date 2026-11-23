@@ -64,6 +64,8 @@ export interface ApiCtx {
   startAnalyze: (consent: 'metadata' | 'excerpts') => Promise<number>;
   previewAnalyze: (consent: 'metadata' | 'excerpts') => { payload: string; bytes: number; nodes: number };
   changed: (reason: string) => void;
+  /** A reminder was written or deleted: the open board reads them again. */
+  remindersChanged?: () => void;
 }
 
 export class HttpError extends Error {
@@ -345,7 +347,16 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
             key, nodeId, nodePath, nodeName, title.trim(), String(status), notes, folderId, old?.createdAt ?? now, now);
           return ctx.db.get(`SELECT ${columns} FROM reminders WHERE id = ?`, key);
         });
+        ctx.remindersChanged?.();
         return send(res, id ? 200 : 201, result);
+      }
+      if (id && method === 'DELETE') {
+        // The person's own notes: an agent may update its node's reminders, never delete them.
+        if (member) throw new HttpError(403, 'Solo l’utente elimina un promemoria');
+        if (!ctx.db.get('SELECT id FROM reminders WHERE id = ?', id)) throw new HttpError(404, 'Promemoria non trovato');
+        await apiWrite(ctx.db, () => ctx.db.run('DELETE FROM reminders WHERE id = ?', id));
+        ctx.remindersChanged?.();
+        return send(res, 200, { deleted: id });
       }
       throw new HttpError(405, 'Metodo non consentito');
     }
@@ -728,7 +739,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         if (!canManage || isBrain) throw new HttpError(403, 'Solo l’orchestratore crea incarichi');
         const assignedTo = recipient(b.assignedTo);
         if(ctx.routing?.rule(nodeId,team).enabled) return send(res,201,ctx.routing.create(ctx,nodeId,team,actor,b,assignedTo));
-        const task = ctx.teams.createTask(nodeId, actor, { title: b.title, scope: b.scope, assignedTo }, team);
+        const task = ctx.teams.createTask(nodeId, actor, { title: b.title, scope: b.scope, description: b.description, priority: b.priority, labels: b.labels, assignedTo }, team);
         ctx.teams.message(nodeId, actor, assignedTo, `${english ? 'Task' : 'Incarico'} ${task.id}: ${task.title}`, team);
         notify(); return send(res, 201, task);
       }
@@ -737,8 +748,29 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         if(board.policy.delivery==='manual' && actor!=='user')throw new HttpError(409,'La persona deve confermare il checkpoint nella squadra a consegna manuale');
         return send(res,200,ctx.routing.handoff(ctx,nodeId,team,taskId,actor,b));
       }
+      if (action === 'tasks' && taskId && method === 'DELETE') {
+        // Only the person at the app deletes a task; an agent closes or blocks it instead.
+        if (member || isBrain) throw new HttpError(403, 'Solo l’utente elimina un incarico');
+        const removed = ctx.teams.deleteTask(nodeId, taskId, team);
+        if (removed.assignedTo && removed.status !== 'done' && sessions.some(s => s.alive && s.id === removed.assignedTo)) {
+          ctx.teams.message(nodeId, 'user', removed.assignedTo, `${english ? 'Task' : 'Incarico'} ${removed.id} ${english ? 'deleted by the user. Stop working on this task.' : 'eliminato dall’utente. Interrompi il lavoro su questo incarico.'}`, team);
+          wake(removed.assignedTo);
+        }
+        return send(res, 200, { deleted: removed.id });
+      }
       if (action === 'tasks' && taskId && method === 'PATCH') {
         if (isBrain) throw new HttpError(403, 'Il Main Brain non ha incarichi');
+        // Title, description, files, priority, labels, position: written first; the status rules below are untouched.
+        const EDITS = ['title', 'description', 'scope', 'priority', 'labels', 'order'] as const;
+        if (EDITS.some(k => b[k] !== undefined)) {
+          const edited = ctx.teams.editTask(nodeId, taskId, actor, member?.info.role, b, team);
+          const owner = edited.task.assignedTo;
+          if (edited.content && owner && owner !== actor && edited.task.status !== 'done' && sessions.some(s => s.alive && s.id === owner)) {
+            ctx.teams.message(nodeId, actor, owner, `${english ? 'Task' : 'Incarico'} ${edited.task.id} ${english ? 'changed' : 'modificato'}: ${edited.task.title}. ${english ? 'Read the description on the board again before continuing.' : 'Rileggi la descrizione in bacheca prima di proseguire.'}`, team);
+            wake(owner);
+          }
+          if (b.status === undefined && b.result === undefined && b.assignedTo === undefined) return send(res, 200, edited.task);
+        }
         const finishing = b.status === 'done' || b.status === 'blocked';
         const manual = finishing && board.policy.delivery === 'manual' && (member?.info.role === 'operator' || member?.info.role === 'reviewer');
         const before = board.tasks.find(t => t.id === taskId);
@@ -782,6 +814,9 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
           inform(task.assignedTo, message);
           if (target && (reopened || unblocked || ownerChanged && before.assignedTo)) inform(target.id, message);
         }
+        // The person moved an assigned card to «In corso»: its owner starts now.
+        if (actor === 'user' && before?.status === 'pending' && task.status === 'working' && task.assignedTo === before.assignedTo)
+          inform(task.assignedTo, `${label} · ${english ? 'started by the user. Begin now: read the title and description on the board.' : 'avviato dall’utente. Inizia ora: leggi titolo e descrizione in bacheca.'}`);
         if (target && !notified.has(target.id) && (task.status === 'done' || task.status === 'blocked')) {
           const done = task.status === 'done';
           const word = done ? (english ? 'Done' : 'Completato') : (english ? 'Blocked' : 'Bloccato');

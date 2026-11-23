@@ -54,6 +54,21 @@ export function sessionWorking(s: ToneSession, now = Date.now()): boolean {
   const state = activity(s, now); return state === 'busy' || state === 'working';
 }
 
+/** The rail's state filters: «Tutti», «Attivi» (working now), «Per te» (waits on the person), «Chiusi». Pure. */
+export type RailFilter = 'all' | 'active' | 'needs' | 'ended';
+export function inRailFilter(filter: string, s: ToneSession, now = Date.now()): boolean {
+  if (filter === 'all') return true;
+  const state = sessionTone(s, now) ?? (s.alive ? 'terminal' : 'ended');
+  if (filter === 'needs') return state === 'attention' || state === 'blocked';
+  if (filter === 'active') return state === 'active' || (state === 'orchestrator' && sessionWorking(s, now));
+  return state === filter;
+}
+/** How many sessions each rail filter shows. Pure. */
+export function railCounts(list: ToneSession[], now = Date.now()): Record<RailFilter, number> {
+  const count = (f: RailFilter) => list.filter(s => inRailFilter(f, s, now)).length;
+  return { all: list.length, active: count('active'), needs: count('needs'), ended: count('ended') };
+}
+
 export const TONES: SessionTone[] = ['orchestrator', 'active', 'idle', 'blocked', 'attention', 'stale', 'ended'];
 
 const ago = (ms: number) => (ms < 60_000 ? ui`${Math.floor(ms / 1000)} s fa` : ui`${Math.floor(ms / 60_000)} min fa`);

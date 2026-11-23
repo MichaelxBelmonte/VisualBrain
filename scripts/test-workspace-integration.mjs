@@ -156,7 +156,7 @@ Object.assign(sidebar, {
   },
   nodes:nodeRowsInfo,tabs:sidebarTabs,selectedNode:1,active:'shell',links:[],filter:'',nodeOrder:[],sessionOrder:[],
   collapsedNodes:new Set(),railDragCleanup:[],railLinkSource:null,listEl:list,cb:{sessionsChanged(){}},
-  syncSel(){},bindNodeDrag(){},renderRailLinks(){},control:()=>({querySelector:()=>null}),picker:{open:false},sel:{ids:[]},updateConnection(){},
+  syncSel(){},bindNodeDrag(){},renderRailLinks(){},control:()=>({querySelector:()=>null,querySelectorAll:()=>[]}),picker:{open:false},sel:{ids:[]},updateConnection(){},
   openLauncher(_agent,_mode,_prompt,_squad,nodeId){launched=nodeId ?? this.selectedNode;},
 });
 document.getElementById=()=>({});

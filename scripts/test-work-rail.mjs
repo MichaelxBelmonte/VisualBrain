@@ -94,19 +94,18 @@ try {
     assert.doesNotMatch(page + source, /work-quick-menu/, 'no terminal button in the head');
     assert.match(source, /const anchor = this\.control<HTMLElement>\('\.work-rail-head'\)!;\n\s+if \(terminalQuickMenuOpen\(\)\) \{ this\.dismissQuickMenu\?\.\(\); return; \}/, 'the shortcut opens the quick menu under the head and closes it again');
     assert.match(quick, /const button = anchor\.matches\('button, \[role="button"\]'\);/, 'a plain container is not told it has a menu open');
-    assert.match(css, /\.rail-search input \{ flex: 0 0 0; width: 0; min-width: 0; opacity: 0;/, 'at rest the field is closed: only the lens shows, and it can still take the focus');
-    assert.match(css, /\.rail-search:focus-within, \.rail-search\.has-query \{ flex: 1 1 auto;/, 'the field opens with the focus and stays open while it holds a query');
-    assert.match(source, /field\.parentElement\?\.classList\.toggle\('has-query', !!field\.value\);/);
-    // Four state filters as dots, same order and values as the text filters they replace, each with a name and a tooltip.
+    assert.match(css, /\.rail-search \{ flex: 1 1 auto;[^}]*background: var\(--rail-hover\);/, 'the search is a real field, always visible');
+    assert.match(css, /\.rail-search input \{ flex: 1; width: auto;/, 'its input is never collapsed to zero');
+    // Four state filters, each with a name and a count: a segmented control, same order and values as before.
     const states = /<div id="work-state-filter" class="rail-states" role="radiogroup" aria-label="Filtra per stato">(.*?)<\/div>/.exec(page)[1];
-    assert.deepEqual([...states.matchAll(/<button type="button" role="radio" data-state="(\w+)" aria-label="([^"]+)" title="([^"]+)"><\/button>/g)].map(m => m.slice(1)),
-      [['all', 'Tutti', 'Tutti'], ['active', 'In corso', 'In corso: agenti al lavoro'], ['needs', 'Serve te', 'Serve te: permessi, domande e bloccati'], ['ended', 'Terminati', 'Terminati: processi chiusi']]);
-    assert.match(css, /\.rail-states button \{[^}]*min-width: 28px; height: 26px;/, 'a comfortable target round a small dot');
-    assert.match(css, /\.rail-states \{ display: flex; gap: 2px; padding: 0 8px 6px; flex-wrap: nowrap;/, 'the four dots stay on one row');
-    assert.match(css, /\.rail-states button\[aria-checked="true"\]::before \{ border-color: var\(--fg\); \}/, 'the chosen filter has a ring round its dot');
-    assert.match(css, /\.rail-states button\[data-state="ended"\]::before \{ background: radial-gradient/, 'the ended filter is a hollow dot, not only another colour');
+    assert.deepEqual([...states.matchAll(/<button type="button" role="radio" data-state="(\w+)" title="([^"]+)"><span>([^<]+)<\/span><b><\/b><\/button>/g)].map(m => m.slice(1)),
+      [['all', 'Tutte le sessioni', 'Tutti'], ['active', 'In corso: agenti al lavoro', 'Attivi'], ['needs', 'Serve te: permessi, domande e bloccati', 'Per te'], ['ended', 'Terminati: processi chiusi', 'Chiusi']]);
+    assert.match(css, /\.rail-states button \{ flex: 1 1 auto; min-width: 0;/, 'four segments sized by their words, on one row down to the narrowest rail');
+    assert.match(css, /\.rail-states button > span \{ min-width: 0; overflow: hidden; text-overflow: ellipsis; \}/, 'a name that does not fit is shortened, the count stays');
+    assert.match(css, /\.rail-states button\[data-state="needs"\]\[data-zero="false"\] > b \{[^}]*background: var\(--role-attention\);/, '«Per te» is coloured only when something waits');
+    assert.match(css, /\.rail-states button\[aria-checked="true"\] \{ background: var\(--bg\);/, 'the chosen filter is a raised segment');
     assert.match(css, /\.rail-states button:focus-visible \{ outline: 2px solid var\(--fg\); outline-offset: 1px; \}/);
-    assert.match(source, /needsFilter\.setAttribute\('aria-label', said \|\| tr\('Serve te'\)\);/, 'the count on the dot is said, not only drawn');
+    assert.match(source, /button\.setAttribute\('aria-label', `\$\{names\[id\]\}: \$\{n\}`\);/, 'the count is said, not only drawn');
     for (const text of ['"In corso: agenti al lavoro": "In progress: agents working"', '"Serve te: permessi, domande e bloccati"', '"Terminati: processi chiusi": "Ended: closed processes"']) assert.ok(english.includes(text), text);
   }
   assert.deepEqual(railWidthLimits(1200), { min: 180, max: 360 });

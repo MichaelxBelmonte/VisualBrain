@@ -65,3 +65,58 @@ assert.deepEqual(youDisclosure(9, 3, false), { shown: 6, label: 'Show 3 more' })
 assert.deepEqual(youDisclosure(9, 3, true), { shown: 9, label: 'Show less' });
 setLanguage('it');
 console.log('PASS "Serve te" shows two grid rows, counts the remaining cards and labels both actions in IT/EN');
+
+// --- Editable board (0.2.65): one-line entry, drops, order, the «now» line, the rail filters.
+import { laneMove, nowLine, parseQuickTask, placeAt, sortCards } from '../src/ui/work-tasks.ts';
+import { laneDropTarget } from '../src/ui/board-drag.ts';
+import { inRailFilter, railCounts } from '../src/ui/work-roles.ts';
+
+assert.deepEqual(parseQuickTask('Rifai il menu !alta #ui #UI @op2'), { title: 'Rifai il menu', priority: 'high', labels: ['ui'], assignee: 'OP2' });
+assert.deepEqual(parseQuickTask('  Scrivi i test   !bassa '), { title: 'Scrivi i test', priority: 'low', labels: [] });
+assert.deepEqual(parseQuickTask('Correggi #123 e poi rilascia !'), { title: 'Correggi e poi rilascia', priority: 'high', labels: ['123'] });
+assert.deepEqual(parseQuickTask('Spiega il caso a@b.it'), { title: 'Spiega il caso a@b.it', labels: [] }, 'an email is not an assignee');
+assert.equal(parseQuickTask('#solo @OP1 !alta'), null, 'no title left: nothing to create');
+console.log('PASS one-line entry: title plus !alta/!bassa, #labels (no duplicates), @code; nothing without a title');
+
+assert.deepEqual(laneMove({ status: 'pending', assignedTo: 's2' }, 'doing', true), { status: 'working' });
+assert.deepEqual(laneMove({ status: 'pending', assignedTo: null }, 'doing', false), { needsOwner: true }, 'nobody to do it: ask first');
+assert.deepEqual(laneMove({ status: 'pending', assignedTo: 's2' }, 'doing', false), { needsOwner: true }, 'a stopped owner cannot start');
+assert.deepEqual(laneMove({ status: 'done', assignedTo: 's2' }, 'todo', true), { status: 'pending' });
+assert.deepEqual(laneMove({ status: 'blocked', assignedTo: 's2' }, 'done', true), { status: 'done' });
+assert.equal(laneMove({ status: 'working', assignedTo: 's2' }, 'doing', true), null, 'same column: only the position');
+console.log('PASS drops: «In corso» needs a live owner, other columns set the status, the same column only reorders');
+
+const base = { status: 'pending', updatedAt: 0 };
+const sorted = sortCards([
+  { ...base, id: 'old', createdAt: 1 }, { ...base, id: 'new', createdAt: 5 }, { ...base, id: 'low', priority: 'low', createdAt: 9 },
+  { ...base, id: 'high', priority: 'high', createdAt: 2 }, { ...base, id: 'placed2', order: 2048 }, { ...base, id: 'placed1', order: 1024 },
+]).map(t => t.id);
+assert.deepEqual(sorted, ['high', 'new', 'old', 'low', 'placed1', 'placed2'], 'unplaced by priority then newest, placed ones after in their order');
+assert.deepEqual(sortCards([{ status: 'done', updatedAt: 1, id: 'a' }, { status: 'done', updatedAt: 9, id: 'b' }]).map(t => t.id), ['b', 'a'], '«Fatto»: latest first');
+assert.deepEqual(placeAt([{ id: 'a', order: 1024 }, { id: 'b', order: 2048 }], 'x', 1), [{ id: 'x', order: 1536 }], 'between neighbours: one write');
+assert.deepEqual(placeAt([{ id: 'a', order: 1024 }], 'x', 0), [{ id: 'x', order: 0 }]);
+assert.deepEqual(placeAt([{ id: 'a', order: 1024 }], 'x', 1), [{ id: 'x', order: 2048 }]);
+assert.deepEqual(placeAt([{ id: 'a' }, { id: 'b', order: 2048 }], 'x', 1), [{ id: 'a', order: 1024 }, { id: 'x', order: 2048 }, { id: 'b', order: 3072 }], 'unplaced cards: the column is numbered once');
+assert.deepEqual(placeAt([], 'x', 0), [{ id: 'x', order: 0 }]);
+console.log('PASS order: priority and age until placed by hand; a drop writes one position, or numbers the column once');
+
+const boxes = [{ lane: 'todo', left: 0, right: 100, top: 0, bottom: 500, mids: [50, 150] }, { lane: 'doing', left: 120, right: 220, top: 0, bottom: 500, mids: [] }];
+assert.deepEqual(laneDropTarget(boxes, 50, 100), { lane: 'todo', index: 1 });
+assert.deepEqual(laneDropTarget(boxes, 50, 400), { lane: 'todo', index: 2 });
+assert.deepEqual(laneDropTarget(boxes, 115, 20), { lane: 'doing', index: 0 }, 'between columns: the nearest');
+assert.equal(laneDropTarget([], 0, 0), null);
+console.log('PASS drop target: column under the pointer (or the nearest) and the place among its cards');
+
+const now = 10_000_000;
+const working = { alive: true, agent: 'claude', title: '✳ Aggiorna work-board.ts', stateAt: now - 12 * 60_000, lastOutputAt: now - 2000 };
+assert.deepEqual(nowLine(working, undefined, now), { doing: 'Aggiorna work-board.ts', meta: 'al lavoro da 12 min · sta scrivendo', live: true });
+assert.equal(nowLine({ ...working, title: '✳ Claude Code' }, undefined, now).doing, '', 'a generic title says nothing');
+assert.equal(nowLine({ ...working, lastOutputAt: now - 5 * 60_000 }, undefined, now).meta, 'al lavoro da 12 min · ultimo segnale 5 min fa');
+assert.equal(nowLine({ ...working, alive: false }, undefined, now), null);
+console.log('PASS «now» line: the terminal title when it says something, time at work, output coming or the last signal');
+
+const tone = (extra) => ({ alive: true, role: 'operator', ...extra });
+const sessions = [tone({ workState: 'working', lastOutputAt: now - 1000 }), tone({ attention: 'permission' }), tone({ workState: 'blocked' }), tone({ alive: false }), { alive: true }];
+assert.deepEqual(railCounts(sessions, now), { all: 5, active: 1, needs: 2, ended: 1 });
+assert.ok(inRailFilter('all', { alive: false }, now) && !inRailFilter('needs', sessions[0], now));
+console.log('PASS rail filters: Tutti, Attivi, Per te and Chiusi count what each would list');
