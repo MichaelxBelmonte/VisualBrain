@@ -1,0 +1,5 @@
+# Visual Brain 0.2.64
+
+- **Aggiorna gli agenti da Impostazioni.** Ogni CLI mostra la versione installata e se ne è uscita una più nuova (registro npm per Claude Code e Codex, `hermes update --check` per Hermes; Antigravity non la pubblica). *Aggiorna* lancia il comando ufficiale della CLI in background, senza terminale, con avanzamento, esito e registro. Se non riesce, *Riprova* o *Apri nel terminale*. Le sessioni già aperte restano sulla versione con cui sono partite finché non le riavvii.
+- **Anche in Aggiornamenti.** Sotto l'aggiornamento dell'app compare l'elenco degli agenti, con *Aggiorna tutti* quando ce n'è più di uno. Il controllo avviene al massimo ogni 6 ore e non invia dati dell'utente; il numero su «Agenti» conta anche gli aggiornamenti disponibili.
+- **Una scheda per provider.** In Impostazioni → Agenti ogni provider ha la sua scheda: versione e sessioni attive, stato, aggiornamento, i suoi account (principale e aggiuntivi, con accesso, nome, Avanzate e rimozione) e *+ Aggiungi account* al suo interno. I dettagli tecnici (percorso, comando di installazione, diagnostica) restano chiusi finché non servono.
