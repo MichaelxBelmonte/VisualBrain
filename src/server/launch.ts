@@ -62,11 +62,24 @@ export function buildContext(detail: NodeDetail, cfg: Config, userPrompt?: strin
   return lines.join('\n');
 }
 
-export function agentCommand(agent: AgentName, cfg: Config, prompt: string, cwd: string, options: LaunchOptions = {}): { file: string; args: string[] } {
+/**
+ * What the session is called in the CLI's own lists: its code and its node, "OP3 · visual-brain"; the node alone for a
+ * session outside a team. One line, at most 80 characters.
+ */
+export function sessionName(code: string | undefined, node: string): string {
+  return [code, node].map(part => (part ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · ').slice(0, 80);
+}
+
+/**
+ * `name` reaches Claude Code as --name: it shows in its /resume picker, prompt box and terminal title, and is saved with
+ * the conversation, so a resumed session keeps it. Codex (0.171) names sessions only from inside its own interface and
+ * has no launch option for it; Hermes and Antigravity have none either.
+ */
+export function agentCommand(agent: AgentName, cfg: Config, prompt: string, cwd: string, options: LaunchOptions = {}, name = ''): { file: string; args: string[] } {
   const model = options.model ? ['--model', options.model] : [];
   switch (agent) {
     case 'claude':
-      return { file: cfg.agents.claude, args: [...model, ...(options.effort ? ['--effort', options.effort] : []), '--', prompt] };
+      return { file: cfg.agents.claude, args: [...model, ...(options.effort ? ['--effort', options.effort] : []), ...(name ? ['--name', name] : []), '--', prompt] };
     case 'codex':
       return { file: cfg.agents.codex, args: ['-C', cwd, ...model, ...(options.effort ? ['-c', `model_reasoning_effort=${JSON.stringify(options.effort)}`] : []), '--', prompt] };
     case 'hermes':
@@ -119,7 +132,7 @@ export function launchEmbedded(terms: TerminalStore, agent: AgentName, cfg: Conf
   if (agent === 'codex' || agent === 'claude') prompt += '\n\n' + (cfg.language === 'en'
     ? 'To see which files are linked to this node (imports, paths, mentions, duplicates, similar files), use the brain_explore MCP tool of the visual_brain server before opening many files.'
     : 'Per vedere quali file sono collegati a questo nodo (import, percorsi, menzioni, duplicati, file simili) usa lo strumento MCP brain_explore del server visual_brain prima di aprire molti file.');
-  const command = agentCommand(agent, cfg, prompt, cwd, options);
+  const command = agentCommand(agent, cfg, prompt, cwd, options, sessionName(code, detail.name));
   // Claude takes its conversation id from us, so "Riprendi" finds it without guessing; Codex is found later from its own records.
   const resumeId = agent === 'claude' ? randomUUID() : undefined;
   if (resumeId) command.args.unshift('--session-id', resumeId);

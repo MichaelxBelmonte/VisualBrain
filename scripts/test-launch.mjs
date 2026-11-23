@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, existsSync, realpathSync, rmSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { agentCommand, launchEmbedded } from '../src/server/launch.ts';
+import { agentCommand, launchEmbedded, sessionName } from '../src/server/launch.ts';
 import { DEFAULTS } from '../src/server/config.ts';
 
 const temp = mkdtempSync(join(tmpdir(), 'vb-test-launch-'));
@@ -61,6 +61,27 @@ try {
   assert.deepEqual(agentCommand('agy', DEFAULTS, prompt, cwd).args, ['-i', prompt], 'without model or effort the CLI defaults apply');
   console.log('PASS Antigravity (agy) starts interactively with the prompt as last argument');
   console.log('PASS model and reasoning choices are passed as CLI arguments for all providers');
+
+  // The session's name in the CLI's own lists: code and node. Only Claude Code has a launch option for it.
+  assert.equal(sessionName('OP3', 'visual-brain'), 'OP3 · visual-brain');
+  assert.equal(sessionName(undefined, 'visual-brain'), 'visual-brain', 'a session outside a team is named after its node');
+  assert.equal(sessionName('OP3', ' two\nlines\t here '), 'OP3 · two lines here', 'one line');
+  assert.equal(sessionName('OP3', 'x'.repeat(200)).length, 80);
+  const named = agentCommand('claude', DEFAULTS, prompt, cwd, { model: 'test-model' }, 'OP3 · visual-brain').args;
+  assert.deepEqual(named, ['--model', 'test-model', '--name', 'OP3 · visual-brain', '--', prompt], 'the name comes before the prompt separator');
+  assert.equal(agentCommand('claude', DEFAULTS, prompt, cwd).args.includes('--name'), false, 'no name, no option');
+  for (const agent of ['codex', 'hermes', 'agy']) {
+    assert.deepEqual(agentCommand(agent, DEFAULTS, prompt, cwd, {}, 'OP3 · visual-brain').args, agentCommand(agent, DEFAULTS, prompt, cwd).args, `${agent} has no launch option for a session name`);
+  }
+  launchEmbedded(terms, 'claude', DEFAULTS, detail, cwd, prompt, undefined, { role: 'operator', code: 'OP3' });
+  assert.equal(options.args[options.args.indexOf('--name') + 1], 'OP3 · fixture', 'a team session is named with its code and node');
+  assert.ok(options.args.indexOf('--name') < options.args.indexOf('--'), 'before the prompt separator');
+  assert.equal(options.name, undefined, 'the name shown by Visual Brain stays the user\'s to choose');
+  launchEmbedded(terms, 'claude', DEFAULTS, detail, cwd, prompt);
+  assert.equal(options.args[options.args.indexOf('--name') + 1], 'fixture');
+  launchEmbedded(terms, 'codex', DEFAULTS, detail, cwd, prompt, undefined, { role: 'operator', code: 'OP4' });
+  assert.equal(options.args.some(arg => arg.includes('OP4 · fixture')), false, 'Codex is not given a name');
+  console.log('PASS Claude Code sessions are named with code and node; other CLIs are left as they are');
 
   for (const agent of ['claude', 'hermes', 'agy']) {
     launchEmbedded(terms, agent, DEFAULTS, detail, cwd, prompt);
