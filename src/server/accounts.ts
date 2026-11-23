@@ -73,11 +73,14 @@ export function accountId(label: string, taken: Iterable<string>): string {
 }
 
 /** Writes `accounts` into the settings file, keeping everything else in it. */
-function persist(configFile: string, list: AgentAccount[]): void {
+function persist(configFile: string, list: AgentAccount[], key = 'accounts'): void {
+  write(configFile, { [key]: list });
+}
+function write(configFile: string, patch: Record<string, unknown>): void {
   const previous = existsSync(configFile) ? JSON.parse(readFileSync(configFile, 'utf8')) : {};
   mkdirSync(dirname(configFile), { recursive: true, mode: 0o700 });
   const next = configFile + '.tmp';
-  writeFileSync(next, JSON.stringify({ ...previous, accounts: list }, null, 2) + '\n', { mode: 0o600 });
+  writeFileSync(next, JSON.stringify({ ...previous, ...patch }, null, 2) + '\n', { mode: 0o600 });
   renameSync(next, configFile);
 }
 
@@ -87,7 +90,7 @@ export function addAccount(cfg: { dataDir: string; configFile?: string }, agent:
   const name = typeof label === 'string' ? label.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
   if (!name) throw new Error('Dai un nome all’account');
   if (known.length >= MAX_ACCOUNTS) throw new Error(`Al massimo ${MAX_ACCOUNTS} account aggiuntivi`);
-  if (known.some(a => a.agent === agent && a.label.toLowerCase() === name.toLowerCase())) throw new Error('Esiste già un account con questo nome');
+  if (known.some(a => a.agent === agent && a.label.toLowerCase() === name.toLowerCase()) || mainNames[agent]?.toLowerCase() === name.toLowerCase()) throw new Error('Esiste già un account con questo nome');
   const id = accountId(name, known.map(a => a.id));
   const home = join(cfg.dataDir, 'accounts', `${agent}-${id}`);
   mkdirSync(home, { recursive: true, mode: 0o700 });
@@ -111,6 +114,47 @@ export function setAccountShare(cfg: { configFile?: string }, id: string, value:
   const list = known.map(a => a.id === id ? next : a);
   if (cfg.configFile) persist(cfg.configFile, list);
   useAccounts(list);
+  return next;
+}
+
+/** A name typed by the person: spaces collapsed, at most 40 characters; empty when nothing is left. */
+const cleanName = (value: unknown) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+
+/** A new name for an extra account. Its id and folder stay, so sign-in, conversations and sessions keep working. */
+export function renameAccount(cfg: { configFile?: string }, id: string, label: unknown): AgentAccount {
+  const account = accountById(id);
+  if (!account) throw new Error('Account non trovato');
+  const name = cleanName(label);
+  if (!name) throw new Error('Dai un nome all’account');
+  if (known.some(a => a.id !== id && a.agent === account.agent && a.label.toLowerCase() === name.toLowerCase())
+    || mainNames[account.agent]?.toLowerCase() === name.toLowerCase()) throw new Error('Esiste già un account con questo nome');
+  const next = { ...account, label: name };
+  const list = known.map(a => a.id === id ? next : a);
+  if (cfg.configFile) persist(cfg.configFile, list);
+  useAccounts(list);
+  return next;
+}
+
+/** Names the person gave to the main account of each CLI (shown on its sessions); absent: «Principale». */
+let mainNames: Partial<Record<AccountAgent, string>> = {};
+export function parseMainNames(value: unknown): Partial<Record<AccountAgent, string>> {
+  const v = value as Record<string, unknown> | null, names: Partial<Record<AccountAgent, string>> = {};
+  if (v && typeof v === 'object') for (const agent of ACCOUNT_AGENTS) { const name = cleanName(v[agent]); if (name) names[agent] = name; }
+  return names;
+}
+export function useMainNames(names: Partial<Record<AccountAgent, string>>): void { mainNames = { ...names }; }
+export function mainName(agent: string): string | undefined { return isAccountAgent(agent) ? mainNames[agent] : undefined; }
+export function mainNamesNow(): Partial<Record<AccountAgent, string>> { return { ...mainNames }; }
+
+/** Names the main account of a CLI; an empty name goes back to «Principale». */
+export function setMainName(cfg: { configFile?: string }, agent: unknown, name: unknown): Partial<Record<AccountAgent, string>> {
+  if (!isAccountAgent(agent)) throw new Error('Nomi degli account solo per Claude Code e Codex');
+  const clean = cleanName(name);
+  if (clean && known.some(a => a.agent === agent && a.label.toLowerCase() === clean.toLowerCase())) throw new Error('Esiste già un account con questo nome');
+  const next = { ...mainNames };
+  if (clean) next[agent] = clean; else delete next[agent];
+  if (cfg.configFile) write(cfg.configFile, { accountNames: next });
+  useMainNames(next);
   return next;
 }
 

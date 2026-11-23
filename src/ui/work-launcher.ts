@@ -4,6 +4,7 @@
 import { t as tr, ui } from './i18n.ts';
 import { ROLE_WORDS } from './work-roles.ts';
 import { api } from './api.ts';
+import { accountNames as accountNamesNow, accountTag, refreshAccountNames } from './account-names.ts';
 import { effortChoices } from '../shared/agent-effort.ts';
 import { parseFileDrop } from './work-input.ts';
 import type { AgentAccountStatus, AgentName, AgentRole, ModelChoice, NodeDetail, SavedSquad, SwarmProposal, TeamSummary, TerminalInfo } from '../shared/types.ts';
@@ -247,7 +248,9 @@ export function openWorkLauncher(options: {
   const agentOptions = (selected: Choice, withShell: boolean) => Object.entries(labels).filter(([a]) => withShell || a !== 'shell')
     .map(([a, label]) => {
       const off = a !== 'shell' && !options.agents[a as AgentName] ? 'disabled' : '';
-      const main = ui`<option value="${a}" ${a === selected.agent && !selected.account ? 'selected' : ''} ${off}>${label}</option>`;
+      // The main account shows its name once it has one, or once the CLI has other accounts to tell it from.
+      const tag = accountTag({ agent: a });
+      const main = ui`<option value="${a}" ${a === selected.agent && !selected.account ? 'selected' : ''} ${off}>${label}${tag ? ' · ' + esc(tag) : ''}</option>`;
       return main + accounts.filter(x => x.agent === a).map(x => `<option value="${esc(agentValue({ agent: x.agent, account: x.id }))}" ${a === selected.agent && x.id === selected.account ? 'selected' : ''} ${off}>${esc(label)} · ${esc(x.label)}${x.signedIn === false ? ' ' + esc(tr('(accesso richiesto)')) : ''}</option>`).join('');
     }).join('');
   const updateEffort = (row: HTMLElement, choice: Choice) => {
@@ -325,13 +328,13 @@ export function openWorkLauncher(options: {
   };
   customizeButton.onclick = () => { customize = !customize; renderRows(); };
   // Missing or signed-out CLIs: say which, and where to fix it, instead of a silent disabled option.
-  void api.agents().then(({ clis, accounts: extra = [] }) => {
+  void Promise.all([api.agents(), refreshAccountNames()]).then(([{ clis, accounts: extra = [] }]) => {
     const hint = form.querySelector<HTMLElement>('[data-cli-hint]');
     if (!hint?.isConnected) return;
     accounts = extra;
     // A remembered account that was removed falls back to the main one.
     for (const c of choices) if (c.account && !accounts.some(a => a.id === c.account && a.agent === c.agent)) delete c.account;
-    if (accounts.length) renderRows();
+    if (accounts.length || Object.keys(accountNamesNow().main).length) renderRows();
     const missing = clis.filter(c => !c.path).map(c => c.label), signedOut = clis.filter(c => c.path && c.signedIn === false).map(c => c.label);
     if (!missing.length && !signedOut.length) return;
     hint.innerHTML = [missing.length ? ui`Non installati: ${esc(missing.join(', '))}.` : '', signedOut.length ? ui`Senza accesso: ${esc(signedOut.join(', '))}.` : ''].filter(Boolean).join(' ') + ui` <button type="button" class="link" data-open-agents>Impostazioni → Agenti</button>`;

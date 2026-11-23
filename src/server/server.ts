@@ -264,10 +264,10 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     const origin = req.headers.origin;
     return !origin || origin === `http://${host}`;
   };
-  /** Everything but the health probe, updates, preferences and the terminal list reads the map. */
+  /** Everything but the health probe, updates, preferences, account names and the terminal list reads the map. */
   const needsMap = (req: IncomingMessage): boolean => {
     const path = (req.url ?? '').split('?')[0];
-    if (path === '/api/health' || path.startsWith('/api/update') || (path === '/api/preferences' && req.method === 'GET') || path === '/api/models') return false;
+    if (path === '/api/health' || path.startsWith('/api/update') || (path === '/api/preferences' && req.method === 'GET') || path === '/api/models' || (path === '/api/accounts' && req.method === 'GET')) return false;
     return !(path === '/api/terminals' && req.method === 'GET');
   };
   let stopping = false;

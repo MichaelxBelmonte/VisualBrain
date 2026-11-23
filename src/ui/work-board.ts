@@ -4,6 +4,7 @@
 // same board. Squad settings live behind the ··· menu, messages in a strip below.
 // Reads every 4 seconds only while visible; nothing here calls a model or types into a terminal.
 import { t as tr, ui } from './i18n.ts';
+import { accountTag } from './account-names.ts';
 import { api } from './api.ts';
 import { roleName, sessionTone, toneReason, CODE_IN_TEXT } from './work-roles.ts';
 import type { AgentRole, ClaudeMemory, InboxItem, InboxKind, NodeDetail, NodeReminder, SwarmProposal, TeamLink, TeamSummary, TeamTask, TeamView, TerminalInfo } from '../shared/types.ts';
@@ -360,7 +361,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
     }
     if (team !== REMINDERS) {
       // Permission prompts and questions of this board's sessions: answered in their terminal.
-      for (const s of (team === 'brain' ? (view.brain ? [view.brain] : []) : view.sessions)) if (s.alive && sessionTone(s) === 'attention') lanes.you.unshift(ui`<article class="lavoro-card" data-tone="attention"><header><span class="work-code">${esc(s.code ?? '')}</span><small>${esc(s.name || roleName(s))}</small></header><strong>${esc(toneReason(s))}</strong><footer><button class="btn small primary" data-goto="${esc(s.id)}">Apri terminale</button></footer></article>`);
+      for (const s of (team === 'brain' ? (view.brain ? [view.brain] : []) : view.sessions)) if (s.alive && sessionTone(s) === 'attention') lanes.you.unshift(ui`<article class="lavoro-card" data-tone="attention"><header><span class="work-code">${esc(s.code ?? '')}</span><small>${esc([s.name || roleName(s), accountTag(s)].filter(Boolean).join(' · '))}</small></header><strong>${esc(toneReason(s))}</strong><footer><button class="btn small primary" data-goto="${esc(s.id)}">Apri terminale</button></footer></article>`);
       for (const i of view.inbox ?? []) if (inboxLane(i) === 'you') lanes.you.push(inboxCard(i)); else if (lanes.done.length < 14) lanes.done.push(inboxCard(i));
     }
     const empty: Record<LaneId, string> = { todo: tr('Niente in coda'), doing: tr('Nessuno sta lavorando'), you: '', done: '—' };
@@ -398,7 +399,7 @@ export function mountWorkBoard(el: HTMLElement, cb: BoardCallbacks): BoardUpdate
       const member = members.get(chip.dataset.goto!);
       if (!member) continue;
       const tone = sessionTone(member) ?? '';
-      const title = [member.name || roleName(member), toneReason(member), member.agent, member.model, member.effort].filter(Boolean).join(' · ');
+      const title = [member.name || roleName(member), toneReason(member), member.agent, accountTag(member), member.model, member.effort].filter(Boolean).join(' · ');
       if (chip.dataset.tone !== tone) chip.dataset.tone = tone;
       if (chip.title !== title) chip.title = title;
     }

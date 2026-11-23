@@ -116,6 +116,12 @@ function codexRollout(id: string, createdAt: number, home: string): string | und
 interface Cached { file?: string; missingAt?: number; size?: number; mtimeMs?: number; record?: ModelRecord; codexId?: string; sure?: boolean; guessedAt?: number; walkedAt?: number }
 const cache = new Map<string, Cached>();
 
+/** The CLI record (transcript or rollout) of a session, found the same way as its model; undefined when none is found. */
+export function sessionRecordFile(info: TerminalInfo, claimed: () => Set<string> = () => new Set(), now = Date.now()): string | undefined {
+  sessionModel(info, claimed, now);
+  return cache.get(info.id)?.file;
+}
+
 /** Sessions that ended for good: nothing is kept for them. */
 export function forgetSessionModel(id: string): void { cache.delete(id); }
 

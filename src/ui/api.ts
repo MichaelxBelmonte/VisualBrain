@@ -115,6 +115,11 @@ export const api = {
   accountAction: (id: string, action: 'login' | 'logout') => call<{ info: TerminalInfo }>('POST', `/api/agents/accounts/${encodeURIComponent(id)}/${action}`, {}),
   removeAccount: (id: string) => call<{ removed: string }>('DELETE', `/api/agents/accounts/${encodeURIComponent(id)}`),
   /** Avanzate: what an extra account borrows from the main one; `linked` are the entries now linked. */
+  /** Names of the accounts, for the label on each session (no CLI is asked anything). */
+  accountNames: () => call<{ accounts: { id: string; agent: string; label: string }[]; main: Partial<Record<string, string>> }>('GET', '/api/accounts'),
+  renameAccount: (id: string, label: string) => call<{ account: AgentAccount }>('PATCH', `/api/agents/accounts/${encodeURIComponent(id)}`, { label }),
+  /** Names the main account of a CLI; an empty name goes back to «Principale». */
+  setMainAccountName: (agent: 'claude' | 'codex', name: string) => call<{ main: Partial<Record<string, string>> }>('PUT', '/api/agents/main-name', { agent, name }),
   setAccountShare: (id: string, share: AccountShare) => call<{ account: AgentAccount; linked: string[] }>('PATCH', `/api/agents/accounts/${encodeURIComponent(id)}`, { share }),
   agentAction: (id: string, action: 'install' | 'update' | 'login' | 'logout') => call<{ info: TerminalInfo }>('POST', `/api/agents/${id}/${action}`, {}),
   githubAccountLogin: () => call<{ info: TerminalInfo }>('POST', '/api/github/login', {}),

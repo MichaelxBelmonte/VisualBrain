@@ -221,6 +221,46 @@ try {
     console.log('PASS Avanzate: memory, skills and plugins of the main account, linked on request and given back when turned off');
   }
 
+  // --- Names: the main account of each CLI and the extra ones, renamable; the label shown on each session.
+  {
+    const cfg = { configFile: join(dir, 'profile', 'settings.json') };
+    const home = accounts.agentHome('claude', 'lavoro');
+    const renamed = accounts.renameAccount(cfg, 'lavoro', '  Ufficio   Milano ');
+    assert.deepEqual([renamed.id, renamed.label, renamed.home], ['lavoro', 'Ufficio Milano', home], 'renaming keeps id and folder');
+    assert.equal(accounts.agentHome('claude', 'lavoro'), home);
+    assert.throws(() => accounts.renameAccount(cfg, 'lavoro', '  '), /nome/);
+    assert.throws(() => accounts.renameAccount(cfg, 'nessuno', 'X'), /non trovato/);
+    assert.deepEqual(accounts.parseMainNames({ claude: '  Personale ', codex: '', hermes: 'x', extra: 1 }), { claude: 'Personale' });
+    assert.deepEqual(accounts.parseMainNames(null), {});
+    assert.deepEqual(accounts.setMainName(cfg, 'claude', 'Personale'), { claude: 'Personale' });
+    assert.equal(accounts.mainName('claude'), 'Personale');
+    assert.equal(accounts.mainName('shell'), undefined);
+    assert.throws(() => accounts.setMainName(cfg, 'claude', 'ufficio milano'), /Esiste già/, 'the main name differs from the extra ones');
+    assert.throws(() => accounts.renameAccount(cfg, 'lavoro', 'PERSONALE'), /Esiste già/, 'and the other way round');
+    assert.throws(() => accounts.setMainName(cfg, 'hermes', 'X'), /Claude Code e Codex/);
+    let saved = JSON.parse(readFileSync(cfg.configFile, 'utf8'));
+    assert.deepEqual(saved.accountNames, { claude: 'Personale' });
+    assert.equal(saved.accounts.find(a => a.id === 'lavoro').label, 'Ufficio Milano');
+    assert.deepEqual(saved.roots, ['/tmp/x'], 'the other settings stay');
+    assert.deepEqual(accounts.setMainName(cfg, 'claude', ' '), {}, 'an empty name goes back to «Principale»');
+    assert.deepEqual(JSON.parse(readFileSync(cfg.configFile, 'utf8')).accountNames, {});
+    accounts.setMainName(cfg, 'claude', 'Personale');
+
+    const { useAccountNames, accountTag, mainAccountName } = await import('../src/ui/account-names.ts');
+    useAccountNames({ accounts: [], main: {} });
+    assert.equal(accountTag({ agent: 'claude' }), null, 'a single account nobody named: no label');
+    assert.equal(mainAccountName('claude'), 'Principale');
+    useAccountNames({ accounts: [{ id: 'lavoro', agent: 'claude', label: 'Ufficio Milano' }], main: {} });
+    assert.equal(accountTag({ agent: 'claude' }), 'Principale', 'with an extra account the main one is told apart');
+    assert.equal(accountTag({ agent: 'codex' }), null, 'another CLI without extra accounts: no label');
+    assert.equal(accountTag({ agent: 'claude', account: 'lavoro' }), 'Ufficio Milano');
+    assert.equal(accountTag({ agent: 'claude', account: 'rimosso' }), 'rimosso', 'a removed account still shows which one it was');
+    assert.equal(accountTag({ agent: 'shell' }), null);
+    useAccountNames({ accounts: [], main: { codex: 'Lavoro' } });
+    assert.equal(accountTag({ agent: 'codex' }), 'Lavoro', 'a named main account always shows its name');
+    assert.equal(mainAccountName('codex'), 'Lavoro');
+    console.log('PASS renaming extra and main accounts, unique names, saved in the settings file, label on the sessions');
+  }
   {
     const cfg = { configFile: join(dir, 'profile', 'settings.json') };
     const home = accounts.agentHome('claude', 'lavoro');

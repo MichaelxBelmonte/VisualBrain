@@ -45,9 +45,16 @@
 .mega-stats details .mega-stats-kpis dd { font-size: 19px; }
 .mega-stats-sources { margin-top: 20px; }
 .mega-stats-sources p { max-width: 80ch; color: var(--g5); font-size: 12px; }
-.mega-stats .mega-stats-turn-coverage { margin-top: 8px; }
-.mega-stats-controls { display: grid; justify-items: start; gap: 4px; color: var(--g5); font-size: 12px; }
-.mega-stats-controls .btn { margin: 3px 0; }
+/* Where to step in: one button per blocked board or waiting session. */
+.mega-stats-label { margin-top: 12px !important; color: var(--g5); font-size: 12px; }
+.mega-stats-targets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mega-stats-section > .mega-stats-meta { margin-top: 8px; }
+/* A squad inside a project: name, tasks by status, its board. */
+.mega-stats-team { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 6px 0; font-size: 13px; }
+.mega-stats-team b { font-weight: 560; }
+.mega-stats-table th small { display: block; color: var(--g5); font-size: 11px; font-weight: 400; }
+.mega-stats details > .mega-stats-table { margin-bottom: 14px; }
+@media (max-width: 600px) { .mega-stats details > .mega-stats-table { display: block; overflow-x: auto; } }
 .mega-stats-dialog {
   width: min(390px, calc(100vw - 24px)); max-height: calc(100vh - 24px); padding: 20px;
   border: 1px solid var(--g3); border-radius: 12px; box-shadow: var(--shadow-pop);

@@ -16,7 +16,7 @@ import type { TerminalStore } from './terminals.ts';
 import type { Area, GraphEdge, GraphNode, LaunchRequest, LlmRun, NodeDetail, Note, ProjectInfo, RepoChoice, StatusPayload, TeamBoard } from '../shared/types.ts';
 import { forgetAgents, hasAgents, openWith } from './launch.ts';
 import { accountCatalog, cliAction, cliCatalog, forgetCliCatalog, isCli } from './agent-clis.ts';
-import { accountById, addAccount, listAccounts, removeAccount, setAccountShare } from './accounts.ts';
+import { accountById, addAccount, listAccounts, mainNamesNow, removeAccount, renameAccount, setAccountShare, setMainName } from './accounts.ts';
 import { syncShared } from './account-share.ts';
 import { harnessCatalog, launchHarness } from './harnesses.ts';
 import { startHarnessInstall } from './harness-installer.ts';
@@ -284,23 +284,13 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       } else if(method!=='GET' || path.endsWith('/refresh')) throw new HttpError(405,'Metodo non consentito');
       return sendJson(res,200,ctx.routing.view(ctx,node,team));
     }
-    if (path === '/api/mega-stats' || path === '/api/mega-stats/preferences') {
+    if (path === '/api/mega-stats') {
       if (req.headers.authorization || req.headers['sec-fetch-site'] !== 'same-origin') throw new HttpError(403, 'Solo dalla pagina Stats');
       if (!ctx.stats?.available) throw new HttpError(503, 'Telemetria non disponibile');
-      if (path === '/api/mega-stats' && method === 'GET') {
-        const hours = Number(url.searchParams.get('hours') ?? 24);
-        if (![1,24,168].includes(hours)) throw new HttpError(400, 'Intervallo non valido');
-        return send(res,200,ctx.stats.report(ctx,hours,{project:url.searchParams.get('project'),team:url.searchParams.get('team'),session:url.searchParams.get('session')}));
-      }
-      if (path.endsWith('/preferences') && method === 'PUT') {
-        const b = await readJson(req);
-        if (typeof b.nodeId !== 'number' || !Number.isSafeInteger(b.nodeId) || !isTeamId(b.teamId) ||
-          typeof b.cadenceMinutes !== 'number' || !Number.isInteger(b.cadenceMinutes) || b.cadenceMinutes < 1 || b.cadenceMinutes > 1440 ||
-          (b.mode !== 'suggest' && b.mode !== 'assign') || (b.provider !== 'balanced' && b.provider !== 'codex' && b.provider !== 'claude')) throw new HttpError(400, 'Preferenze non valide');
-        try { return send(res,200,ctx.stats.setRequest(ctx,b.nodeId,b.teamId,{cadenceMinutes:b.cadenceMinutes,mode:b.mode,provider:b.provider})); }
-        catch (err) { if (err instanceof RangeError) throw new HttpError(404,err.message); throw err; }
-      }
-      throw new HttpError(405, 'Metodo non consentito');
+      if (method !== 'GET') throw new HttpError(405, 'Metodo non consentito');
+      const hours = Number(url.searchParams.get('hours') ?? 24);
+      if (![1,24,168].includes(hours)) throw new HttpError(400, 'Intervallo non valido');
+      return send(res,200,ctx.stats.report(ctx,hours,{project:url.searchParams.get('project'),team:url.searchParams.get('team'),session:url.searchParams.get('session')}));
     }
     if (preview) {
       res.setHeader('x-vb-map-preview', preview.id);
@@ -865,6 +855,18 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       }
       return send(res, 200, { clis, sessions, accounts: accounts.map(a => ({ ...a, sessions: perAccount[a.id] ?? 0 })) });
     }
+    // The names of the accounts, for the label on each session: cheap, no CLI is asked anything.
+    if (path === '/api/accounts' && method === 'GET') {
+      if (req.headers.authorization) throw new HttpError(403, 'Solo dall’interfaccia');
+      return send(res, 200, { accounts: listAccounts().map(({ id, agent, label }) => ({ id, agent, label })), main: mainNamesNow() });
+    }
+    if (path === '/api/agents/main-name' && method === 'PUT') {
+      if (req.headers.authorization) throw new HttpError(403, 'Rinomina gli account da Impostazioni → Agenti');
+      const body = await readJson(req);
+      try { ctx.cfg.accountNames = setMainName(ctx.cfg, body.agent, body.name); } catch (error) { throw new HttpError(400, (error as Error).message); }
+      ctx.stats?.signal();
+      return send(res, 200, { main: mainNamesNow() });
+    }
     // Extra accounts of Claude Code and Codex: only the person at the app adds, signs in or removes them.
     if (path === '/api/agents/accounts' && method === 'POST') {
       if (req.headers.authorization) throw new HttpError(403, 'Aggiungi gli account da Impostazioni → Agenti');
@@ -887,10 +889,16 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       if (method === 'PATCH') {
         // Avanzate: what the account borrows from the main one. Running sessions keep what they started with.
         if (m[2]) throw new HttpError(404, 'Azione sconosciuta');
+        // A new name, what it borrows from the main account, or both.
         const body = await readJson(req);
-        let next;
-        try { next = setAccountShare(ctx.cfg, account.id, body.share); } catch (error) { throw new HttpError(400, (error as Error).message); }
-        ctx.cfg.accounts = listAccounts(); forgetCliCatalog();
+        if (body.label === undefined && body.share === undefined) throw new HttpError(400, 'Niente da cambiare');
+        let next = account;
+        try {
+          if (body.label !== undefined) next = renameAccount(ctx.cfg, account.id, body.label);
+          if (body.share !== undefined) next = setAccountShare(ctx.cfg, account.id, body.share);
+        } catch (error) { throw new HttpError(400, (error as Error).message); }
+        ctx.cfg.accounts = listAccounts(); forgetCliCatalog(); ctx.stats?.signal();
+        if (body.share === undefined) return send(res, 200, { account: next, linked: [] });
         let linked: string[];
         try { linked = syncShared(next); } catch (error) { throw new HttpError(500, `Collegamenti non aggiornati: ${(error as Error).message}`); }
         return send(res, 200, { account: next, linked });

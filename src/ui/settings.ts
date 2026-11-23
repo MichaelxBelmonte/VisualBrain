@@ -1,5 +1,6 @@
 // Impostazioni: one window for everything that is not daily work. The first run keeps the short welcome form.
 import { api, type AgentCli } from './api.ts';
+import { accountNames, mainAccountName, refreshAccountNames } from './account-names.ts';
 import { getLanguage, setLanguage, t as tr, ui, type Language } from './i18n.ts';
 import { sectionViews } from './section-views.ts';
 import { glassEnabled, nativeMac, setGlass, syncWindowTheme } from './window-chrome.ts';
@@ -147,9 +148,10 @@ export function cliState(c: AgentCli): { tone: 'ok' | 'warn' | 'off'; text: stri
 
 async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
   root.innerHTML = ui`<p class="muted">Controllo le CLI installate…</p>`;
-  let open: string | null = null, advanced: string | null = null;
+  // renaming: the account whose name is being edited («main:claude» for a main account, otherwise the extra account's id).
+  let open: string | null = null, advanced: string | null = null, renaming: string | null = null;
   const draw = async (fresh: boolean) => {
-    const [{ clis, sessions, accounts = [] }, harnesses] = await Promise.all([api.agents(fresh), api.harnesses()]);
+    const [{ clis, sessions, accounts = [] }, harnesses] = await Promise.all([api.agents(fresh), api.harnesses(), refreshAccountNames()]);
     if (!root.isConnected) return;
     ctx.badge('agents', clis.filter(needsUser).length);
     const row = (c: AgentCli) => {
@@ -162,6 +164,16 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
 `;
       return `<div class="cli-row" data-row="${c.id}"><button type="button" class="cli-summary" data-toggle="${c.id}" aria-expanded="${open === c.id}"><span class="cli-dot" data-tone="${s.tone}"></span><span class="cli-name"><b>${esc(c.label)}</b><small>${esc(c.version ? `v${c.version}` : c.command)}</small></span><span class="cli-state" data-tone="${s.tone}">${esc(s.text)}</span></button><span class="cli-actions">${actions}</span>${open === c.id ? `<div class="cli-open">${detail}</div>` : ''}</div>`;
     };
+    // The name of an account, or the field to change it while it is being renamed.
+    const nameCell = (key: string, name: string) => renaming !== key ? `<b>${esc(name)}</b>`
+      : ui`<form class="cli-rename" data-rename-form="${esc(key)}"><input name="name" maxlength="40" value="${esc(name)}" aria-label="Nome dell’account"><button class="btn small primary" type="submit">Salva</button><button class="btn small ghost" type="button" data-rename-cancel>Annulla</button></form>`;
+    const renameButton = (key: string) => renaming === key ? '' : ui`<button class="btn small ghost" data-rename-start="${esc(key)}">Rinomina</button>`;
+    // The main account of a CLI: its name (shown on the sessions), the email the CLI reports.
+    const mainRow = (c: AgentCli) => {
+      const s = cliState(c), key = 'main:' + c.id;
+      const sub = [c.label, tr('account principale'), c.account].filter(Boolean).join(' · ');
+      return `<div class="cli-row cli-account" data-account-row="${esc(key)}"><div class="cli-summary static"><span class="cli-dot" data-tone="${s.tone}"></span><span class="cli-name">${nameCell(key, mainAccountName(c.id))}<small>${esc(sub)}</small></span><span class="cli-state" data-tone="${s.tone}">${esc(s.text)}</span></div><span class="cli-actions">${renameButton(key)}</span></div>`;
+    };
     // An extra account under its CLI: the name chosen by the person, the email the CLI reports, sign-in and removal.
     const accountRow = (a: AgentAccountStatus) => {
       const tone = a.signedIn === false ? 'warn' : 'ok';
@@ -169,6 +181,7 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
       const cli = clis.find(c => c.id === a.agent)?.label ?? a.agent;
       const sub = `${cli} · ${a.email ?? (a.sessions ? ui`${a.sessions} sessioni attive` : tr('accesso da completare'))}`;
       const actions = (a.signedIn === false ? ui`<button class="btn small primary" data-account="${a.id}" data-account-act="login">Accedi</button>` : ui`<button class="btn small ghost" data-account="${a.id}" data-account-act="logout">Esci</button>`)
+        + renameButton(a.id)
         + ui`<button class="btn small ghost" data-account-adv="${a.id}" aria-expanded="${advanced === a.id}">Avanzate</button>`
         + ui`<button class="btn small ghost" data-account="${a.id}" data-account-act="remove" ${a.sessions ? ui`disabled title="Chiudi prima le sessioni attive di questo account"` : ''}>Rimuovi</button>`;
       // Avanzate: off by default. Linked, never copied; settings, default model, permissions and sign-in stay separate.
@@ -178,7 +191,7 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
           + option('tools', tr('Skill, plugin, comandi, agenti e CLAUDE.md dell’account principale'), tr('Collegati, non copiati: una modifica vale per entrambi gli account. I plugin attivi sono quelli dell’account principale.'))
         : option('tools', tr('Skill, regole, prompt e AGENTS.md dell’account principale'), tr('Collegati, non copiati: una modifica vale per entrambi gli account.'))
       }${ui`<p class="muted">Impostazioni, modello predefinito, permessi e accesso restano separati. Vale per le sessioni avviate da ora; ciò che l’account aveva di suo resta da parte e torna quando spegni l’opzione.</p>`}</div>`;
-      return `<div class="cli-row cli-account" data-account-row="${esc(a.id)}"><div class="cli-summary static" title="${esc(a.home)}"><span class="cli-dot" data-tone="${tone}"></span><span class="cli-name"><b>${esc(a.label)}</b><small>${esc(sub)}</small></span><span class="cli-state" data-tone="${tone}">${esc(state)}</span></div><span class="cli-actions">${actions}</span>${share}</div>`;
+      return `<div class="cli-row cli-account" data-account-row="${esc(a.id)}"><div class="cli-summary static" title="${esc(a.home)}"><span class="cli-dot" data-tone="${tone}"></span><span class="cli-name">${nameCell(a.id, a.label)}<small>${esc(sub)}</small></span><span class="cli-state" data-tone="${tone}">${esc(state)}</span></div><span class="cli-actions">${actions}</span>${share}</div>`;
     };
     const steps: Record<string, string> = { download: tr('Scaricamento componenti'), python: tr('Preparazione Python'), packages: tr('Installazione pacchetti'), verify: tr('Verifica installazione') };
     const harnessRow = (h: Awaited<ReturnType<typeof api.harnesses>>[number]) => {
@@ -188,11 +201,14 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
       const button = installing ? '' : !h.installed ? ui`<button class="btn small primary" data-harness="${h.id}" ${h.canInstall ? '' : 'disabled'}>Installa</button>` : h.outdated ? ui`<button class="btn small" data-harness="${h.id}">Aggiorna</button>` : '';
       return `<div class="cli-row"><div class="cli-summary static"><span class="cli-dot" data-tone="${tone}"></span><span class="cli-name"><b>${esc(h.label)}</b><small>${esc(h.version ? String(h.version).slice(0, 12) : tr('nel profilo di Visual Brain'))}</small></span><span class="cli-state" data-tone="${tone}" title="${esc(h.install?.error ? tr(h.install.error) : '')}">${esc(text)}</span></div><span class="cli-actions">${button}</span></div>`;
     };
-    // Extra accounts: a section of their own, always visible, with the form to add one and the accounts already added.
+    // Accounts: a section of their own, always visible. Each CLI's main account, then its extra ones, all renamable;
+    // the name is the label on the sessions. Below, the form to add an account.
     const addable = clis.filter(c => c.path && (c.id === 'claude' || c.id === 'codex'));
-    const accountSection = !addable.length && !accounts.length ? '' : ui`<div class="settings-subhead"><h4>Account aggiuntivi</h4></div>
-      <p class="muted">Un altro abbonamento da usare insieme a quello principale, anche nello stesso momento. Dopo l’accesso lo scegli dal menu Agente quando avvii un agente. In Avanzate puoi fargli usare memoria, skill e plugin dell’account principale.</p>`
-      + (accounts.length ? `<div class="cli-list">${accounts.map(accountRow).join('')}</div>` : '')
+    const accountList = [...addable.flatMap(c => [mainRow(c), ...accounts.filter(a => a.agent === c.id).map(accountRow)]),
+      ...accounts.filter(a => !addable.some(c => c.id === a.agent)).map(accountRow)];
+    const accountSection = !addable.length && !accounts.length ? '' : ui`<div class="settings-subhead"><h4>Account</h4></div>
+      <p class="muted">Il nome di ogni account compare accanto alle sessioni di Claude Code e Codex, così vedi con quale stanno lavorando. Un account aggiuntivo è un altro abbonamento da usare insieme al principale, anche nello stesso momento: dopo l’accesso lo scegli dal menu Agente quando avvii un agente.</p>`
+      + (accountList.length ? `<div class="cli-list">${accountList.join('')}</div>` : '')
       + (addable.length ? `<form class="cli-add-account" data-add-account><select name="agent" aria-label="${esc(tr('Agente'))}">${addable.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}</select>`
         + ui`<input name="label" maxlength="40" required placeholder="Nome del nuovo account (es. Lavoro)" aria-label="Nome del nuovo account"><button class="btn small primary" type="submit">Aggiungi account</button></form>` : '');
     root.innerHTML = ui`<div class="settings-subhead"><h4>CLI degli agenti</h4><button class="btn small ghost" data-refresh>Ricontrolla</button></div>
@@ -217,6 +233,29 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
       try { const r = await api.addAccount(agent, label); ctx.terminal(r.info); await draw(false); }
       catch (err) { error.textContent = String(err); button.disabled = false; }
     }));
+    root.querySelectorAll<HTMLButtonElement>('[data-rename-start]').forEach(b => b.addEventListener('click', async () => {
+      renaming = b.dataset.renameStart!; await draw(false);
+      const input = root.querySelector<HTMLInputElement>('[data-rename-form] input');
+      input?.focus(); input?.select();
+    }));
+    root.querySelectorAll<HTMLFormElement>('[data-rename-form]').forEach(form => {
+      const key = form.dataset.renameForm!, input = form.querySelector<HTMLInputElement>('input')!;
+      const cancel = () => { renaming = null; void draw(false); };
+      form.querySelector('[data-rename-cancel]')!.addEventListener('click', cancel);
+      input.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); } });
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const save = form.querySelector<HTMLButtonElement>('[type=submit]')!;
+        save.disabled = true;
+        try {
+          // A main account with an empty name goes back to «Principale»; an extra account needs a name.
+          if (key.startsWith('main:')) await api.setMainAccountName(key.slice(5) as 'claude' | 'codex', input.value.trim());
+          else await api.renameAccount(key, input.value.trim());
+          renaming = null;
+          await draw(false);
+        } catch (err) { error.textContent = String(err); save.disabled = false; }
+      });
+    });
     root.querySelectorAll<HTMLButtonElement>('[data-account-adv]').forEach(b => b.addEventListener('click', () => { advanced = advanced === b.dataset.accountAdv ? null : b.dataset.accountAdv!; void draw(false); }));
     root.querySelectorAll<HTMLInputElement>('[data-share]').forEach(box => box.addEventListener('change', async () => {
       const account = accounts.find(a => a.id === box.dataset.shareAccount);

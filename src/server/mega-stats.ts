@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ApiCtx } from './api.ts';
 import type { TerminalInfo } from '../shared/types.ts';
-import type { CoordinationRequest, MegaStatsReport, StatsLatency, StatsMeasures, StatsSession, StatsTeam } from '../shared/mega-stats.ts';
+import type { MegaStatsReport, StatsAccount, StatsLatency, StatsMeasures, StatsSession, StatsTeam, StatsUsage } from '../shared/mega-stats.ts';
+import { sessionRecordFile } from './session-model.ts';
+import { addUsage, emptyUsage, usageOf } from './session-usage.ts';
+import { accountById, mainName } from './accounts.ts';
 
 const HOUR = 3_600_000;
 const WEEK = 168 * HOUR;
@@ -53,8 +56,7 @@ export class MegaStats {
       CREATE INDEX IF NOT EXISTS stats_event_scope ON events(node,at);
       CREATE TABLE IF NOT EXISTS turns (sid TEXT, id TEXT, start INTEGER, stop INTEGER, source TEXT, run TEXT, PRIMARY KEY(sid,id));
       CREATE INDEX IF NOT EXISTS stats_turn_start ON turns(start);
-      CREATE TABLE IF NOT EXISTS sources (sid TEXT PRIMARY KEY, source TEXT, first INTEGER, last INTEGER);
-      CREATE TABLE IF NOT EXISTS preferences (node INTEGER, team TEXT, body TEXT, PRIMARY KEY(node,team));`);
+      CREATE TABLE IF NOT EXISTS sources (sid TEXT PRIMARY KEY, source TEXT, first INTEGER, last INTEGER);`);
     this.db.prepare('INSERT INTO runs VALUES (?,?,?)').run(this.run, now, now);
     this.beat(now);
   }
@@ -169,45 +171,61 @@ export class MegaStats {
     const project = ctx.cache.nodes.get(node)?.projectId;
     return ctx.cache.projectByNode.has(node) ? node : project != null ? ctx.cache.projects.get(project)?.nodeId ?? node : node;
   }
-  private linked(ctx: ApiCtx) {
-    const nodes = new Set(ctx.teams.getLinks().flatMap(l => [l.srcNodeId, l.dstNodeId]).filter(n => ctx.cache.nodes.has(n)));
-    return { nodes, projects: new Set([...nodes].map(n => this.project(ctx, n))) };
-  }
-  setRequest(ctx: ApiCtx, node: number, team: string, values: Pick<CoordinationRequest,'cadenceMinutes'|'mode'|'provider'>): CoordinationRequest {
-    if (!this.linked(ctx).projects.has(this.project(ctx, node)) || !ctx.cache.nodes.has(node) || (team !== 'brain' && !ctx.teams.team(node, team))) throw new RangeError('Destinatario non collegato');
-    const body = { ...values, status: 'pending' as const, updatedAt: Date.now() };
-    this.db.prepare('INSERT OR REPLACE INTO preferences VALUES (?,?,?)').run(node, team, JSON.stringify(body));
-    this.signal(); return body;
-  }
   report(ctx: ApiCtx, hours: number, filters: { project: string | null; team: string | null; session: string | null }, now = Date.now()): MegaStatsReport {
     this.snapshot(ctx, now); this.beat(now);
-    const from = now - hours * HOUR, { nodes, projects: linked } = this.linked(ctx);
-    const projects = [...linked].map(id => ({ id, name: ctx.cache.nodes.get(id)?.name ?? String(id) }));
+    const from = now - hours * HOUR;
+    // Every session seen in the period, whatever node it ran in: projects are those of their nodes.
     const rows = this.db.prepare('SELECT * FROM members WHERE seen>=?').all(from) as unknown as Member[];
-    const teamNodes = new Set([...nodes,...linked]);
+    const projectIds = new Set(rows.map(r => this.project(ctx, r.node)));
+    const projects = [...projectIds].map(id => ({ id, name: ctx.cache.nodes.get(id)?.name ?? String(id) })).sort((a, b) => a.name.localeCompare(b.name));
     const totals = samples(), groups = new Map<string,Samples>(), sessions: StatsSession[] = [];
-    const projectOk = (p: number) => linked.has(p) && (!filters.project || String(p) === filters.project);
+    const projectOk = (p: number) => projectIds.has(p) && (!filters.project || String(p) === filters.project);
     const accepts = (s: Scope) => projectOk(this.project(ctx, s.node)) && (!filters.team || filters.team === `${s.node}:${s.team}`) && (!filters.session || filters.session === s.sid);
+    const claimed = () => new Set(ctx.terms.list().map(s => s.resumeId).filter((r): r is string => Boolean(r)));
+    const usage = emptyUsage(), accounts = new Map<string, StatsAccount>();
+    let usageMissing = 0;
     for (const r of rows) {
-      if (linked.has(this.project(ctx, r.node))) teamNodes.add(r.node);
       if (!accepts(r)) continue;
       const g = samples(), live = this.live.get(r.sid);
       g.metrics.waiting = Number(!!live?.attention); g.metrics.blocked = Number(live?.state === 'blocked');
       totals.metrics.waiting += g.metrics.waiting; totals.metrics.blocked += g.metrics.blocked;
       groups.set(r.sid, g);
+      // Turns and tokens from the CLI's own record, when the session is still known to the terminal store.
+      const info = ctx.terms.get(r.sid)?.info;
+      let used: StatsUsage | null = null;
+      if (r.agent === 'claude' || r.agent === 'codex') {
+        const file = info ? sessionRecordFile(info, claimed, now) : undefined;
+        used = (file && usageOf(file, r.agent, from, now)) || null;
+        if (used) addUsage(usage, used); else usageMissing++;
+      }
+      // An extra account by its current name; the main one by the name the person gave it, if any.
+      const account = info?.account ?? null, accountLabel = account ? accountById(account)?.label ?? account : mainName(r.agent) ?? null;
+      const activeMs = Math.max(0, Math.min(now, live ? now : r.seen) - Math.max(from, r.created));
+      if (r.agent === 'claude' || r.agent === 'codex') {
+        const key = `${r.agent}:${account ?? ''}`;
+        const line = accounts.get(key) ?? { key, agent: r.agent, account, label: accountLabel, sessions: 0, activeMs: 0, usage: emptyUsage() };
+        line.sessions++; line.activeMs += activeMs; if (used) addUsage(line.usage, used);
+        accounts.set(key, line);
+      }
       sessions.push({ id:r.sid, label:r.label, nodeId:r.node, projectId:this.project(ctx, r.node), teamKey:r.team ? `${r.node}:${r.team}` : null,
-        agent:r.agent, role:r.role, alive:!!live, state:live?.state ?? null, attention:live?.attention ?? null, since:live?.since ?? null, turnSource:null, metrics:g.metrics });
+        agent:r.agent, role:r.role, alive:!!live, state:live?.state ?? null, attention:live?.attention ?? null, since:live?.since ?? null, turnSource:null,
+        account, accountLabel, activeMs, usage: used, metrics:g.metrics });
     }
+    // Squads that worked in the period (a session of theirs, or tasks on their board), with their tasks by status now.
     const teams: StatsTeam[] = [];
-    for (const nodeId of teamNodes) {
+    for (const nodeId of new Set(rows.map(r => r.node))) {
       const projectId = this.project(ctx,nodeId);
       for (const t of [...ctx.teams.teams(nodeId), {id:'brain', name:'Main Brain'}]) {
-        const lead = rows.find(r => r.node === nodeId && r.team === t.id && (r.role === 'brain' || r.role === 'orchestrator') && this.live.has(r.sid));
-        const saved = this.db.prepare('SELECT body FROM preferences WHERE node=? AND team=?').get(nodeId,t.id);
+        const key = `${nodeId}:${t.id}`;
+        if (!projectOk(projectId) || (filters.team && filters.team !== key) || (filters.session && !sessions.some(s => s.id === filters.session && s.teamKey === key))) continue;
         const board = ctx.teams.get(nodeId,t.id);
-        teams.push({ key:`${nodeId}:${t.id}`, id:t.id, name:t.name, nodeId,projectId,recipient:lead?.label ?? null,
-          blockedTasks:board.tasks.filter(task => task.status === 'blocked' && (!filters.session || task.assignedTo === filters.session)).length,
-          autoSpawn:board.policy.autoSpawn, requested:saved ? JSON.parse(String(saved.body)) : null });
+        const mine = board.tasks.filter(task => !filters.session || task.assignedTo === filters.session);
+        const members = rows.some(r => r.node === nodeId && r.team === t.id);
+        if (!members && !mine.length) continue;
+        const lead = rows.find(r => r.node === nodeId && r.team === t.id && (r.role === 'brain' || r.role === 'orchestrator') && this.live.has(r.sid));
+        const count = (status: string) => mine.filter(task => task.status === status).length;
+        teams.push({ key, id:t.id, name:t.name, nodeId, projectId, recipient:lead?.label ?? null,
+          blockedTasks:count('blocked'), tasks:{ pending:count('pending'), working:count('working'), blocked:count('blocked'), done:count('done') } });
       }
     }
     const unattributedHttp = Number(this.db.prepare('SELECT COUNT(*) AS n FROM events WHERE node IS NULL AND at BETWEEN ? AND ?').get(from,now)!.n);
@@ -240,6 +258,8 @@ export class MegaStats {
     const observedMs = Number(this.db.prepare('SELECT SUM(MAX(0,MIN(stop,?)-MAX(start,?))) AS ms FROM runs WHERE stop>=? AND start<=?').get(now,from,from,now)?.ms ?? 0);
     for (const s of sessions) s.metrics = finish(groups.get(s.id)!,observedMs);
     return { from, to:now, updatedAt:now, observedMs, coverageStart:Number(this.db.prepare('SELECT MIN(start) AS start FROM runs').get()!.start),
-      projects, teams, sessions, totals:finish(totals,observedMs), unattributedHttp };
+      projects, teams, sessions, totals:finish(totals,observedMs), usage, usageMissing,
+      accounts:[...accounts.values()].sort((a, b) => a.agent.localeCompare(b.agent) || Number(!!a.account) - Number(!!b.account) || (a.label ?? '').localeCompare(b.label ?? '')),
+      unattributedHttp };
   }
 }

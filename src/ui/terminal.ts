@@ -15,10 +15,16 @@ import { clampSplit, moveTile, orderTiles, MAX_TILES, connectionEndpoints, defau
 import { CODE_IN_TEXT, resumable, roleName, sessionTone, sessionWorking, toneFlag, toneReason, type SessionTone, ROLE_WORDS } from './work-roles.ts';
 import { DEFAULT_FONT_SIZE, dropText, fontZoomKey, isNewTerminalKey, isPlainTerminalKey, parseFileDrop, zoomFont } from './work-input.ts';
 import { api } from './api.ts';
+import { accountTag, refreshAccountNames } from './account-names.ts';
 import { fmtBytes } from './panel.ts';
 import type { AgentName, AgentRole, ModelSwitchChoice, NodeDetail, SwarmProposal, TeamLink, TerminalInfo } from '../shared/types.ts';
 import { sessionPreview, type SessionPreview } from '../shared/session-preview.ts';
 import { mountWorkBoard, reconcileWorkList, type WorkListItem, type BoardUpdate } from './work-board.ts';
+/** The account of a Claude Code or Codex session, as a small label beside its name; nothing when there is nothing to tell apart. */
+function accountChip(info: TerminalInfo): string {
+  const tag = accountTag(info);
+  return tag ? `<span class="account-chip" title="${esc(tr('Account') + ': ' + tag)}">${esc(tag)}</span>` : '';
+}
 
 /** How long keys typed before the terminal connection opens are still worth sending. */
 const EARLY_KEYS_MS = 5000;
@@ -178,6 +184,9 @@ export class Terminals {
     document.addEventListener('keydown', e => this.tileKey(e), true);
     document.addEventListener('keydown', e => this.shortcutKey(e), true);
     window.addEventListener('vb-file-drop', e => this.fileDrop((e as CustomEvent).detail));
+    // The account label of each Claude Code and Codex session follows the names set in Impostazioni → Agenti.
+    window.addEventListener('vb:accounts-changed', () => { for (const t of this.tabs.values()) this.updateCard(t); this.renderList(); this.renderTabs(); });
+    void refreshAccountNames();
     this.control('#work-brain')!.addEventListener('click', () => { if (this.selectedNode !== null) { this.show(false); this.cb.reveal(this.selectedNode); } });
     bindRailSearch(this.control<HTMLInputElement>('#work-filter')!);
     this.listEl.addEventListener('keydown', e => this.railKey(e));
@@ -674,7 +683,7 @@ export class Terminals {
       const t = this.tabs.get(id)!, on = id === this.active, tone = sessionTone(t.info);
       const label = t.info.role ? this.roleName(t) : t.info.name || this.generatedName(t);
       const keys = i < 9 ? ` · Ctrl+Alt+${i + 1}` : '';
-      return ui`<button type="button" role="tab" class="term-tab" data-tab="${id}" aria-selected="${on}"${tone ? ` data-tone="${tone}"` : ''} title="${esc(this.sessionLabel(t) + ' · ' + toneReason(t.info) + keys)}"><span class="work-dot"></span><span class="term-tab-label">${esc(label)}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>`;
+      return ui`<button type="button" role="tab" class="term-tab" data-tab="${id}" aria-selected="${on}"${tone ? ` data-tone="${tone}"` : ''} title="${esc(this.sessionLabel(t) + ' · ' + toneReason(t.info) + keys)}"><span class="work-dot"></span><span class="term-tab-label">${esc(label)}</span>${accountChip(t.info)}${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>`;
     }).join('');
     this.tabStrip.classList.toggle('hidden', !html);
     this.bodyEl.classList.toggle('with-tabs', Boolean(html)); // the tab already names the session: the pane header does not repeat it
@@ -993,7 +1002,7 @@ export class Terminals {
       if (clusterStart) groups.push({ key: `cluster:${id}`, html: ui`<div class="work-cluster"${toneAttr(id)}>⇄ Collegati · ${clusterSize} nodi</div>` });
       const rows: WorkListItem[] = [{ key: 'header', html: ui`<div class="work-node-row">${id !== null ? ui`<button class="work-row-grip" data-node-grip="${id}" aria-label="Sposta ${esc(name)}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button>` : ''}${id !== null ? ui`<button class="work-fold" data-fold="${id}" aria-expanded="${!collapsed}" title="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}" aria-label="${collapsed ? tr('Espandi nodo') : tr('Compatta nodo')}">${collapsed ? '›' : '⌄'}</button>` : ''}<button class="work-node ${this.selectedNode === id ? 'selected' : ''}" data-node="${id ?? ''}" aria-current="${this.selectedNode === id ? 'true' : 'false'}" title="${esc(path)}"><span class="work-node-icon" aria-hidden="true">${icon('folder')}</span><span><strong>${esc(name)}</strong>${id !== null && tones.has(id) ? ui` <span class="work-link-mark" title="Nodo con collegamenti" aria-hidden="true">⇄</span>` : ''}</span><span class="work-number">${sessions.length}</span></button>${id === null ? ui`<button class="work-rail-action" data-add-shell="" title="Nuovo terminale libero" aria-label="Nuovo terminale libero">${icon('terminal')}</button>` : ''}${id !== null ? ui`<button class="work-rail-action" data-add-agent="${id}" title="Aggiungi agente a ${esc(name)}" aria-label="Aggiungi agente a ${esc(name)}">${icon('plus')}</button><button class="work-rail-action" data-add-shell="${id}" title="Terminale in ${esc(name)}" aria-label="Terminale in ${esc(name)}">${icon('terminal')}</button><button class="work-rail-action" data-node-link="${id}" title="Collega ${esc(name)}" aria-label="Collega ${esc(name)}" aria-expanded="${this.railLinkSource === `node:${id}`}">${icon('connect')}</button>${tones.has(id) ? ui`<button class="work-rail-action" data-group="${id}" title="Affianca i nodi collegati" aria-label="Affianca i nodi collegati a ${esc(name)}">${icon('grid')}</button>` : ''}` : ''}${id !== null ? ui`<button class="work-remove" data-remove="${id}" title="${sessions.length ? tr('Chiudi il nodo e termina le sue sessioni') : tr('Rimuovi il nodo dalla vista Operativa')}" aria-label="Chiudi ${esc(name)}">×</button>` : ''}</div>` }];
       if (!collapsed) for (const t of shown) {
-        rows.push({ key: `session:${t.info.id}`, html: ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button><div class="work-session-detail" hidden></div></div>` });
+        rows.push({ key: `session:${t.info.id}`, html: ui`<div class="work-session ${this.active === t.info.id ? 'selected' : ''}" data-sid="${t.info.id}"${toneAttr(id)}${squadMark(t.info)}${endpoints.has(t.info.id) ? ` data-connection-endpoint="${endpoints.get(t.info.id)}"` : ''}><button class="work-row-grip" data-session-grip="${t.info.id}" aria-label="Sposta ${esc(t.info.name || this.roleName(t))}" title="Trascina per riordinare · Alt e frecce per muovere">⠿</button><button data-session="${t.info.id}"><span class="work-dot ${t.info.alive ? 'live' : ''}"></span><span class="work-session-name">${esc(t.info.name || this.roleName(t))}${endpoints.has(t.info.id) ? ' ⇄' : ''}</span>${accountChip(t.info)}${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>${t.info.role && t.info.alive ? ui`<button class="work-rail-action" data-session-link="${t.info.id}" title="Collega ${esc(this.sessionLabel(t))}" aria-label="Collega ${esc(this.sessionLabel(t))}" aria-expanded="${this.railLinkSource === `session:${t.info.id}`}">${icon('connect')}</button>` : ''}<button class="work-close" data-close="${t.info.id}" title="Chiudi sessione e termina il processo" aria-label="Chiudi ${labels[t.info.agent]} ${t.info.id}">×</button><div class="work-session-detail" hidden></div></div>` });
       }
       groups.push({ key: `node:${id}`, html: `<section class="work-group ${this.selectedNode === id ? 'current-node' : ''}"${toneAttr(id)} ${id !== null ? `data-drag="${id}"` : ''}></section>`, children: rows });
     }
@@ -1147,7 +1156,7 @@ export class Terminals {
 
   private mount(t: Tab): void {
     const pane = document.createElement('article'); pane.className = 'term-pane'; pane.dataset.session = t.info.id;
-    pane.innerHTML = ui`<header class="session-head"><button class="work-tile-drag" data-move-tile aria-label="Sposta terminale" title="Trascina per riordinare · frecce per muovere">⠿</button><div class="session-heading"><span class="work-dot"></span><span class="tile-badge" aria-hidden="true"></span><strong class="session-label"></strong><span class="session-code"></span><span class="session-meta hidden"></span><span class="tile-node tile-node-slot"></span><span class="card-state"></span></div><span class="pane-peers"></span><button class="btn small session-resume hidden" data-resume title="Riavvia la sessione nella stessa cartella e riprendi la conversazione">Riprendi</button><div class="session-actions" role="group" aria-label="Comandi del terminale"><button class="btn ghost icon-btn" data-unview aria-label="Nascondi dalla vista" title="Il terminale resta attivo (Ctrl+Alt+W)">${icon('hide')}</button><button class="btn ghost icon-btn" data-rename aria-label="Rinomina sessione" title="Rinomina sessione">${icon('edit')}</button><button class="btn ghost icon-btn" data-context aria-expanded="false" aria-label="Mostra contesto" title="Mostra contesto">${icon('context')}</button><button class="btn ghost icon-btn" data-reconnect aria-label="Riconnetti" title="Riconnetti">${icon('refresh')}</button><button class="btn ghost icon-btn" data-end aria-label="Termina sessione" title="Termina sessione">${icon('close')}</button></div></header><div class="session-content"><aside class="session-context"></aside><div class="terminal-surface"></div></div>`;
+    pane.innerHTML = ui`<header class="session-head"><button class="work-tile-drag" data-move-tile aria-label="Sposta terminale" title="Trascina per riordinare · frecce per muovere">⠿</button><div class="session-heading"><span class="work-dot"></span><span class="tile-badge" aria-hidden="true"></span><strong class="session-label"></strong><span class="account-chip session-account hidden"></span><span class="session-code"></span><span class="session-meta hidden"></span><span class="tile-node tile-node-slot"></span><span class="card-state"></span></div><span class="pane-peers"></span><button class="btn small session-resume hidden" data-resume title="Riavvia la sessione nella stessa cartella e riprendi la conversazione">Riprendi</button><div class="session-actions" role="group" aria-label="Comandi del terminale"><button class="btn ghost icon-btn" data-unview aria-label="Nascondi dalla vista" title="Il terminale resta attivo (Ctrl+Alt+W)">${icon('hide')}</button><button class="btn ghost icon-btn" data-rename aria-label="Rinomina sessione" title="Rinomina sessione">${icon('edit')}</button><button class="btn ghost icon-btn" data-context aria-expanded="false" aria-label="Mostra contesto" title="Mostra contesto">${icon('context')}</button><button class="btn ghost icon-btn" data-reconnect aria-label="Riconnetti" title="Riconnetti">${icon('refresh')}</button><button class="btn ghost icon-btn" data-end aria-label="Termina sessione" title="Termina sessione">${icon('close')}</button></div></header><div class="session-content"><aside class="session-context"></aside><div class="terminal-surface"></div></div>`;
     this.bodyEl.appendChild(pane); t.pane = pane;
     pane.addEventListener('focusin', () => {
       this.active = t.info.id;
@@ -1245,6 +1254,8 @@ export class Terminals {
     label.setAttribute('title', [this.generatedName(t), toneReason(t.info), tr('Doppio clic per rinominare')].join(' · '));
     if (!label.querySelector('input')) label.textContent = t.info.name || this.roleName(t);
     t.pane.querySelector('.session-code')!.textContent = t.info.code ?? '';
+    const account = t.pane.querySelector<HTMLElement>('.session-account'), tag = accountTag(t.info);
+    if (account) { account.textContent = tag ?? ''; account.title = tag ? tr('Account') + ': ' + tag : ''; account.classList.toggle('hidden', !tag); }
     const meta = t.pane.querySelector<HTMLElement>('.session-meta');
     if (meta) { meta.textContent = this.generatedName(t); meta.title = this.generatedName(t); }
     t.pane.classList.toggle('ended', !t.info.alive);
@@ -1331,7 +1342,8 @@ export class Terminals {
 
   /** Generated label (agent, model, effort), used when the user has not named the session. */
   private generatedName(t: Tab): string {
-    return ui`${this.agentLabel(t)}${t.info.account ? ' · @' + t.info.account : ''}${t.info.model ? ' · ' + t.info.model : ''}${t.info.effort ? ' / ' + t.info.effort : ''}${t.info.branch ? ' · ⑂ ' + t.info.branch : ''}`;
+    const account = accountTag(t.info);
+    return ui`${this.agentLabel(t)}${account ? ' · ' + account : ''}${t.info.model ? ' · ' + t.info.model : ''}${t.info.effort ? ' / ' + t.info.effort : ''}${t.info.branch ? ' · ⑂ ' + t.info.branch : ''}`;
   }
   private sessionLabel(t: Tab): string {
     return ui`${t.info.role ? this.roleName(t) + ' · ' : ''}${t.info.name || this.generatedName(t)}`;

@@ -16,7 +16,7 @@ Requires macOS 13.5 or later (Apple Silicon and Intel). Node is bundled: no npm,
 
 The package uses a stable self-signed identity and is not notarized, so macOS may ask you to approve the first launch in **System Settings › Privacy & Security**. The first time it reads your Desktop macOS asks for permission; if access is refused, a notice in the app explains how to allow it.
 
-Your index, settings and boards stay in `~/Library/Application Support/Visual Brain/` (logs in `logs/`). Scans only read the folders you chose and never modify files. Agents you launch may modify files, according to your instructions and their CLI's permissions. Claude Code, Codex and Hermes are optional; each user installs and signs in with their own account. Claude Code and Codex can also run under several accounts at once (Settings → Agents → Add account; pick the account from the Agent menu when launching).
+Your index, settings and boards stay in `~/Library/Application Support/Visual Brain/` (logs in `logs/`). Scans only read the folders you chose and never modify files. Agents you launch may modify files, according to your instructions and their CLI's permissions. Claude Code, Codex and Hermes are optional; each user installs and signs in with their own account. Claude Code and Codex can also run under several accounts at once (Settings → Agents → Accounts → Add account; pick the account from the Agent menu when launching). Every account, the main one included, can be renamed there; the name is shown next to each Claude Code and Codex session.
 
 ## Features
 
