@@ -55,6 +55,8 @@ export class Teams {
   private readonly boards = new Map<string, TeamBoard>();
   private readonly dir: string;
   private links: TeamLink[] | null = null;
+  /** Hears every saved board with its tasks before and after (local Stats). It must not throw, nor slow the save. */
+  onTasks?: (nodeId: number, team: string, before: readonly TeamTask[], after: readonly TeamTask[]) => void;
   constructor(dataDir: string) { this.dir = join(dataDir, 'teams'); }
   getLinks(): TeamLink[] {
     if (this.links === null) {
@@ -120,7 +122,9 @@ export class Teams {
     const temp = `${file}.tmp`;
     writeFileSync(temp, JSON.stringify(board), { mode: 0o600 });
     renameSync(temp, file);
+    const before = this.boards.get(key)?.tasks ?? [];
     this.boards.set(key, board);
+    if (this.onTasks && before !== board.tasks) try { this.onTasks(nodeId, team, before, board.tasks); } catch { /* measurements never stop a board */ }
   }
 
   /** The node's squads, oldest first. The first squad exists implicitly: boards from before squads are its board. */

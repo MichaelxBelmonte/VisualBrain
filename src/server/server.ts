@@ -214,6 +214,8 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   let stats: MegaStats | undefined;
   try { stats = new MegaStats(join(cfg.dataDir, 'work-stats.sqlite'), () => events.send({type:'stats:changed'})); }
   catch { console.warn('[stats] Archivio locale non disponibile.'); }
+  // Task transitions for «Qualità»: a comparison in memory at each board save, a row only when a task changes.
+  teams.onTasks = (node, team, before, after) => stats?.capture(() => stats!.tasks(node, team, before, after));
   const routing = new QuotaRouter(cfg.dataDir);
   const ctx: ApiCtx = {
     db, cfg, cache, startupMap, terms, teams, updater, access, state, startIndex, startAnalyze, configure, stats, routing,
@@ -223,6 +225,8 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
   const heartbeat = () => stats?.capture(() => stats!.heartbeat(ctx));
   heartbeat();
   const statsTimer = setInterval(() => { heartbeat(); if(mapReady) routing.tick(ctx); }, 15_000);
+  // How long the agents wait for the person: sessions' states compared in memory every 5 s, written only when a wait ends.
+  const waitTimer = setInterval(() => stats?.capture(() => stats!.snapshot(ctx)), 5_000);
 
   const uiDir = join(PROJECT_ROOT, 'dist', 'ui');
   const serveStatic = (req: IncomingMessage, res: ServerResponse): void => {
@@ -450,7 +454,7 @@ export async function startServer(cfg: Config, db: Db, opts: ServeOptions): Prom
     if (stopping) return;
     stopping = true;
     updater.stop();
-    clearInterval(statsTimer); stats?.close();
+    clearInterval(statsTimer); clearInterval(waitTimer); stats?.close();
     stopTeamWatch();
     stopHarnessInstalls();
     server.close();

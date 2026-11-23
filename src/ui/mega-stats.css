@@ -101,6 +101,72 @@
 .mega-stats-two-lines { display: grid; }
 .mega-stats-two-lines b { font-weight: 580; }
 
+/* Qualità: hints as a short list. */
+.mega-stats-hints { display: grid; gap: 8px; }
+.mega-stats-hints li { position: relative; padding: 12px 16px 12px 36px; border: 1px solid var(--g2); border-radius: var(--stats-radius); background: var(--stats-card); font-size: 13px; line-height: 1.45; }
+.mega-stats-hints li::before { content: ''; position: absolute; left: 16px; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: var(--role-attention); }
+.mega-stats-table code { font-size: 11.5px; }
+
+/* Charts. Categorical colours in a fixed order, validated (colour-blind separation, lightness) on these surfaces;
+   two light ones fall under 3:1, so every chart keeps a legend and its table view. Text never takes a series colour. */
+.mega-stats { --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; --chart-grid: #e8e8e6; --chart-base: #c3c2b7; }
+:root[data-theme="dark"] .mega-stats { --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --chart-grid: #232322; --chart-base: #3a3a38; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mega-stats { --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --chart-grid: #232322; --chart-base: #3a3a38; } }
+.mega-stats [data-series="1"] { --series: var(--series-1); }
+.mega-stats [data-series="2"] { --series: var(--series-2); }
+.mega-stats [data-series="3"] { --series: var(--series-3); }
+.mega-stats [data-series="4"] { --series: var(--series-4); }
+
+.mega-stats-charts { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; }
+@media (max-width: 860px) { .mega-stats-charts { grid-template-columns: minmax(0, 1fr); } }
+.stats-chart, .mega-stats-chart-card { display: grid; gap: 12px; margin: 0; min-width: 0; padding: 16px; border: 1px solid var(--g2); border-radius: var(--stats-radius); background: var(--stats-card); }
+.mega-stats-section > .stats-chart { margin-top: 0; }
+.stats-chart figcaption { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.mega-stats h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.stats-chart-total { font-size: 18px; font-weight: 640; letter-spacing: -.02em; }
+.stats-chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--g5); font-size: 12px; }
+.stats-chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.stats-chart-legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--series); }
+.stats-chart-empty { padding: 28px 0; color: var(--g4); font-size: 12.5px; text-align: center; }
+
+/* Plot: hairline grid with the values on the left, columns of at most 24 px with a 4 px round top, square at the base. */
+.stats-chart-plot { position: relative; height: 180px; margin-left: 40px; outline: none; }
+.stats-chart-plot:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg); border-radius: 4px; }
+.stats-chart-grid > span { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--chart-grid); }
+.stats-chart-grid > span.base { border-top-color: var(--chart-base); }
+.stats-chart-grid b { position: absolute; right: calc(100% + 8px); top: -7px; color: var(--g4); font-size: 10.5px; font-weight: 450; line-height: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.stats-chart-cols { position: absolute; inset: 0; display: flex; align-items: stretch; }
+.stats-chart-slot { position: relative; flex: 1 1 0; min-width: 0; display: flex; align-items: flex-end; justify-content: center; cursor: crosshair; }
+.stats-chart-col { display: flex; flex-direction: column-reverse; gap: 2px; width: min(24px, 64%); min-height: 0; transition: opacity .12s; }
+.stats-chart-col > span { flex: 1 1 0; min-height: 2px; background: var(--series); }
+.stats-chart-col > span:last-child { border-radius: 4px 4px 0 0; }
+.stats-chart-cols.hovering .stats-chart-slot:not(.on) .stats-chart-col { opacity: .42; }
+.stats-chart-slot.on { background: linear-gradient(to top, color-mix(in srgb, var(--fg) 4%, transparent), transparent); }
+.stats-chart-x { position: relative; height: 16px; margin: -4px 0 0 40px; color: var(--g4); font-size: 10.5px; }
+.stats-chart-x span { position: absolute; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* One tooltip: the interval, the value in strong ink, then each series with a line key. */
+.stats-chart-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); z-index: 2; display: grid; gap: 3px; min-width: 120px; padding: 8px 10px; border: 1px solid var(--g2); border-radius: 8px; background: var(--bg); box-shadow: 0 6px 20px rgb(0 0 0 / 12%); font-size: 12px; pointer-events: none; white-space: nowrap; }
+.stats-chart-tip[hidden] { display: none; }
+.stats-chart-tip-when { color: var(--g4); font-size: 11px; }
+.stats-chart-tip > strong { font-size: 15px; font-weight: 640; }
+.stats-chart-tip-row { display: flex; align-items: center; gap: 6px; color: var(--g5); }
+.stats-chart-tip-row i { width: 10px; height: 2px; border-radius: 1px; background: var(--series); }
+.stats-chart-tip-row b { color: var(--fg); font-weight: 600; }
+
+.stats-chart-data > summary { width: fit-content; color: var(--g4); font-size: 11.5px; cursor: pointer; }
+.stats-chart-data > summary:hover { color: var(--fg); }
+.stats-chart-data[open] > summary { margin-bottom: 6px; }
+
+/* Bars in a natural order (time to answer). */
+.stats-ordered { display: grid; gap: 8px; }
+.stats-ordered li { display: grid; grid-template-columns: 110px minmax(0, 1fr) 72px; align-items: center; gap: 12px; font-size: 12.5px; }
+.stats-ordered-label { color: var(--g5); }
+.stats-ordered-track { height: 12px; }
+.stats-ordered-track i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--series-1); }
+.stats-ordered b { text-align: right; font-weight: 580; }
+@media (max-width: 520px) { .stats-ordered li { grid-template-columns: 90px minmax(0, 1fr) 60px; gap: 8px; } }
+
 /* Tables. */
 .mega-stats-table-wrap { overflow-x: auto; }
 .mega-stats-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12.5px; }

@@ -52,6 +52,50 @@ export interface StatsTeam {
 }
 /** One line of «Per account»: the main account of a CLI or one of its extra accounts. */
 export interface StatsAccount { key: string; agent: string; account: string | null; label: string | null; sessions: number; activeMs: number; usage: StatsUsage }
+/** One line of «Qualità»: an agent·model·role, or a squad. */
+export interface StatsQualityRow {
+  key: string; label: string; agent: string | null; model: string | null; role: string | null;
+  created: number; completed: number; reopened: number; blocked: number;
+  /** From creation to «fatto», for the tasks closed in the period. */
+  cycle: StatsLatency;
+  /** Tokens of the line's sessions in the period divided by the tasks they closed; null without closed tasks or records. */
+  tokensPerTask: number | null;
+}
+/**
+ * How the squads' work went, from the boards' transitions recorded by Visual Brain (from 0.2.63 on), and how long the
+ * agents waited for the person. Counts only: no titles, results or prompts.
+ */
+export interface StatsQuality {
+  /** First recorded transition; null: none yet. */
+  since: number | null;
+  created: number; completed: number;
+  /** Closed tasks put back to «da fare» or «in corso»: work to redo. */
+  reopened: number;
+  blocked: number; reassigned: number;
+  cycle: StatsLatency;
+  blockedMs: number;
+  /** Permission dialogs and questions in the terminals: how many, and how long until the person answered. */
+  waits: { n: number; open: number; permission: number; input: number; response: StatsLatency;
+    /** Answers by time to answer: under 1 min, 1–5 min, 5–15 min, 15–60 min, over an hour. */
+    histogram: number[] };
+  workers: StatsQualityRow[];
+  teams: StatsQualityRow[];
+  /** Local API calls that failed, by route (ids replaced), most frequent first. */
+  failures: { route: string; status: number; n: number }[];
+}
+/**
+ * The period in intervals (5 min for an hour, 1 h for a day, 6 h for a week), aligned to the local clock; the first
+ * interval starts with the period, so the sums match the totals.
+ */
+export interface StatsTimeline {
+  /** Interval edges: interval i is [edges[i], edges[i+1]). */
+  edges: number[];
+  /** Tokens (read + written, cache apart) per account; the main account of a CLI has key «agent:». */
+  tokens: { key: string; agent: string; label: string | null; values: number[] }[];
+  requests: number[];
+  completed: number[];
+  reopened: number[];
+}
 export interface MegaStatsReport {
   from: number; to: number; updatedAt: number; observedMs: number; coverageStart: number;
   projects: { id: number; name: string }[];
@@ -63,5 +107,7 @@ export interface MegaStatsReport {
   /** Sessions whose CLI keeps records but none was found. */
   usageMissing: number;
   accounts: StatsAccount[];
+  quality: StatsQuality;
+  timeline: StatsTimeline;
   unattributedHttp: number;
 }

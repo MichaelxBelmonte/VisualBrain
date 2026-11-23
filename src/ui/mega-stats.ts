@@ -1,12 +1,14 @@
 // Stats: what the agents are doing now and what they did in the period, in four tabs.
 // - Panoramica: what waits for the person, the agents now, the period in figures, where the work went.
+// - Qualità: how the squads' tasks went (time to done, rework, blocks), how long the agents waited for the person, hints.
 // - Sessioni: each project with its squads (tasks by status) and its sessions.
 // - Account: usage per account of Claude Code and Codex, and the providers' limits.
 // - Dettagli tecnici: Visual Brain's own measures (local API traffic, hook-reported turns, latencies).
 // Turns, tokens and models come from the CLIs' own records (exact, not estimated); tasks from the squads' boards.
-import type { MegaStatsReport, StatsAccount, StatsLatency, StatsMeasures, StatsSession, StatsTeam, StatsUsage } from '../shared/mega-stats.ts';
+import type { MegaStatsReport, StatsAccount, StatsLatency, StatsMeasures, StatsQuality, StatsQualityRow, StatsSession, StatsTeam, StatsTimeline, StatsUsage } from '../shared/mega-stats.ts';
 import { getLanguage, t } from './i18n.ts';
 import { mountQuotaPanel } from './quota-panel.ts';
+import { columnChart, orderedBars, type ColumnSeries } from './stats-charts.ts';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, className?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -284,8 +286,22 @@ function byProject(r: MegaStatsReport): HTMLElement | null {
   return box;
 }
 
+/** Andamento: tokens per account and requests over the period, interval by interval. */
+function trend(r: MegaStatsReport): HTMLElement {
+  const box = section(t('Andamento'), t('Passa sopra una colonna (o usa le frecce) per i valori di quell’intervallo.'));
+  // At most four colours: past four accounts the smallest ones fold into «Altri».
+  const lines = r.timeline.tokens.map(s => ({ key: s.key, label: `${agentName(s.agent)} · ${s.label ?? t('Principale')}`, values: s.values }));
+  const series: ColumnSeries[] = lines.length > 4 ? [...lines.slice(0, 3), { key: 'other', label: t('Altri'), values: lines.slice(3).reduce((acc, s) => acc.map((v, i) => v + (s.values[i] ?? 0)), lines[3].values.map(() => 0)) }] : lines;
+  const grid = el('div', undefined, 'mega-stats-charts');
+  grid.append(
+    columnChart({ title: t('Token per account'), note: t('letti e scritti, cache esclusa'), edges: r.timeline.edges, series, empty: t('Nessun token registrato nel periodo.') }),
+    columnChart({ title: t('Richieste agli agenti'), note: t('messaggi tuoi o di Visual Brain'), edges: r.timeline.edges, series: [{ key: 'requests', label: t('Richieste'), values: r.timeline.requests }], format: n => numeric(n, 0), empty: t('Nessuna richiesta nel periodo.') }));
+  box.append(grid);
+  return box;
+}
+
 function overview(r: MegaStatsReport, hours: string): HTMLElement[] {
-  return [needsYou(r), nowCards(r), periodCards(r, hours), byProject(r)].filter((x): x is HTMLElement => !!x);
+  return [needsYou(r), nowCards(r), periodCards(r, hours), trend(r), byProject(r)].filter((x): x is HTMLElement => !!x);
 }
 
 /** A squad: its name, tasks by status as a bar, and its board. */
@@ -386,20 +402,114 @@ function latencyTable(m: StatsMeasures) {
 function technicalTab(r: MegaStatsReport): HTMLElement[] {
   const box = section(t('Dettagli tecnici'), t('Misure di Visual Brain stesso: servono a diagnosticare l’app, non a leggere il lavoro degli agenti.'));
   box.append(cards(
-    card(t('Richieste HTTP'), numeric(r.totals.http, 0), t('Errori HTTP') + ' · ' + numeric(r.totals.httpErrors, 0), r.totals.httpErrors ? 'blocked' : undefined),
-    card(t('Turni dagli hook'), numeric(r.totals.turns, 0), t('Turni senza coppia') + ' · ' + numeric(r.totals.unpairedTurns, 0)),
-    card(t('HTTP senza attribuzione'), numeric(r.unattributedHttp, 0)),
-    card(t('Copertura del server'), duration(r.observedMs))));
+    // Some failed calls are normal (a terminal already closed, something no longer there): colour only above 5%.
+    card(t('Richieste HTTP dei nodi'), numeric(r.totals.http, 0), t('{n} errori').replace('{n}', numeric(r.totals.httpErrors, 0)) + (r.totals.http ? ` (${Math.round(r.totals.httpErrors / r.totals.http * 1000) / 10}%)` : ''), r.totals.http && r.totals.httpErrors / r.totals.http > .05 ? 'blocked' : undefined),
+    card(t('Richieste generali dell’app'), numeric(r.unattributedHttp, 0), t('l’interfaccia che si aggiorna, senza un nodo')),
+    card(t('Turni dagli hook'), numeric(r.totals.turns, 0), t('{n} interrotti o incompleti').replace('{n}', numeric(r.totals.unpairedTurns, 0))),
+    card(t('App accesa'), duration(r.observedMs), t('nel periodo scelto'))));
   box.append(latencyTable(r.totals));
+  if (r.quality.failures.length) box.append(table([t('Chiamata non riuscita'), t('Codice'), t('Volte')],
+    r.quality.failures.map(f => [el('code', f.route), String(f.status), numeric(f.n, 0)]), [1, 2], t('Errori per funzione')));
   const windowLine = el('p', undefined, 'mega-stats-meta');
   windowLine.append(t('Finestra richiesta'), ' · ', timestamp(r.from), ' – ', timestamp(r.to), ' · ', t('Copertura del server'), ' · ', t('Dal'), ' ', timestamp(r.coverageStart));
   box.append(windowLine, el('p', t('HTTP: richieste all’API locale di Visual Brain, non al modello. Turni dagli hook e latenze: solo per le sessioni con hook attivi (membri di squadra; Codex con hook approvati in /hooks). P50 e P95 usano il rango più vicino. Conservazione locale: 7 giorni.'), 'mega-stats-meta'));
   return [box];
 }
 
-type Tab = 'overview' | 'sessions' | 'accounts' | 'technical';
+const percent = (part: number, whole: number) => whole ? Math.round(part / whole * 100) + '%' : '—';
+
+function workerName(w: StatsQualityRow): HTMLElement {
+  const name = el('span', undefined, 'mega-stats-two-lines');
+  name.append(el('b', [agentName(w.agent ?? ''), w.model ? modelName(w.model) : ''].filter(Boolean).join(' · ')));
+  if (w.role) name.append(el('small', roleNames()[w.role] ?? w.role));
+  return name;
+}
+
+/**
+ * Hints from fixed rules on the figures above (no model): where the person slows the agents, which line redoes work,
+ * which one closes the same work with fewer tokens, how often tasks get stuck.
+ */
+export function hints(q: StatsQuality): string[] {
+  const out: string[] = [];
+  const p50 = q.waits.response.p50Ms;
+  if (q.waits.n >= 3 && p50 !== null && p50 >= 180_000)
+    out.push(t('Gli agenti ti aspettano di solito {d} prima di una risposta: in quel tempo sono fermi. Con la consegna automatica e i permessi per i comandi sicuri lavorano senza fermarsi.').replace('{d}', duration(p50)));
+  if (q.waits.n >= 5 && q.waits.permission / q.waits.n >= .6)
+    out.push(t('{p} delle attese sono permessi: autorizzare in anticipo i comandi che approvi sempre toglie la maggior parte delle interruzioni.').replace('{p}', percent(q.waits.permission, q.waits.n)));
+  for (const w of q.workers) if (w.role !== 'reviewer' && w.completed >= 3 && w.reopened / w.completed >= .3)
+    out.push(t('{w} come {r}: {p} degli incarichi chiusi sono stati riaperti. Prova un modello più forte per questo ruolo o un revisore nella squadra.')
+      .replace('{w}', [agentName(w.agent ?? ''), w.model ? modelName(w.model) : ''].filter(Boolean).join(' · ')).replace('{r}', (roleNames()[w.role ?? ''] ?? w.role ?? '').toLowerCase()).replace('{p}', percent(w.reopened, w.completed)));
+  const byRole = new Map<string, StatsQualityRow[]>();
+  for (const w of q.workers) if (w.role && w.completed >= 3 && w.tokensPerTask) byRole.set(w.role, [...(byRole.get(w.role) ?? []), w]);
+  for (const [role, list] of byRole) {
+    if (list.length < 2) continue;
+    const sorted = [...list].sort((a, b) => a.tokensPerTask! - b.tokensPerTask!), cheap = sorted[0], dear = sorted.at(-1)!;
+    if (dear.tokensPerTask! >= 2 * cheap.tokensPerTask! && cheap.reopened / cheap.completed <= dear.reopened / dear.completed + .1)
+      out.push(t('Come {r}, {a} chiude un incarico con {x} token, {b} con {y}, e la rilavorazione è simile: per questo ruolo conviene il primo.')
+        .replace('{r}', (roleNames()[role] ?? role).toLowerCase())
+        .replace('{a}', [agentName(cheap.agent ?? ''), modelName(cheap.model)].join(' · ')).replace('{x}', tokens(cheap.tokensPerTask!))
+        .replace('{b}', [agentName(dear.agent ?? ''), modelName(dear.model)].join(' · ')).replace('{y}', tokens(dear.tokensPerTask!)));
+  }
+  if (q.created >= 4 && q.blocked / q.created >= .25)
+    out.push(t('{p} degli incarichi si blocca: incarichi più piccoli, con i file da toccare indicati, si bloccano meno.').replace('{p}', percent(q.blocked, q.created)));
+  return out;
+}
+
+/** Qualità: tasks, waits for the person, who closes the work and at what cost, squads, hints. */
+function qualityTab(q: StatsQuality, timeline: StatsTimeline): HTMLElement[] {
+  if (q.since === null && !q.waits.n && !q.waits.open) {
+    return [el('p', t('Le misure di qualità partono da questa versione: compaiono qui appena le squadre creano e chiudono incarichi.'), 'mega-stats-empty')];
+  }
+  const out: HTMLElement[] = [];
+  const work = section(t('Incarichi delle squadre'), q.since ? t('Registrati dal {d}.').replace('{d}', new Date(q.since).toLocaleString(getLanguage(), { dateStyle: 'short', timeStyle: 'short' })) : undefined);
+  work.append(cards(
+    card(t('Incarichi chiusi'), numeric(q.completed, 0), t('{n} creati nel periodo').replace('{n}', numeric(q.created, 0))),
+    card(t('Tempo fino a «fatto»'), duration(q.cycle.p50Ms), q.cycle.p95Ms !== null ? t('metà entro questo tempo, il 95% entro {d}').replace('{d}', duration(q.cycle.p95Ms)) : t('dalla creazione alla chiusura')),
+    card(t('Rilavorazione'), percent(q.reopened, q.completed), t('{n} riaperti dopo «fatto»').replace('{n}', numeric(q.reopened, 0)), q.completed >= 3 && q.reopened / q.completed >= .3 ? 'attention' : undefined),
+    card(t('Tempo bloccato'), duration(q.blockedMs), t('{n} blocchi · {m} riassegnati').replace('{n}', numeric(q.blocked, 0)).replace('{m}', numeric(q.reassigned, 0)), q.blocked ? 'blocked' : undefined)));
+  work.append(columnChart({ title: t('Incarichi chiusi e riaperti'), note: t('per intervallo del periodo'), edges: timeline.edges, format: n => numeric(n, 0), additive: false, empty: t('Nessun incarico chiuso nel periodo.'),
+    series: [{ key: 'done', label: t('Chiusi'), values: timeline.completed }, { key: 'reopened', label: t('Riaperti'), values: timeline.reopened }] }));
+  out.push(work);
+
+  const you = section(t('Quanto aspettano te'), t('Permessi e domande nei terminali, da quando compaiono a quando rispondi (precisione di qualche secondo).'));
+  const w = q.waits;
+  you.append(cards(
+    card(t('Richieste a te'), numeric(w.n, 0), t('{p} permessi · {q} domande').replace('{p}', numeric(w.permission, 0)).replace('{q}', numeric(w.input, 0))),
+    card(t('Risposta tipica'), duration(w.response.p50Ms), t('metà delle volte entro questo tempo'), w.response.p50Ms !== null && w.response.p50Ms >= 180_000 ? 'attention' : undefined),
+    card(t('Risposte più lente'), duration(w.response.p95Ms), t('il 5% delle volte oltre questo tempo')),
+    card(t('Aspettano adesso'), numeric(w.open, 0), undefined, w.open ? 'attention' : undefined)));
+  if (w.n) {
+    const spread = el('div', undefined, 'mega-stats-chart-card');
+    spread.append(el('h4', t('Dopo quanto rispondi')), orderedBars([t('meno di 1 min'), t('1–5 min'), t('5–15 min'), t('15–60 min'), t('oltre un’ora')].map((label, i) => ({ label, value: w.histogram[i] ?? 0 })),
+      n => n === 1 ? t('1 volta') : t('{n} volte').replace('{n}', numeric(n, 0))));
+    you.append(spread);
+  }
+  out.push(you);
+
+  const tips = hints(q);
+  const advice = section(t('Cosa migliorare'), t('Suggerimenti da regole fisse sui numeri di questa pagina, non da un modello.'));
+  if (tips.length) { const list = el('ul', undefined, 'mega-stats-hints'); for (const tip of tips) list.append(el('li', tip)); advice.append(list); }
+  else advice.append(el('p', q.completed >= 3 || w.n >= 3 ? t('Nessun punto debole evidente nel periodo.') : t('Servono qualche incarico chiuso e qualche risposta tua per dare suggerimenti.'), 'mega-stats-meta'));
+  out.push(advice);
+
+  if (q.workers.length) {
+    const who = section(t('Chi chiude gli incarichi'), t('Per agente, modello e ruolo. Token per incarico: i token delle sue sessioni nel periodo divisi per gli incarichi che ha chiuso.'));
+    who.append(table([t('Agente e ruolo'), t('Chiusi'), t('Riaperti'), t('Bloccati'), t('Tempo tipico'), t('Token per incarico')],
+      q.workers.map(x => [workerName(x), numeric(x.completed, 0), x.reopened ? `${x.reopened} (${percent(x.reopened, x.completed)})` : '0', numeric(x.blocked, 0), duration(x.cycle.p50Ms), x.tokensPerTask === null ? '—' : tokens(x.tokensPerTask)]), [1, 2, 3, 4, 5]));
+    out.push(who);
+  }
+  if (q.teams.length) {
+    const squads = section(t('Per squadra'));
+    squads.append(table([t('Squadra'), t('Creati'), t('Chiusi'), t('Riaperti'), t('Bloccati'), t('Tempo tipico')],
+      q.teams.map(x => [x.label, numeric(x.created, 0), numeric(x.completed, 0), numeric(x.reopened, 0), numeric(x.blocked, 0), duration(x.cycle.p50Ms)]), [1, 2, 3, 4, 5]));
+    out.push(squads);
+  }
+  return out;
+}
+
+type Tab = 'overview' | 'quality' | 'sessions' | 'accounts' | 'technical';
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'overview', label: 'Panoramica' }, { id: 'sessions', label: 'Sessioni' }, { id: 'accounts', label: 'Account' }, { id: 'technical', label: 'Dettagli tecnici' },
+  { id: 'overview', label: 'Panoramica' }, { id: 'quality', label: 'Qualità' }, { id: 'sessions', label: 'Sessioni' }, { id: 'accounts', label: 'Account' }, { id: 'technical', label: 'Dettagli tecnici' },
 ];
 /** Per-viewer conveniences (tab, period): storage can be missing, the page works without it. */
 const remember = {
@@ -508,6 +618,7 @@ export function mountMegaStats(root: HTMLElement): () => void {
       overviewButton.append(badge);
     }
     panels.get('overview')!.replaceChildren(...overview(r, hours));
+    panels.get('quality')!.replaceChildren(...qualityTab(r.quality, r.timeline));
     panels.get('sessions')!.replaceChildren(...sessionsTab(r));
     accountsBox.replaceChildren(accountsTab(r));
     panels.get('technical')!.replaceChildren(...technicalTab(r));
@@ -520,7 +631,7 @@ export function mountMegaStats(root: HTMLElement): () => void {
     const now = new AbortController();
     request = now;
     if (reset) {
-      for (const id of ['overview', 'sessions', 'technical'] as Tab[]) panels.get(id)!.replaceChildren();
+      for (const id of ['overview', 'quality', 'sessions', 'technical'] as Tab[]) panels.get(id)!.replaceChildren();
       accountsBox.replaceChildren();
       meta.replaceChildren();
     }

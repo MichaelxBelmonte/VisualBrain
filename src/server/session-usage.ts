@@ -111,6 +111,38 @@ export function usageOf(file: string, agent: 'claude' | 'codex', from: number, t
   return usage;
 }
 
+/** The interval holding `at` (binary search over the edges); -1 outside them. The last interval includes its end. */
+export function bucketOf(edges: readonly number[], at: number): number {
+  const last = edges.length - 1;
+  if (last < 1 || at < edges[0] || at > edges[last]) return -1;
+  let lo = 0, hi = last - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (edges[mid] <= at) lo = mid; else hi = mid - 1; }
+  return lo;
+}
+
+/**
+ * Requests and tokens (read + written) of a record per interval, in one pass over what is already parsed. Codex keeps a
+ * running total: each total adds its difference from the previous one to its own interval, so the intervals sum to the
+ * period's figure.
+ */
+export function usageBuckets(file: string, agent: 'claude' | 'codex', edges: readonly number[]): { turns: number[]; tokens: number[] } | undefined {
+  const p = parsed(file, agent);
+  if (!p) return undefined;
+  const n = Math.max(0, edges.length - 1), turns = new Array<number>(n).fill(0), tokens = new Array<number>(n).fill(0);
+  for (const at of p.starts.length ? p.starts : p.prompts) { const i = bucketOf(edges, at); if (i >= 0) turns[i]++; }
+  if (agent === 'claude') {
+    for (const a of p.answers.values()) { const i = bucketOf(edges, a.at); if (i >= 0) tokens[i] += a.input + a.output; }
+  } else {
+    let prev = 0;
+    for (const t of p.totals) {
+      const worked = Math.max(0, t.input - t.cached) + t.output, i = bucketOf(edges, t.at);
+      if (i >= 0) tokens[i] += Math.max(0, worked - prev);
+      prev = worked;
+    }
+  }
+  return { turns, tokens };
+}
+
 export function addUsage(into: StatsUsage, u: StatsUsage): void {
   into.turns += u.turns; into.input += u.input; into.output += u.output; into.cacheRead += u.cacheRead; into.cacheWrite += u.cacheWrite;
   if (u.model) into.model = u.model;
