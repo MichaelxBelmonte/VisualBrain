@@ -3,7 +3,7 @@ import { api, type AgentCli } from './api.ts';
 import { getLanguage, setLanguage, t as tr, ui, type Language } from './i18n.ts';
 import { sectionViews } from './section-views.ts';
 import { glassEnabled, nativeMac, setGlass, syncWindowTheme } from './window-chrome.ts';
-import type { TerminalInfo } from '../shared/types.ts';
+import type { AgentAccountStatus, TerminalInfo } from '../shared/types.ts';
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 export type SettingsSection = 'general' | 'folders' | 'agents' | 'github' | 'updates' | 'shortcuts';
@@ -147,9 +147,9 @@ export function cliState(c: AgentCli): { tone: 'ok' | 'warn' | 'off'; text: stri
 
 async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
   root.innerHTML = ui`<p class="muted">Controllo le CLI installate…</p>`;
-  let open: string | null = null;
+  let open: string | null = null, advanced: string | null = null;
   const draw = async (fresh: boolean) => {
-    const [{ clis, sessions }, harnesses] = await Promise.all([api.agents(fresh), api.harnesses()]);
+    const [{ clis, sessions, accounts = [] }, harnesses] = await Promise.all([api.agents(fresh), api.harnesses()]);
     if (!root.isConnected) return;
     ctx.badge('agents', clis.filter(needsUser).length);
     const row = (c: AgentCli) => {
@@ -158,8 +158,26 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
         : (c.signedIn === false ? ui`<button class="btn small primary" data-act="login" data-cli="${c.id}">Accedi</button>` : '') + ui`<button class="btn small" data-act="update" data-cli="${c.id}">Aggiorna</button>`;
       const detail = ui`<dl class="cli-detail"><dt>Eseguibile</dt><dd><code>${esc(c.path ?? c.command)}</code></dd><dt>Installazione</dt><dd><code>${esc(c.installCommand)}</code></dd>${c.account ? ui`<dt>Account</dt><dd>${esc(c.account)}</dd>` : ''}<dt>Usato da</dt><dd>${used ? ui`${used} sessioni attive` : tr('nessuna sessione')}</dd></dl>
         <div class="cli-more">${c.path ? ui`<button class="btn small ghost" data-act="login" data-cli="${c.id}">${c.signedIn === true ? tr('Cambia account') : tr('Accedi')}</button>` : ''}${c.path && c.canLogout && c.signedIn !== false ? ui`<button class="btn small ghost" data-act="logout" data-cli="${c.id}">Esci</button>` : ''}<button class="btn small ghost" data-copy="${c.id}">Copia diagnostica</button></div>
-        ${used && c.path ? ui`<p class="muted">Aggiornare non interrompe le ${used} sessioni aperte: continuano con la versione attuale finché non le riavvii.</p>` : ''}`;
-      return `<div class="cli-row" data-row="${c.id}"><button type="button" class="cli-summary" data-toggle="${c.id}" aria-expanded="${open === c.id}"><span class="cli-dot" data-tone="${s.tone}"></span><span class="cli-name"><b>${esc(c.label)}</b><small>${esc(c.version ? `v${c.version}` : c.command)}</small></span><span class="cli-state" data-tone="${s.tone}">${esc(s.text)}</span></button><span class="cli-actions">${actions}</span>${open === c.id ? `<div class="cli-open">${detail}</div>` : ''}</div>`;
+        ${used && c.path ? ui`<p class="muted">Aggiornare non interrompe le ${used} sessioni aperte: continuano con la versione attuale finché non le riavvii.</p>` : ''}
+        ${c.path && (c.id === 'claude' || c.id === 'codex') ? ui`<form class="cli-add-account" data-add-account="${c.id}"><input name="label" maxlength="40" required placeholder="Nome del nuovo account (es. Lavoro)" aria-label="Nome del nuovo account"><button class="btn small" type="submit">Aggiungi account</button></form><p class="muted">Un altro abbonamento da usare insieme a quello principale: nel lancio lo scegli dal menu Agente. Ha impostazioni, memoria e cronologia proprie.</p>` : ''}`;
+      return `<div class="cli-row" data-row="${c.id}"><button type="button" class="cli-summary" data-toggle="${c.id}" aria-expanded="${open === c.id}"><span class="cli-dot" data-tone="${s.tone}"></span><span class="cli-name"><b>${esc(c.label)}</b><small>${esc(c.version ? `v${c.version}` : c.command)}</small></span><span class="cli-state" data-tone="${s.tone}">${esc(s.text)}</span></button><span class="cli-actions">${actions}</span>${open === c.id ? `<div class="cli-open">${detail}</div>` : ''}</div>` + accounts.filter(a => a.agent === c.id).map(accountRow).join('');
+    };
+    // An extra account under its CLI: the name chosen by the person, the email the CLI reports, sign-in and removal.
+    const accountRow = (a: AgentAccountStatus) => {
+      const tone = a.signedIn === false ? 'warn' : 'ok';
+      const state = a.signedIn === false ? tr('Accesso richiesto') : a.signedIn === true ? tr('Pronto') : tr('Stato sconosciuto');
+      const sub = a.email ?? (a.sessions ? ui`${a.sessions} sessioni attive` : tr('Account aggiuntivo'));
+      const actions = (a.signedIn === false ? ui`<button class="btn small primary" data-account="${a.id}" data-account-act="login">Accedi</button>` : ui`<button class="btn small ghost" data-account="${a.id}" data-account-act="logout">Esci</button>`)
+        + ui`<button class="btn small ghost" data-account-adv="${a.id}" aria-expanded="${advanced === a.id}">Avanzate</button>`
+        + ui`<button class="btn small ghost" data-account="${a.id}" data-account-act="remove" ${a.sessions ? ui`disabled title="Chiudi prima le sessioni attive di questo account"` : ''}>Rimuovi</button>`;
+      // Avanzate: off by default. Linked, never copied; settings, default model, permissions and sign-in stay separate.
+      const option = (key: 'memory' | 'tools', title: string, note: string) => ui`<label class="cli-share"><input type="checkbox" data-share="${key}" data-share-account="${a.id}" ${a.share?.[key] ? 'checked' : ''}><span><b>${title}</b><small>${note}</small></span></label>`;
+      const share = advanced !== a.id ? '' : `<div class="cli-open">${a.agent === 'claude'
+        ? option('memory', tr('Memoria dell’account principale'), tr('Le sessioni leggono e scrivono la memoria automatica del progetto dell’account principale. Una memoria di squadra propria resta prioritaria.'))
+          + option('tools', tr('Skill, plugin, comandi, agenti e CLAUDE.md dell’account principale'), tr('Collegati, non copiati: una modifica vale per entrambi gli account. I plugin attivi sono quelli dell’account principale.'))
+        : option('tools', tr('Skill, regole, prompt e AGENTS.md dell’account principale'), tr('Collegati, non copiati: una modifica vale per entrambi gli account.'))
+      }${ui`<p class="muted">Impostazioni, modello predefinito, permessi e accesso restano separati. Vale per le sessioni avviate da ora; ciò che l’account aveva di suo resta da parte e torna quando spegni l’opzione.</p>`}</div>`;
+      return `<div class="cli-row cli-account" data-account-row="${esc(a.id)}"><div class="cli-summary static" title="${esc(a.home)}"><span class="cli-dot" data-tone="${tone}"></span><span class="cli-name"><b>${esc(a.label)}</b><small>${esc(sub)}</small></span><span class="cli-state" data-tone="${tone}">${esc(state)}</span></div><span class="cli-actions">${actions}</span>${share}</div>`;
     };
     const steps: Record<string, string> = { download: tr('Scaricamento componenti'), python: tr('Preparazione Python'), packages: tr('Installazione pacchetti'), verify: tr('Verifica installazione') };
     const harnessRow = (h: Awaited<ReturnType<typeof api.harnesses>>[number]) => {
@@ -181,6 +199,32 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
       b.disabled = true;
       try { const r = await api.agentAction(b.dataset.cli!, b.dataset.act as 'install' | 'update' | 'login' | 'logout'); ctx.terminal(r.info); }
       catch (e) { error.textContent = String(e); b.disabled = false; }
+    }));
+    root.querySelectorAll<HTMLFormElement>('[data-add-account]').forEach(form => form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const button = form.querySelector<HTMLButtonElement>('button')!, label = form.querySelector<HTMLInputElement>('input')!.value.trim();
+      if (!label) return;
+      button.disabled = true;
+      try { const r = await api.addAccount(form.dataset.addAccount as 'claude' | 'codex', label); ctx.terminal(r.info); await draw(false); }
+      catch (err) { error.textContent = String(err); button.disabled = false; }
+    }));
+    root.querySelectorAll<HTMLButtonElement>('[data-account-adv]').forEach(b => b.addEventListener('click', () => { advanced = advanced === b.dataset.accountAdv ? null : b.dataset.accountAdv!; void draw(false); }));
+    root.querySelectorAll<HTMLInputElement>('[data-share]').forEach(box => box.addEventListener('change', async () => {
+      const account = accounts.find(a => a.id === box.dataset.shareAccount);
+      if (!account) return;
+      box.disabled = true;
+      try { await api.setAccountShare(account.id, { ...account.share, [box.dataset.share!]: box.checked }); await draw(false); }
+      catch (err) { error.textContent = String(err); box.checked = !box.checked; box.disabled = false; }
+    }));
+    root.querySelectorAll<HTMLButtonElement>('[data-account-act]').forEach(b => b.addEventListener('click', async () => {
+      const id = b.dataset.account!, act = b.dataset.accountAct!;
+      const account = accounts.find(a => a.id === id);
+      if (act === 'remove' && !confirm(ui`Rimuovere l’account «${account?.label ?? id}» da Visual Brain? La sua cartella resta: riaggiungendolo con lo stesso nome ritrovi accesso e conversazioni.`)) return;
+      b.disabled = true;
+      try {
+        if (act === 'remove') { await api.removeAccount(id); await draw(true); }
+        else { const r = await api.accountAction(id, act as 'login' | 'logout'); ctx.terminal(r.info); }
+      } catch (err) { error.textContent = String(err); b.disabled = false; }
     }));
     root.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach(b => b.addEventListener('click', async () => {
       const c = clis.find(x => x.id === b.dataset.copy)!;

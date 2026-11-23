@@ -16,7 +16,7 @@ const FILE = 'sessions.json';
 const RESUMABLE = new Set(['claude', 'codex', 'shell']);
 const VERSION = 1;
 /** Fields of a session worth keeping: identity, place and how to start it again. Live state (attention, activity) is not. */
-const KEPT = ['id', 'agent', 'cwd', 'title', 'name', 'nodeId', 'createdAt', 'model', 'effort', 'role', 'parentId', 'task', 'resumeId', 'branch'] as const;
+const KEPT = ['id', 'agent', 'cwd', 'title', 'name', 'nodeId', 'createdAt', 'model', 'effort', 'role', 'parentId', 'task', 'resumeId', 'branch', 'account'] as const;
 
 interface Saved { info: Partial<TerminalInfo>; teamToken: string; seenMessage: number }
 

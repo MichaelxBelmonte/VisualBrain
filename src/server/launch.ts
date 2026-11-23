@@ -9,6 +9,8 @@ import type { Config } from './config.ts';
 import type { AgentName, AgentRole, GraphEdge, LaunchOptions, NodeDetail, TerminalInfo } from '../shared/types.ts';
 import type { TerminalStore } from './terminals.ts';
 import { teamInstructions } from './team.ts';
+import { accountById, accountEnv, agentHome } from './accounts.ts';
+import { sharedClaudeSettings, syncShared } from './account-share.ts';
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -121,8 +123,8 @@ export function launchEmbedded(terms: TerminalStore, agent: AgentName, cfg: Conf
   // Claude takes its conversation id from us, so "Riprendi" finds it without guessing; Codex is found later from its own records.
   const resumeId = agent === 'claude' ? randomUUID() : undefined;
   if (resumeId) command.args.unshift('--session-id', resumeId);
-  const { file, args } = embeddedCommand(agent, command, options.role, memory);
-  return terms.spawn({ ...options, id, teamToken, resumeId, branch, agent, cwd, file, args, env: embeddedEnv(cfg, agent, detail.id, id, teamToken, options.role, memory), title: `${agent} · ${detail.name}`, nodeId: detail.id, cols: size?.cols, rows: size?.rows });
+  const { file, args } = embeddedCommand(agent, command, options.role, memory, options.account, cwd);
+  return terms.spawn({ ...options, id, teamToken, resumeId, branch, agent, cwd, file, args, env: embeddedEnv(cfg, agent, detail.id, id, teamToken, options.role, memory, options.account), title: `${agentTitle(agent, options.account)} · ${detail.name}`, nodeId: detail.id, cols: size?.cols, rows: size?.rows });
 }
 
 /** The command reopening an ended conversation, with the same model and effort; the optional prompt tells a team member to reread the board. */
@@ -135,17 +137,21 @@ export function resumeCommand(agent: 'claude' | 'codex', cfg: Config, cwd: strin
 /** An ended session started again under the same id: same team token, code, role and node, so the board still knows it. */
 export function resumeEmbedded(terms: TerminalStore, cfg: Config, info: TerminalInfo, resumeId: string, teamToken: string, seenMessage: number, size?: { cols: number; rows: number }, memory?: string) {
   const agent = info.agent as 'claude' | 'codex';
-  const options: LaunchOptions = { model: info.model, effort: info.effort, role: info.role, parentId: info.parentId, task: info.task };
+  const options: LaunchOptions = { model: info.model, effort: info.effort, role: info.role, parentId: info.parentId, task: info.task, ...(info.account ? { account: info.account } : {}) };
   const prompt = info.role ? (cfg.language === 'en'
     ? 'Visual Brain restarted this session after its process ended. Read the board before resuming. Check each task’s current owner, blocker and checkpoint. Claim available work before starting.'
     : 'Visual Brain ha riavviato questa sessione dopo la chiusura del processo. Prima di riprendere, rileggi la bacheca. Verifica proprietario, blocco e checkpoint di ogni incarico. Rivendica il lavoro disponibile prima di iniziare.') : undefined;
-  const { file, args } = embeddedCommand(agent, resumeCommand(agent, cfg, info.cwd, resumeId, options, prompt), info.role, memory);
-  return terms.spawn({ ...options, id: info.id, createdAt: info.createdAt, branch: info.branch, teamToken, seenMessage, resumeId, agent, cwd: info.cwd, file, args, env: embeddedEnv(cfg, agent, info.nodeId ?? null, info.id, teamToken, info.role, memory), title: info.title, nodeId: info.nodeId, cols: size?.cols, rows: size?.rows });
+  const { file, args } = embeddedCommand(agent, resumeCommand(agent, cfg, info.cwd, resumeId, options, prompt), info.role, memory, info.account, info.cwd);
+  return terms.spawn({ ...options, id: info.id, createdAt: info.createdAt, branch: info.branch, teamToken, seenMessage, resumeId, agent, cwd: info.cwd, file, args, env: embeddedEnv(cfg, agent, info.nodeId ?? null, info.id, teamToken, info.role, memory, info.account), title: info.title, nodeId: info.nodeId, cols: size?.cols, rows: size?.rows });
 }
 
 /** Claude and Codex get the visual_brain MCP bridge (and Claude the turn hooks of a team member); Codex starts from the login shell. */
-function embeddedCommand(agent: AgentName, command: { file: string; args: string[] }, role?: AgentRole, memory?: string): { file: string; args: string[] } {
+function embeddedCommand(agent: AgentName, command: { file: string; args: string[] }, role?: AgentRole, memory?: string, account?: string, cwd = ''): { file: string; args: string[] } {
   let { file, args } = command;
+  // An extra account that borrows skills and plugins from the main one: links made now, so a new entry of the main
+  // folder is seen too. A failure (a file in the way) never stops the launch.
+  const borrowing = accountById(account);
+  if (borrowing && borrowing.agent === agent) try { syncShared(borrowing); } catch (error) { console.warn('[account] condivisione non aggiornata:', (error as Error).message); }
   if (agent === 'codex' || agent === 'claude') {
     const bridge = fileURLToPath(new URL('./team-mcp.mjs', import.meta.url));
     const variables = ['VB_EXPLORE_URL', ...(role ? ['VB_STATE_URL', 'VB_SESSION_ID', 'VB_TEAM_TOKEN'] : [])];
@@ -164,7 +170,7 @@ function embeddedCommand(agent: AgentName, command: { file: string; args: string
         '-c', `mcp_servers.visual_brain.args=${JSON.stringify([bridge])}`,
         '-c', `mcp_servers.visual_brain.env_vars=${JSON.stringify(variables)}`,
         ...args.slice(at)];
-    } else args = [...(role ? ['--settings', claudeHookSettings(memory && memory !== 'off' ? memoryDirectory(memory) : undefined)] : []), '--mcp-config', JSON.stringify({ mcpServers: { visual_brain: {
+    } else args = [...claudeSettingsFlag(role, memory, account, cwd), '--mcp-config', JSON.stringify({ mcpServers: { visual_brain: {
       type: 'stdio', command: process.execPath, args: [bridge],
       env: Object.fromEntries(variables.map(name => [name, '${' + name + '}'])),
     } } }), ...args];
@@ -179,12 +185,37 @@ function embeddedCommand(agent: AgentName, command: { file: string; args: string
   return { file, args };
 }
 
-function embeddedEnv(cfg: Config, agent: AgentName, nodeId: number | null, id: string, teamToken: string, role?: AgentRole, memory?: string): Record<string, string> | undefined {
+/** The agent's name in a session title; with an extra account, its name too ("claude (Lavoro)"). */
+function agentTitle(agent: AgentName, account?: string): string {
+  const label = accountById(account)?.label;
+  return label ? `${agent} (${label})` : agent;
+}
+
+function embeddedEnv(cfg: Config, agent: AgentName, nodeId: number | null, id: string, teamToken: string, role?: AgentRole, memory?: string, account?: string): Record<string, string> | undefined {
+  // An extra account: the CLI reads sign-in and conversations from that account's folder.
+  const own = accountEnv(agent, account);
+  const env = nodeEnv(cfg, agent, nodeId, id, teamToken, role, memory);
+  return env || Object.keys(own).length ? { ...env, ...own } : undefined;
+}
+
+function nodeEnv(cfg: Config, agent: AgentName, nodeId: number | null, id: string, teamToken: string, role?: AgentRole, memory?: string): Record<string, string> | undefined {
   if (nodeId === null) return undefined;
   const explore = { VB_EXPLORE_URL: `http://${cfg.host}:${cfg.port}/api/explore?node=${nodeId}` };
   // Claude Code's documented switch for auto memory; Codex keeps its own setting (memories, off unless the person enabled it).
   const noMemory: Record<string, string> = agent === 'claude' && memory === 'off' ? { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' } : {};
   return role ? { ...hookEnv(cfg, nodeId, id, teamToken), ...explore, ...noMemory } : agent === 'codex' || agent === 'claude' ? explore : undefined;
+}
+
+/**
+ * The --settings of a Claude Code session: the turn hooks of a team member, and for an extra account what it borrows
+ * from the main one (memory, enabled plugins). A squad memory of its own wins over the borrowed memory. Nothing to add:
+ * no flag at all, as before.
+ */
+function claudeSettingsFlag(role: AgentRole | undefined, memory: string | undefined, account: string | undefined, cwd: string): string[] {
+  const squad = memory && memory !== 'off' ? memoryDirectory(memory) : undefined;
+  const shared = sharedClaudeSettings(account, cwd, memory);
+  if (!Object.keys(shared).length) return role ? ['--settings', claudeHookSettings(squad)] : [];
+  return ['--settings', JSON.stringify({ ...shared, ...(role ? JSON.parse(claudeHookSettings(squad)) : {}) })];
 }
 
 /** A squad's own memory directory, created before Claude Code starts in it. */
@@ -198,7 +229,7 @@ function memoryDirectory(dir: string): string {
  * line names the id, cwd and start time): the earliest one started in the same folder from the session's launch on,
  * skipping conversations already bound to another session. Codex has no flag to choose the id at launch.
  */
-export function findCodexSession(cwd: string, createdAt: number, claimed: Set<string>, home = process.env.CODEX_HOME || join(homedir(), '.codex')): string | undefined {
+export function findCodexSession(cwd: string, createdAt: number, claimed: Set<string>, home = agentHome('codex')): string | undefined {
   let best: { id: string; at: number } | undefined;
   for (const r of codexRollouts(cwd, createdAt, home)) if (!claimed.has(r.id) && (!best || r.at < best.at)) best = r;
   return best?.id;
@@ -209,7 +240,7 @@ export function findCodexSession(cwd: string, createdAt: number, claimed: Set<st
  * ("sessione <id>" / "session <id>"). Unlike the guess above it cannot take the conversation of another session started
  * in the same folder in the same seconds; undefined until Codex has recorded that first message.
  */
-export function findCodexSessionOf(session: string, cwd: string, createdAt: number, home = process.env.CODEX_HOME || join(homedir(), '.codex')): string | undefined {
+export function findCodexSessionOf(session: string, cwd: string, createdAt: number, home = agentHome('codex')): string | undefined {
   if (!/^[a-z0-9-]+$/i.test(session)) return undefined;
   const named = new RegExp(`\\bsessione? ${session}\\b`);
   for (const r of codexRollouts(cwd, createdAt, home)) if (named.test(r.head)) return r.id;
@@ -260,7 +291,13 @@ export function launchExternal(agent: AgentName, cfg: Config, detail: NodeDetail
   const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
   const command = agentCommand(agent, cfg, '', cwd, options);
   command.args.pop(); // The last argument is always the prompt, supplied from the file.
-  const cmd = `cd ${sq(cwd)} && ${[sq(command.file), ...command.args.map(sq)].join(' ')} "$(cat ${sq(file)})"`;
+  const borrowing = accountById(options.account);
+  if (borrowing && borrowing.agent === agent) {
+    try { syncShared(borrowing); } catch (error) { console.warn('[account] condivisione non aggiornata:', (error as Error).message); }
+    if (agent === 'claude') command.args.unshift(...claudeSettingsFlag(undefined, undefined, options.account, cwd));
+  }
+  const vars = Object.entries(accountEnv(agent, options.account)).map(([name, value]) => `${name}=${sq(value)} `).join('');
+  const cmd = `cd ${sq(cwd)} && ${vars}${[sq(command.file), ...command.args.map(sq)].join(' ')} "$(cat ${sq(file)})"`;
   const script = `tell application "Terminal"\n activate\n do script ${JSON.stringify(cmd)}\nend tell`;
   const p = spawn('osascript', ['-e', script], { stdio: 'ignore', detached: true });
   p.unref();

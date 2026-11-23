@@ -6,22 +6,32 @@ import { ROLE_WORDS } from './work-roles.ts';
 import { api } from './api.ts';
 import { effortChoices } from '../shared/agent-effort.ts';
 import { parseFileDrop } from './work-input.ts';
-import type { AgentName, AgentRole, ModelChoice, NodeDetail, SavedSquad, SwarmProposal, TeamSummary, TerminalInfo } from '../shared/types.ts';
+import type { AgentAccountStatus, AgentName, AgentRole, ModelChoice, NodeDetail, SavedSquad, SwarmProposal, TeamSummary, TerminalInfo } from '../shared/types.ts';
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const labels = { codex: 'Codex', claude: 'Claude Code', hermes: 'Hermes', agy: 'Antigravity', shell: tr('Terminale') };
 const roles = ROLE_WORDS;
-export type Choice = { agent: TerminalInfo['agent']; model: string; effort: string; role?: AgentRole; name?: string };
+/** `account`: an extra account of the agent CLI (Impostazioni → Agenti); absent: its main account. */
+export type Choice = { agent: TerminalInfo['agent']; model: string; effort: string; account?: string; role?: AgentRole; name?: string };
 
-/** Whether the first `count` members already run the same agent, model and effort. Pure. */
+/** Whether the first `count` members already run the same agent, account, model and effort. Pure. */
 export function allSame(choices: Choice[], count: number): boolean {
   const [first, ...rest] = choices.slice(0, count);
-  return !first || rest.every(c => c.agent === first.agent && c.model === first.model && c.effort === first.effort);
+  return !first || rest.every(c => c.agent === first.agent && c.account === first.account && c.model === first.model && c.effort === first.effort);
 }
 
-/** "Uguale per tutti": every member takes the first member's agent, model and effort; roles and names stay. Pure. */
+/** "Uguale per tutti": every member takes the first member's agent, account, model and effort; roles and names stay. Pure. */
 export function sameForAll(choices: Choice[], count: number): Choice[] {
   const first = choices[0];
-  return choices.map((c, i) => i > 0 && i < count ? { ...c, agent: first.agent, model: first.model, effort: first.effort } : c);
+  return choices.map((c, i) => i > 0 && i < count ? { ...c, agent: first.agent, account: first.account, model: first.model, effort: first.effort } : c);
+}
+
+/** The agent menu's value: the agent, or agent@account for an extra account. Pure. */
+export function agentValue(choice: Pick<Choice, 'agent' | 'account'>): string {
+  return choice.account ? `${choice.agent}@${choice.account}` : choice.agent;
+}
+export function parseAgentValue(value: string): Pick<Choice, 'agent' | 'account'> {
+  const [agent, account] = value.split('@');
+  return { agent: agent as Choice['agent'], ...(account ? { account } : {}) };
 }
 
 export function openWorkLauncher(options: {
@@ -53,13 +63,15 @@ export function openWorkLauncher(options: {
   let restored: SavedSquad | null = null;
   let savedSquads: SavedSquad[] = [];
   let catalog: Record<AgentName, ModelChoice[]> | undefined;
+  /** Extra accounts of Claude Code and Codex: each one is an entry of the agent menu. */
+  let accounts: AgentAccountStatus[] = [];
   const defaultAgent = options.initialAgent ?? (['codex', 'claude', 'hermes', 'agy'] as const).find(a => options.agents[a]) ?? 'shell';
   if (defaultAgent === 'shell') squad = false;
   let choices: Choice[] = Array.from({ length: HARD_MAX }, () => ({ agent: defaultAgent, model: '', effort: '' }));
   for (let i = 0; i < choices.length; i++) {
     try {
       const saved = JSON.parse(localStorage.getItem(ui`vb:roster:${i}`) || 'null') as Choice | null;
-      if (saved && saved.agent !== 'shell' && options.agents[saved.agent] && !options.initialAgent) choices[i] = { agent: saved.agent, model: saved.model, effort: saved.effort };
+      if (saved && saved.agent !== 'shell' && options.agents[saved.agent] && !options.initialAgent) choices[i] = { agent: saved.agent, model: saved.model, effort: saved.effort, ...(saved.account ? { account: saved.account } : {}) };
       else choices[i].model = localStorage.getItem(ui`vb:model:${defaultAgent}`) || '';
     } catch { /* keep defaults */ }
   }
@@ -232,8 +244,12 @@ export function openWorkLauncher(options: {
   }).catch(() => { if (form.isConnected) form.querySelector('[data-saved-hint]')!.textContent = tr('Configurazioni salvate non disponibili. Riapri per riprovare.'); });
 
   // One agent line: agent menu, model (Auto by default) and effort menu. Shared line, per-member line or single agent.
-  const agentOptions = (selected: Choice['agent'], withShell: boolean) => Object.entries(labels).filter(([a]) => withShell || a !== 'shell')
-    .map(([a, label]) => ui`<option value="${a}" ${a === selected ? 'selected' : ''} ${a !== 'shell' && !options.agents[a as AgentName] ? 'disabled' : ''}>${label}</option>`).join('');
+  const agentOptions = (selected: Choice, withShell: boolean) => Object.entries(labels).filter(([a]) => withShell || a !== 'shell')
+    .map(([a, label]) => {
+      const off = a !== 'shell' && !options.agents[a as AgentName] ? 'disabled' : '';
+      const main = ui`<option value="${a}" ${a === selected.agent && !selected.account ? 'selected' : ''} ${off}>${label}</option>`;
+      return main + accounts.filter(x => x.agent === a).map(x => `<option value="${esc(agentValue({ agent: x.agent, account: x.id }))}" ${a === selected.agent && x.id === selected.account ? 'selected' : ''} ${off}>${esc(label)} · ${esc(x.label)}${x.signedIn === false ? ' ' + esc(tr('(accesso richiesto)')) : ''}</option>`).join('');
+    }).join('');
   const updateEffort = (row: HTMLElement, choice: Choice) => {
     let available = effortChoices(choice.agent, choice.model, choice.agent === 'shell' ? [] : catalog?.[choice.agent]);
     if (choice.effort && !available.includes(choice.effort)) {
@@ -268,7 +284,7 @@ export function openWorkLauncher(options: {
       const lead = !squad
         ? ui`<label class="launch-field launch-role" data-role-box><span>Ruolo</span><select data-role>${Object.entries(roles).map(([r, label]) => ui`<option value="${r}" ${r === singleRole ? 'selected' : ''} ${(r === 'orchestrator' && orchestrator) || (r === 'brain' && brainAlive) ? 'disabled' : ''}>${label}</option>`).join('')}</select></label>`
         : customize ? ui`<span class="role-tag" data-tone="${toneOf(role)}"><i></i>${roles[role]}${choice.name ? ' · ' + esc(choice.name) : ''}</span>` : '';
-      return ui`<div class="launch-agent-row" data-row="${i}">${lead}<label class="launch-field"><span>${squad && !customize ? tr('Agente per tutti') : tr('Agente')}</span><select data-agent aria-label="Agente ${i + 1}">${agentOptions(choice.agent, !squad)}</select></label><label class="launch-field launch-model"><span>Modello</span><input data-model list="roster-models-${i}" aria-label="Modello ${i + 1}" placeholder="Auto" title="Auto usa la configurazione del CLI." maxlength="160" autocomplete="off" value="${esc(choice.model)}"><datalist id="roster-models-${i}"></datalist></label><label class="launch-field launch-effort"><span>Effort</span><select data-effort aria-label="Effort ${i + 1}"></select></label></div>`;
+      return ui`<div class="launch-agent-row" data-row="${i}">${lead}<label class="launch-field"><span>${squad && !customize ? tr('Agente per tutti') : tr('Agente')}</span><select data-agent aria-label="Agente ${i + 1}">${agentOptions(choice, !squad)}</select></label><label class="launch-field launch-model"><span>Modello</span><input data-model list="roster-models-${i}" aria-label="Modello ${i + 1}" placeholder="Auto" title="Auto usa la configurazione del CLI." maxlength="160" autocomplete="off" value="${esc(choice.model)}"><datalist id="roster-models-${i}"></datalist></label><label class="launch-field launch-effort"><span>Effort</span><select data-effort aria-label="Effort ${i + 1}"></select></label></div>`;
     };
     roster.innerHTML = lines.map(member).join('');
     roster.classList.toggle('custom', squad && customize);
@@ -277,7 +293,11 @@ export function openWorkLauncher(options: {
       const model = row.querySelector<HTMLInputElement>('[data-model]')!;
       const shared = () => { if (squad && !customize) choices = sameForAll(choices, total()); };
       row.querySelector<HTMLSelectElement>('[data-agent]')!.onchange = e => {
-        choice.agent = (e.target as HTMLSelectElement).value as Choice['agent']; choice.effort = '';
+        const picked = parseAgentValue((e.target as HTMLSelectElement).value), sameAgent = picked.agent === choice.agent;
+        choice.agent = picked.agent; choice.account = picked.account;
+        // Another account of the same CLI keeps model and effort; another CLI starts from its last model.
+        if (sameAgent) { shared(); return; }
+        choice.effort = '';
         try { choice.model = localStorage.getItem(ui`vb:model:${choice.agent}`) || ''; } catch { choice.model = ''; }
         model.value = choice.model; updateModels(row, choice); shared();
         row.querySelector('[data-role-box]')?.classList.toggle('hidden', choice.agent === 'shell' || options.mode === 'external');
@@ -305,9 +325,13 @@ export function openWorkLauncher(options: {
   };
   customizeButton.onclick = () => { customize = !customize; renderRows(); };
   // Missing or signed-out CLIs: say which, and where to fix it, instead of a silent disabled option.
-  void api.agents().then(({ clis }) => {
+  void api.agents().then(({ clis, accounts: extra = [] }) => {
     const hint = form.querySelector<HTMLElement>('[data-cli-hint]');
     if (!hint?.isConnected) return;
+    accounts = extra;
+    // A remembered account that was removed falls back to the main one.
+    for (const c of choices) if (c.account && !accounts.some(a => a.id === c.account && a.agent === c.agent)) delete c.account;
+    if (accounts.length) renderRows();
     const missing = clis.filter(c => !c.path).map(c => c.label), signedOut = clis.filter(c => c.path && c.signedIn === false).map(c => c.label);
     if (!missing.length && !signedOut.length) return;
     hint.innerHTML = [missing.length ? ui`Non installati: ${esc(missing.join(', '))}.` : '', signedOut.length ? ui`Senza accesso: ${esc(signedOut.join(', '))}.` : ''].filter(Boolean).join(' ') + ui` <button type="button" class="link" data-open-agents>Impostazioni → Agenti</button>`;
@@ -349,7 +373,7 @@ export function openWorkLauncher(options: {
         if (!result.info && !result.opened) throw new Error(tr('Sessione non restituita dal server'));
         sessions = result.info ? [result.info] : []; external = !!result.opened; warning = result.warning;
       }
-      for (const [i, choice] of choices.slice(0, total()).entries()) try { if (squad) localStorage.setItem(ui`vb:roster:${i}`, JSON.stringify({ agent: choice.agent, model: choice.model, effort: choice.effort })); localStorage.setItem(ui`vb:model:${choice.agent}`, choice.model); } catch { /* storage unavailable */ }
+      for (const [i, choice] of choices.slice(0, total()).entries()) try { if (squad) localStorage.setItem(ui`vb:roster:${i}`, JSON.stringify({ agent: choice.agent, model: choice.model, effort: choice.effort, ...(choice.account ? { account: choice.account } : {}) })); localStorage.setItem(ui`vb:model:${choice.agent}`, choice.model); } catch { /* storage unavailable */ }
       busy = false; close(); options.launched(sessions, squad, external, warning);
     } catch (err) { error.textContent = String(err); }
     finally { busy = false; submit.disabled = false; submit.textContent = launchLabel(); refreshCapacity(); }

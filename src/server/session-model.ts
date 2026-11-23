@@ -2,10 +2,10 @@
 // Claude Code's transcript (each answer names its model; a model command leaves its confirmation) and Codex's rollout
 // (each turn records its model and effort; a settings change is recorded when it is applied). Read-only, local files.
 import { closeSync, openSync, readdirSync, readSync, realpathSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { TerminalInfo } from '../shared/types.ts';
 import { findCodexSession, findCodexSessionOf } from './launch.ts';
+import { agentHome } from './accounts.ts';
 
 export interface ModelRecord {
   /** Model of the last turn the provider answered (Claude: model id; Codex: model slug). */
@@ -90,7 +90,8 @@ const real = (p: string) => { try { return realpathSync(p); } catch { return p; 
  *  whose folder is known to the CLI under another path), which costs a walk of them all. */
 function claudeTranscript(info: TerminalInfo, everywhere: boolean): string | undefined {
   if (!info.resumeId) return undefined;
-  const projects = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'projects'), name = `${info.resumeId}.jsonl`;
+  // A session of an extra account keeps its transcripts in that account's folder.
+  const projects = join(agentHome('claude', info.account), 'projects'), name = `${info.resumeId}.jsonl`;
   const direct = join(projects, real(info.cwd).replace(/[^a-zA-Z0-9]/g, '-'), name);
   if (statSync(direct, { throwIfNoEntry: false })?.isFile()) return direct;
   if (!everywhere) return undefined;
@@ -100,8 +101,7 @@ function claudeTranscript(info: TerminalInfo, everywhere: boolean): string | und
   return undefined;
 }
 
-function codexRollout(id: string, createdAt: number): string | undefined {
-  const home = process.env.CODEX_HOME || join(homedir(), '.codex');
+function codexRollout(id: string, createdAt: number, home: string): string | undefined {
   for (const offset of [0, -1, 1]) {
     const day = new Date(createdAt + offset * 86_400_000);
     const dir = join(home, 'sessions', String(day.getFullYear()), String(day.getMonth() + 1).padStart(2, '0'), String(day.getDate()).padStart(2, '0'));
@@ -139,16 +139,17 @@ export function sessionModel(info: TerminalInfo, claimed: () => Set<string> = ()
       c.file = claudeTranscript(info, walk);
     }
     else {
-      const own = info.resumeId ?? findCodexSessionOf(info.id, info.cwd, info.createdAt);
+      const home = agentHome('codex', info.account);
+      const own = info.resumeId ?? findCodexSessionOf(info.id, info.cwd, info.createdAt, home);
       if (own) { if (own !== c.codexId) c.record = undefined; c.codexId = own; c.sure = true; }
       else {
         const taken = claimed();
         for (const [id, other] of cache) if (id !== info.id && other.sure && other.codexId) taken.add(other.codexId);
-        const guess = findCodexSession(info.cwd, info.createdAt, taken);
+        const guess = findCodexSession(info.cwd, info.createdAt, taken, home);
         if (guess !== c.codexId) c.record = undefined;
         c.codexId = guess; c.guessedAt = now;
       }
-      c.file = c.codexId ? codexRollout(c.codexId, info.createdAt) : undefined;
+      c.file = c.codexId ? codexRollout(c.codexId, info.createdAt, home) : undefined;
     }
     if (!c.file) { c.missingAt = now; return undefined; }
     c.size = undefined;

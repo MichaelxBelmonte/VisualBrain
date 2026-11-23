@@ -1,6 +1,6 @@
 import { ui } from './i18n.ts';
 // Typed client of the local API.
-import type { NodeReminder, ReminderBoard, AgentName, ModelChoice, ModelChange, ModelSwitchChoice, TeamLink, TeamView, GraphEdge, GraphNode, GraphPayload, LaunchRequest, NodeDetail, Note, StatusPayload, TerminalInfo, GitRepoView, CodeTree, CodeFile, CodeSearchHit, RepoChoice, GitCommitDetail, GitCommitFile, GithubState } from '../shared/types.ts';
+import type { AccountShare, AgentAccount, AgentAccountStatus, NodeReminder, ReminderBoard, AgentName, ModelChoice, ModelChange, ModelSwitchChoice, TeamLink, TeamView, GraphEdge, GraphNode, GraphPayload, LaunchRequest, NodeDetail, Note, StatusPayload, TerminalInfo, GitRepoView, CodeTree, CodeFile, CodeSearchHit, RepoChoice, GitCommitDetail, GitCommitFile, GithubState } from '../shared/types.ts';
 
 /** One agent CLI as Impostazioni → Agenti shows it (src/server/agent-clis.ts). */
 export interface AgentCli { id: AgentName; label: string; command: string; path: string | null; version: string | null; signedIn: boolean | null; account: string | null; installCommand: string; canLogout: boolean; docs: string }
@@ -109,7 +109,13 @@ export const api = {
   codeSearch: (node: number, q: string) => call<{ hits: CodeSearchHit[]; truncated: boolean }>('GET', `/api/git/${node}/code/search?q=${encodeURIComponent(q)}`),
   codeOpen: (node: number, path: string, line?: number) => call<{ editor: string }>('POST', `/api/git/${node}/code/open`, { path, line }),
   resumeTerminal: (id: string, size: { cols: number; rows: number }) => call<{ termId: string; info: TerminalInfo }>('POST', ui`/api/terminals/${id}/resume`, size),
-  agents: (fresh = false) => call<{ clis: AgentCli[]; sessions: Record<string, number> }>('GET', `/api/agents${fresh ? '?fresh=1' : ''}`),
+  agents: (fresh = false) => call<{ clis: AgentCli[]; sessions: Record<string, number>; accounts?: AgentAccountStatus[] }>('GET', `/api/agents${fresh ? '?fresh=1' : ''}`),
+  /** A new extra account of Claude Code or Codex; the answer carries the terminal of its sign-in. */
+  addAccount: (agent: 'claude' | 'codex', label: string) => call<{ account: AgentAccount; info: TerminalInfo }>('POST', '/api/agents/accounts', { agent, label }),
+  accountAction: (id: string, action: 'login' | 'logout') => call<{ info: TerminalInfo }>('POST', `/api/agents/accounts/${encodeURIComponent(id)}/${action}`, {}),
+  removeAccount: (id: string) => call<{ removed: string }>('DELETE', `/api/agents/accounts/${encodeURIComponent(id)}`),
+  /** Avanzate: what an extra account borrows from the main one; `linked` are the entries now linked. */
+  setAccountShare: (id: string, share: AccountShare) => call<{ account: AgentAccount; linked: string[] }>('PATCH', `/api/agents/accounts/${encodeURIComponent(id)}`, { share }),
   agentAction: (id: string, action: 'install' | 'update' | 'login' | 'logout') => call<{ info: TerminalInfo }>('POST', `/api/agents/${id}/${action}`, {}),
   githubAccountLogin: () => call<{ info: TerminalInfo }>('POST', '/api/github/login', {}),
   githubAccountLogout: () => call<{ info: TerminalInfo }>('POST', '/api/github/logout', {}),

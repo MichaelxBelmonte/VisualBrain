@@ -1331,7 +1331,7 @@ export class Terminals {
 
   /** Generated label (agent, model, effort), used when the user has not named the session. */
   private generatedName(t: Tab): string {
-    return ui`${this.agentLabel(t)}${t.info.model ? ' · ' + t.info.model : ''}${t.info.effort ? ' / ' + t.info.effort : ''}${t.info.branch ? ' · ⑂ ' + t.info.branch : ''}`;
+    return ui`${this.agentLabel(t)}${t.info.account ? ' · @' + t.info.account : ''}${t.info.model ? ' · ' + t.info.model : ''}${t.info.effort ? ' / ' + t.info.effort : ''}${t.info.branch ? ' · ⑂ ' + t.info.branch : ''}`;
   }
   private sessionLabel(t: Tab): string {
     return ui`${t.info.role ? this.roleName(t) + ' · ' : ''}${t.info.name || this.generatedName(t)}`;

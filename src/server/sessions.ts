@@ -8,6 +8,7 @@ import { attachedFiles, withAttachments } from './attachments.ts';
 import { createWorktree, removeWorktree } from './worktrees.ts';
 import { modelCatalog } from './models.ts';
 import { effortChoices } from '../shared/agent-effort.ts';
+import { accountById, accountFor, agentHome } from './accounts.ts';
 
 // Awaiting the remote PTY spawn must not let simultaneous requests bypass roster limits or create two orchestrators.
 const launches = new WeakMap<ApiCtx, Promise<unknown>>();
@@ -158,7 +159,8 @@ async function resumeSessionNow(ctx: ApiCtx, id: string, request: { cols?: numbe
   if (!['claude', 'codex', 'shell'].includes(info.agent)) throw new TeamError(409, 'Questo agente non permette di riprendere la conversazione');
   if (!existsSync(info.cwd)) throw new TeamError(409, 'La cartella di lavoro della sessione non esiste più');
   const size = { cols: Math.max(20, Math.min(500, Number(request.cols) || 120)), rows: Math.max(5, Math.min(200, Number(request.rows) || 30)) };
-  const resumeId = info.resumeId ?? (info.agent === 'codex' ? findCodexSession(info.cwd, info.createdAt, new Set(ctx.terms.list().map(s => s.resumeId).filter((r): r is string => Boolean(r)))) : undefined);
+  if (info.account && !accountById(info.account)) throw new TeamError(409, 'L’account di questa sessione è stato rimosso da Impostazioni → Agenti');
+  const resumeId = info.resumeId ?? (info.agent === 'codex' ? findCodexSession(info.cwd, info.createdAt, new Set(ctx.terms.list().map(s => s.resumeId).filter((r): r is string => Boolean(r))), agentHome('codex', info.account)) : undefined);
   if (info.agent !== 'shell' && !resumeId) throw new TeamError(409, 'Conversazione non trovata: avvia una nuova sessione');
   if (info.agent !== 'shell' && info.nodeId != null && info.role === 'brain') {
     if (liveBrain(ctx, info.nodeId)) throw new TeamError(409, 'Questo nodo ha già un Main Brain attivo');
@@ -179,7 +181,7 @@ async function resumeSessionNow(ctx: ApiCtx, id: string, request: { cols?: numbe
   return { termId: id, info: ctx.teams.withCodes([term.info])[0] };
 }
 
-function validateAgent(request: Pick<LaunchRequest, 'agent' | 'model' | 'effort'>) {
+function validateAgent(request: Pick<LaunchRequest, 'agent' | 'model' | 'effort' | 'account'>) {
   if (!['claude', 'codex', 'hermes', 'agy'].includes(request.agent)) throw new TeamError(400, 'Agente sconosciuto');
   const model = boundedText(request.model, 160);
   if (model && !/^[a-zA-Z0-9][a-zA-Z0-9._:/@+-]*$/.test(model)) throw new TeamError(400, 'Identificativo modello non valido');
@@ -188,7 +190,9 @@ function validateAgent(request: Pick<LaunchRequest, 'agent' | 'model' | 'effort'
   const choice = modelCatalog()[request.agent as keyof ReturnType<typeof modelCatalog>].find(m => m.id === model);
   if (effort && request.agent === 'claude' && !effortChoices('claude', model).includes(effort)) throw new TeamError(400, 'Livello di ragionamento non supportato per questo modello');
   if (effort && choice && !choice.efforts.includes(effort)) throw new TeamError(400, 'Livello di ragionamento non supportato per questo modello');
-  return { model, effort };
+  let account: string | undefined;
+  try { account = accountFor(request.agent, request.account)?.id; } catch (error) { throw new TeamError(400, (error as Error).message); }
+  return { model, effort, ...(account ? { account } : {}) };
 }
 
 /** Validate the whole roster before creating any PTY. A failed spawn only removes this batch. */
@@ -250,14 +254,14 @@ async function startSessionNow(ctx: ApiCtx, detail: NodeDetail, request: LaunchR
   const projectPath = detail.project ? (ctx.cache.nodes.get(detail.project.nodeId)?.path ?? null) : null;
   const cwd = workingDir(detail, projectPath);
   const size = { cols: Math.max(20, Math.min(500, Number(request.cols) || 120)), rows: Math.max(5, Math.min(200, Number(request.rows) || 30)) };
-  const { model, effort } = validateAgent(request);
+  const { model, effort, account } = validateAgent(request);
   const task = boundedText(request.task, 1000);
   const prompt = withAttachments(boundedText(request.prompt, 12000), attachedFiles(request.files), ctx.cfg.language === 'en');
   if (request.mode === 'external') {
-    launchExternal(request.agent, ctx.cfg, detail, cwd, buildContext(detail, ctx.cfg, prompt || task), { model, effort });
+    launchExternal(request.agent, ctx.cfg, detail, cwd, buildContext(detail, ctx.cfg, prompt || task), { model, effort, account });
     return { opened: true };
   }
-  if (request.role === 'brain') return startBrain(ctx, detail, cwd, size, request.agent as AgentName, model, effort, prompt || task);
+  if (request.role === 'brain') return startBrain(ctx, detail, cwd, size, request.agent as AgentName, model, effort, prompt || task, account);
   const team = request.teamId ?? DEFAULT_TEAM;
   const squad = ctx.teams.team(detail.id, team);
   if (!squad) throw new TeamError(404, 'Squadra non trovata');
@@ -291,7 +295,7 @@ async function startSessionNow(ctx: ApiCtx, detail: NodeDetail, request: LaunchR
   let term;
   try {
     term = await launchEmbedded(ctx.terms, request.agent as AgentName, ctx.cfg, detail, workdir, initial.join('\n'), size, {
-      model: model || undefined, effort: effort || undefined, role, task: assignment, parentId: request.parentId || (role !== 'orchestrator' ? sessions.find(s => s.role === 'orchestrator')?.id : undefined),
+      model: model || undefined, effort: effort || undefined, account, role, task: assignment, parentId: request.parentId || (role !== 'orchestrator' ? sessions.find(s => s.role === 'orchestrator')?.id : undefined),
       seenMessage: board.messages.at(-1)?.id ?? 0, code, branch: worktree?.branch, squad: ctx.teams.teams(detail.id).length > 1 ? squad.name : undefined,
       memory: memoryFor(board.policy, role, ctx.cfg.dataDir, detail.id, team),
     });
@@ -315,7 +319,7 @@ async function startSessionNow(ctx: ApiCtx, detail: NodeDetail, request: LaunchR
  * The node's Main Brain: one per node, in the project folder, with its own board. It reads the squads' summaries, talks
  * to their orchestrators and proposes new squads; the orchestrators at work are told it exists.
  */
-async function startBrain(ctx: ApiCtx, detail: NodeDetail, cwd: string, size: { cols: number; rows: number }, agent: AgentName, model: string, effort: string, objective: string) {
+async function startBrain(ctx: ApiCtx, detail: NodeDetail, cwd: string, size: { cols: number; rows: number }, agent: AgentName, model: string, effort: string, objective: string, account?: string) {
   if (liveBrain(ctx, detail.id)) throw new TeamError(409, 'Questo nodo ha già un Main Brain attivo');
   const english = ctx.cfg.language === 'en';
   const code = ctx.teams.reserveCode(detail.id, 'brain');
@@ -323,7 +327,7 @@ async function startBrain(ctx: ApiCtx, detail: NodeDetail, cwd: string, size: { 
   const assignment = objective.slice(0, 1000);
   const initial = teamLaunchContext(detail, cwd, objective, assignment, english, true).join('\n');
   const term = await launchEmbedded(ctx.terms, agent, ctx.cfg, detail, cwd, initial, size, {
-    model: model || undefined, effort: effort || undefined, role: 'brain', task: assignment, seenMessage: board.messages.at(-1)?.id ?? 0, code,
+    model: model || undefined, effort: effort || undefined, account, role: 'brain', task: assignment, seenMessage: board.messages.at(-1)?.id ?? 0, code,
     memory: memoryFor(board.policy, 'brain', ctx.cfg.dataDir, detail.id, BRAIN_TEAM),
   });
   ctx.teams.bindCode(detail.id, term.info.id, code);

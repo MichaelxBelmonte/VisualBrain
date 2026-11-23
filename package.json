@@ -25,7 +25,7 @@
     "release:publish": "node scripts/publish-release.mjs",
     "test:update": "node scripts/test-update.mjs && node scripts/test-access.mjs && node scripts/test-release-guard.mjs",
     "test:team": "node scripts/test-team-watch.mjs",
-    "test:harnesses": "node scripts/test-node-tasks-harnesses.mjs && node scripts/test-harness-installer.mjs && node scripts/test-agent-clis.mjs",
+    "test:harnesses": "node scripts/test-node-tasks-harnesses.mjs && node scripts/test-harness-installer.mjs && node scripts/test-agent-clis.mjs && node scripts/test-agent-accounts.mjs",
     "package:mac": "node scripts/package-mac.mjs",
     "install:mac": "node scripts/package-mac.mjs && node scripts/update-app.mjs --remove-bundle",
     "package:mac:trial": "node scripts/package-mac.mjs --arch=universal --trial",

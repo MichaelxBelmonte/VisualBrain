@@ -223,6 +223,8 @@ export interface TerminalInfo {
   resumeId?: string;
   /** Git branch of the session's own worktree, when the node gives each operator one. */
   branch?: string;
+  /** Extra account of the agent CLI the session runs with (an AgentAccount id); absent: the CLI's main account. */
+  account?: string;
   /** Squad of the node the session belongs to ("1" for the node's first squad, "brain" for the node's Main Brain). */
   teamId?: string;
   /** Read from the agent CLI's own records each time the sessions are listed, never stored: the model of the last turn
@@ -239,12 +241,22 @@ export interface ModelChange { state: 'waiting' | 'running' | 'confirm' | 'done'
 export interface ModelSwitchChoice { id: string; label: string }
 
 export type AgentName = 'claude' | 'codex' | 'hermes' | 'agy';
+/** The agents whose CLI can run under more than one account at the same time. */
+export type AccountAgent = 'claude' | 'codex';
+/** An extra account of an agent CLI: a folder of its own (CLAUDE_CONFIG_DIR / CODEX_HOME), never its credentials. */
+export interface AgentAccount { id: string; agent: AccountAgent; label: string; home: string; share?: AccountShare }
+/** What an extra account borrows from the main one (Avanzate): its memory (Claude Code) and its skills, plugins and instructions. */
+export interface AccountShare { memory?: boolean; tools?: boolean }
+/** An extra account as Impostazioni → Agenti shows it: what the CLI answers about its sign-in in that folder. */
+export interface AgentAccountStatus extends AgentAccount { signedIn: boolean | null; email: string | null; sessions: number }
 /** brain: the node's Main Brain, above the orchestrators of its squads (one per node, it edits no files). */
 export type AgentRole = 'orchestrator' | 'operator' | 'reviewer' | 'brain';
 export interface ModelChoice { id: string; label: string; efforts: string[] }
 export interface LaunchOptions {
   model?: string;
   effort?: string;
+  /** Extra account of the agent CLI (AgentAccount id); absent: the main account. */
+  account?: string;
   role?: AgentRole;
   parentId?: string;
   task?: string;
@@ -334,7 +346,7 @@ export interface SquadRequest {
   prompt?: string;
   /** Absolute paths of attached files: listed in the objective, never read by Visual Brain. */
   files?: string[];
-  members: Array<{ agent: AgentName; model?: string; effort?: string; role?: AgentRole; name?: string }>;
+  members: Array<{ agent: AgentName; model?: string; effort?: string; account?: string; role?: AgentRole; name?: string }>;
   /** An existing squad of the node, or "new"; name of a new squad; the Main Brain proposal being launched. */
   teamId?: string; teamName?: string; proposalId?: string;
 }

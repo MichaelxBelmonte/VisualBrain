@@ -247,6 +247,7 @@ export class TerminalService implements TerminalStore {
     // A host started by an older version drops unknown spawn fields: keep them for this server's lifetime.
     if (opts.resumeId && !term.info.resumeId) term.info.resumeId = opts.resumeId;
     if (opts.branch && !term.info.branch) term.info.branch = opts.branch;
+    if (opts.account && !term.info.account) term.info.account = opts.account;
     return term;
   }
   rename(id: string, name: string) {

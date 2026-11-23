@@ -2,6 +2,8 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parseAccounts, useAccounts } from './accounts.ts';
+import type { AgentAccount } from '../shared/types.ts';
 
 export interface LlmConfig {
   provider: 'claude-cli' | 'anthropic-api' | 'none';
@@ -56,6 +58,8 @@ export interface Config {
   dumpDataShare: number;
   llm: LlmConfig;
   agents: { claude: string; codex: string; hermes: string; agy: string };
+  /** Extra accounts of Claude Code and Codex (Impostazioni → Agenti): a folder each, never credentials. */
+  accounts: AgentAccount[];
 }
 
 export const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -108,6 +112,7 @@ export const DEFAULTS: Config = {
     timeoutMs: 15 * 60 * 1000,
   },
   agents: { claude: 'claude', codex: 'codex', hermes: 'hermes', agy: 'agy' },
+  accounts: [],
 };
 
 function expandHome(p: string): string {
@@ -130,7 +135,9 @@ export function loadConfig(): Config {
     excludePaths: [...DEFAULTS.excludePaths, ...(user.excludePaths ?? [])],
     llm: { ...DEFAULTS.llm, ...(user.llm ?? {}) },
     agents: { ...DEFAULTS.agents, ...(user.agents ?? {}) },
+    accounts: parseAccounts(user.accounts),
   };
+  useAccounts(cfg.accounts);
   cfg.roots = cfg.roots.map((r) => resolve(expandHome(r)));
   cfg.excludePaths = [...new Set([...cfg.excludePaths, cfg.dataDir, ...(DESKTOP_DATA ? [PROJECT_ROOT] : [])])].map((r) => resolve(expandHome(r)));
   cfg.containers = (cfg.containers ?? []).map(expandHome);

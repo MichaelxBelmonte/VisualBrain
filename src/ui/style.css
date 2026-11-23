@@ -1272,6 +1272,15 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .cli-detail dt { color: var(--g4); }
 .cli-detail dd { margin: 0; overflow-wrap: anywhere; }
 .cli-more { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Extra accounts sit under their CLI, indented to its name. */
+.cli-row.cli-account .cli-summary { padding-left: 30px; }
+.cli-add-account { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.cli-add-account input { flex: 1; min-width: 160px; }
+.cli-share { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; cursor: pointer; }
+.cli-share input { margin-top: 2px; }
+.cli-share span { display: flex; flex-direction: column; gap: 2px; }
+.cli-share b { font-weight: 500; }
+.cli-share small { color: var(--g4); font-size: 11.5px; }
 .shortcut-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; }
 .shortcut-list dt { text-align: right; }
 .shortcut-list dd { margin: 0; color: var(--g5); }

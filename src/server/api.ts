@@ -15,7 +15,9 @@ import { rowToEdge } from './cache.ts';
 import type { TerminalStore } from './terminals.ts';
 import type { Area, GraphEdge, GraphNode, LaunchRequest, LlmRun, NodeDetail, Note, ProjectInfo, RepoChoice, StatusPayload, TeamBoard } from '../shared/types.ts';
 import { forgetAgents, hasAgents, openWith } from './launch.ts';
-import { cliAction, cliCatalog, forgetCliCatalog, isCli } from './agent-clis.ts';
+import { accountCatalog, cliAction, cliCatalog, forgetCliCatalog, isCli } from './agent-clis.ts';
+import { accountById, addAccount, listAccounts, removeAccount, setAccountShare } from './accounts.ts';
+import { syncShared } from './account-share.ts';
 import { harnessCatalog, launchHarness } from './harnesses.ts';
 import { startHarnessInstall } from './harness-installer.ts';
 import { BRAIN_TEAM, DEFAULT_TEAM, Teams, TeamError, boundedText, classify, isTeamId } from './team.ts';
@@ -853,10 +855,58 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     }
     if (path === '/api/agents' && method === 'GET') {
       if (req.headers.authorization) throw new HttpError(403, 'Solo dall’interfaccia');
-      const clis = await cliCatalog(ctx.cfg, url.searchParams.get('fresh') === '1');
-      const sessions: Record<string, number> = {};
-      for (const s of ctx.terms.list()) if (s.alive && s.agent !== 'shell') sessions[s.agent] = (sessions[s.agent] ?? 0) + 1;
-      return send(res, 200, { clis, sessions });
+      const fresh = url.searchParams.get('fresh') === '1';
+      const [clis, accounts] = await Promise.all([cliCatalog(ctx.cfg, fresh), accountCatalog(ctx.cfg, fresh)]);
+      const sessions: Record<string, number> = {}, perAccount: Record<string, number> = {};
+      for (const s of ctx.terms.list()) if (s.alive && s.agent !== 'shell') {
+        // «Usato da» of a CLI counts the sessions of its main account; each extra account counts its own.
+        if (s.account) perAccount[s.account] = (perAccount[s.account] ?? 0) + 1;
+        else sessions[s.agent] = (sessions[s.agent] ?? 0) + 1;
+      }
+      return send(res, 200, { clis, sessions, accounts: accounts.map(a => ({ ...a, sessions: perAccount[a.id] ?? 0 })) });
+    }
+    // Extra accounts of Claude Code and Codex: only the person at the app adds, signs in or removes them.
+    if (path === '/api/agents/accounts' && method === 'POST') {
+      if (req.headers.authorization) throw new HttpError(403, 'Aggiungi gli account da Impostazioni → Agenti');
+      const body = await readJson(req);
+      let account;
+      try { account = addAccount(ctx.cfg, body.agent, body.label); } catch (error) { throw new HttpError(400, (error as Error).message); }
+      ctx.cfg.accounts = listAccounts(); forgetCliCatalog();
+      // Signing in is the next step: the CLI's own login, in a visible terminal, in the new account's folder.
+      const action = cliAction(ctx.cfg, account.agent, 'login', account);
+      const term = await ctx.terms.spawn({ agent: 'shell', cwd: homedir(), nodeId: null, title: action.title, file: action.file, args: action.args });
+      term.info.name = action.title;
+      await ctx.terms.flush?.();
+      return send(res, 201, { account, info: term.info });
+    }
+    m = /^\/api\/agents\/accounts\/([a-z0-9-]+)(?:\/(login|logout))?$/.exec(path);
+    if (m && (method === 'DELETE' || method === 'PATCH' || (method === 'POST' && m[2]))) {
+      if (req.headers.authorization) throw new HttpError(403, 'Gestisci gli account da Impostazioni → Agenti');
+      const account = accountById(m[1]);
+      if (!account) throw new HttpError(404, 'Account non trovato');
+      if (method === 'PATCH') {
+        // Avanzate: what the account borrows from the main one. Running sessions keep what they started with.
+        if (m[2]) throw new HttpError(404, 'Azione sconosciuta');
+        const body = await readJson(req);
+        let next;
+        try { next = setAccountShare(ctx.cfg, account.id, body.share); } catch (error) { throw new HttpError(400, (error as Error).message); }
+        ctx.cfg.accounts = listAccounts(); forgetCliCatalog();
+        let linked: string[];
+        try { linked = syncShared(next); } catch (error) { throw new HttpError(500, `Collegamenti non aggiornati: ${(error as Error).message}`); }
+        return send(res, 200, { account: next, linked });
+      }
+      if (method === 'DELETE') {
+        if (ctx.terms.list().some(s => s.alive && s.account === account.id)) throw new HttpError(409, 'Chiudi prima le sessioni attive di questo account');
+        removeAccount(ctx.cfg, account.id);
+        ctx.cfg.accounts = listAccounts(); forgetCliCatalog();
+        return send(res, 200, { removed: account.id });
+      }
+      const action = cliAction(ctx.cfg, account.agent, m[2] as 'login' | 'logout', account);
+      forgetCliCatalog();
+      const term = await ctx.terms.spawn({ agent: 'shell', cwd: homedir(), nodeId: null, title: action.title, file: action.file, args: action.args });
+      term.info.name = action.title;
+      await ctx.terms.flush?.();
+      return send(res, 201, { info: term.info });
     }
     m = /^\/api\/agents\/([a-z]+)\/(install|update|login|logout)$/.exec(path);
     if (m && method === 'POST') {

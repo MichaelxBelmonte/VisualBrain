@@ -102,7 +102,7 @@ export class Terminals {
     const now = Date.now();
     const initialState = opts.role ? (opts.role === 'orchestrator' && !opts.task ? 'working' : 'idle') : undefined;
     const term: Term = {
-      info: { id, agent: opts.agent, cwd: opts.cwd, title: opts.title, alive: true, nodeId: opts.nodeId ?? null, createdAt: Number.isSafeInteger(opts.createdAt) ? opts.createdAt! : now, model: opts.model, effort: opts.effort, role: opts.role, parentId: opts.parentId, task: opts.task, workState: initialState, idleSince: initialState === 'idle' ? now : undefined, ...(opts.role ? { stateSource: 'server' as const, stateAt: now } : {}), ...(typeof opts.resumeId === 'string' ? { resumeId: opts.resumeId } : {}), ...(typeof opts.branch === 'string' ? { branch: opts.branch } : {}) },
+      info: { id, agent: opts.agent, cwd: opts.cwd, title: opts.title, alive: true, nodeId: opts.nodeId ?? null, createdAt: Number.isSafeInteger(opts.createdAt) ? opts.createdAt! : now, model: opts.model, effort: opts.effort, role: opts.role, parentId: opts.parentId, task: opts.task, workState: initialState, idleSince: initialState === 'idle' ? now : undefined, ...(opts.role ? { stateSource: 'server' as const, stateAt: now } : {}), ...(typeof opts.resumeId === 'string' ? { resumeId: opts.resumeId } : {}), ...(typeof opts.branch === 'string' ? { branch: opts.branch } : {}), ...(typeof opts.account === 'string' ? { account: opts.account } : {}) },
       proc, buffer: [], bufferBytes: 0, listeners: new Set(), exitCode: null,
       teamToken: opts.teamToken ?? '', seenMessage: opts.seenMessage ?? 0, injectedMessage: 0, activity: newActivity(),
     };

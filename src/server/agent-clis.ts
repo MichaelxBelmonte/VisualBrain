@@ -4,6 +4,8 @@
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import type { Config } from './config.ts';
+import { ACCOUNT_ENV, listAccounts, type AgentAccount } from './accounts.ts';
+import type { AgentAccountStatus } from '../shared/types.ts';
 
 export type CliName = 'claude' | 'codex' | 'hermes' | 'agy';
 type Action = 'install' | 'update' | 'login' | 'logout';
@@ -50,10 +52,10 @@ export function cliPath(): string {
   return [`${home}/.local/bin`, `${home}/.local/node/bin`, '/opt/homebrew/bin', '/usr/local/bin', process.env.PATH ?? '/usr/bin:/bin'].join(':');
 }
 
-function run(file: string, args: string[], ms: number): Promise<{ code: number | null; out: string }> {
+function run(file: string, args: string[], ms: number, env: Record<string, string> = {}): Promise<{ code: number | null; out: string }> {
   return new Promise(resolve => {
     let out = '', done = false;
-    const child = spawn(file, args, { env: { ...process.env, PATH: cliPath(), NO_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(file, args, { env: { ...process.env, PATH: cliPath(), NO_COLOR: '1', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
     const finish = (code: number | null) => { if (!done) { done = true; clearTimeout(timer); resolve({ code, out }); } };
     const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} finish(null); }, ms);
     child.stdout.on('data', d => { if (out.length < 8000) out += d; });
@@ -112,13 +114,35 @@ export function cliCatalog(cfg: Config, fresh = false): Promise<CliStatus[]> {
   return pending;
 }
 
-export function forgetCliCatalog(): void { cache = null; }
+export function forgetCliCatalog(): void { cache = null; accountCache = null; }
+
+let accountCache: { at: number; list: Omit<AgentAccountStatus, 'sessions'>[] } | null = null;
+
+/** Sign-in of each extra account: the CLI's own status command, run with the account's folder. Cached like the CLIs. */
+export async function accountCatalog(cfg: Config, fresh = false): Promise<Omit<AgentAccountStatus, 'sessions'>[]> {
+  const accounts = listAccounts();
+  if (!fresh && accountCache && Date.now() - accountCache.at < 60_000 && accountCache.list.length === accounts.length
+    && accountCache.list.every((a, i) => a.id === accounts[i].id)) return accountCache.list;
+  const list = await Promise.all(accounts.map(async (a: AgentAccount) => {
+    const path = await resolvePath(cfg.agents[a.agent]);
+    const spec = CLI_SPECS[a.agent];
+    if (!path || !spec.status) return { ...a, signedIn: null, email: null };
+    const auth = await run(path, spec.status, 10_000, { [ACCOUNT_ENV[a.agent]]: a.home });
+    const { signedIn, account } = parseSignedIn(a.agent, auth.code, auth.out);
+    return { ...a, signedIn, email: account };
+  }));
+  accountCache = { at: Date.now(), list };
+  return list;
+}
 
 /** The terminal command for an action: arguments for the login shell, never user text. */
-export function cliAction(cfg: Config, id: CliName, action: Action): { title: string; file: string; args: string[] } {
+export function cliAction(cfg: Config, id: CliName, action: Action, account?: AgentAccount): { title: string; file: string; args: string[] } {
   const spec = CLI_SPECS[id], shell = process.env.SHELL || '/bin/zsh';
   const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
-  const own = (args: string[]) => [cfg.agents[id], ...args].map(quote).join(' ');
+  if (account && (account.agent !== id || (action !== 'login' && action !== 'logout'))) throw new Error('Azione non disponibile per questo account');
+  // An extra account: the CLI signs in and out in that account's folder, never in the main one.
+  const vars = account ? `${ACCOUNT_ENV[account.agent]}=${quote(account.home)} ` : '';
+  const own = (args: string[]) => vars + [cfg.agents[id], ...args].map(quote).join(' ');
   let script: string;
   if (action === 'install' || (action === 'update' && !spec.update)) script = spec.install;
   else if (action === 'update') script = own(spec.update!);
@@ -128,5 +152,6 @@ export function cliAction(cfg: Config, id: CliName, action: Action): { title: st
   const titles: Record<Action, string> = { install: 'installazione', update: 'aggiornamento', login: 'accesso', logout: 'uscita' };
   // The terminal stays open on the result, so the user can read it before closing.
   const done = `vb_code=$?; echo; echo "— ${spec.label}: ${titles[action]} terminato (codice $vb_code). Puoi chiudere questo terminale."`;
-  return { title: `${spec.label} · ${titles[action]}`, file: shell, args: ['-lic', `${script}; ${done}; exec ${quote(shell)} -l`] };
+  const label = account ? `${spec.label} (${account.label})` : spec.label;
+  return { title: `${label} · ${titles[action]}`, file: shell, args: ['-lic', `${script}; ${done}; exec ${quote(shell)} -l`] };
 }

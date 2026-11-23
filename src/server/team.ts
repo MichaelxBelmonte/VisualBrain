@@ -200,7 +200,7 @@ export class Teams {
   }
   saveSquad(nodeId: number, nodePath: string, name: string, sessions: TerminalInfo[], team = DEFAULT_TEAM): void {
     const members = sessions.filter(s => s.nodeId === nodeId && s.alive && s.agent !== 'shell' && s.role && s.role !== 'brain' && this.teamOf(nodeId, s) === team)
-      .map(s => ({ agent: s.agent as AgentName, role: s.role!, model: s.model ?? '', effort: s.effort ?? '', ...(s.name ? { name: s.name } : {}) }))
+      .map(s => ({ agent: s.agent as AgentName, role: s.role!, model: s.model ?? '', effort: s.effort ?? '', ...(s.account ? { account: s.account } : {}), ...(s.name ? { name: s.name } : {}) }))
       .sort((a, b) => Number(b.role === 'orchestrator') - Number(a.role === 'orchestrator'));
     if (!members.length) return;
     const policy = { ...this.get(nodeId, team).policy };
