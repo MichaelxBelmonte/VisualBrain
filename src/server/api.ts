@@ -16,6 +16,7 @@ import type { TerminalStore } from './terminals.ts';
 import type { Area, GraphEdge, GraphNode, LaunchRequest, LlmRun, NodeDetail, Note, ProjectInfo, RepoChoice, StatusPayload, TeamBoard } from '../shared/types.ts';
 import { forgetAgents, hasAgents, openWith } from './launch.ts';
 import { accountCatalog, cliAction, cliCatalog, forgetCliCatalog, isCli } from './agent-clis.ts';
+import { cliUpdates, startCliUpdate } from './cli-updates.ts';
 import { accountById, addAccount, listAccounts, mainNamesNow, removeAccount, renameAccount, setAccountShare, setMainName } from './accounts.ts';
 import { syncShared } from './account-share.ts';
 import { harnessCatalog, launchHarness } from './harnesses.ts';
@@ -854,6 +855,19 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
         else sessions[s.agent] = (sessions[s.agent] ?? 0) + 1;
       }
       return send(res, 200, { clis, sessions, accounts: accounts.map(a => ({ ...a, sessions: perAccount[a.id] ?? 0 })) });
+    }
+    // Updates of the CLIs, like the app's: installed and latest version, and the update in the background.
+    if (path === '/api/agents/updates' && method === 'GET') {
+      if (req.headers.authorization) throw new HttpError(403, 'Solo dall’interfaccia');
+      return send(res, 200, { updates: await cliUpdates(ctx.cfg, url.searchParams.get('fresh') === '1') });
+    }
+    m = /^\/api\/agents\/([a-z]+)\/upgrade$/.exec(path);
+    if (m && method === 'POST') {
+      // Only the person at the app: an agent never updates the CLIs.
+      if (req.headers.authorization) throw new HttpError(403, 'Aggiorna gli agenti da Impostazioni → Agenti');
+      if (!isCli(m[1])) throw new HttpError(404, 'CLI sconosciuta');
+      try { return send(res, 202, { job: await startCliUpdate(ctx.cfg, m[1]) }); }
+      catch (error) { throw new HttpError(409, (error as Error).message); }
     }
     // The names of the accounts, for the label on each session: cheap, no CLI is asked anything.
     if (path === '/api/accounts' && method === 'GET') {

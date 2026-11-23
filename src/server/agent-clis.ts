@@ -25,9 +25,9 @@ interface CliSpec {
 
 export const CLI_SPECS: Record<CliName, CliSpec> = {
   claude: { label: 'Claude Code', install: 'curl -fsSL https://claude.ai/install.sh | bash', update: ['update'], login: ['auth', 'login'], logout: ['auth', 'logout'], status: ['auth', 'status'], docs: 'https://docs.claude.com/en/docs/claude-code/setup' },
-  codex: { label: 'Codex', install: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh', update: null, login: ['login'], logout: ['logout'], status: ['login', 'status'], docs: 'https://developers.openai.com/codex/cli' },
-  hermes: { label: 'Hermes', install: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash', update: null, login: ['setup'], logout: ['logout'], status: null, docs: 'https://hermes-agent.nousresearch.com' },
-  agy: { label: 'Antigravity', install: 'curl -fsSL https://antigravity.google/cli/install.sh | bash', update: null, login: [], logout: null, status: null, docs: 'https://antigravity.google' },
+  codex: { label: 'Codex', install: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh', update: ['update'], login: ['login'], logout: ['logout'], status: ['login', 'status'], docs: 'https://developers.openai.com/codex/cli' },
+  hermes: { label: 'Hermes', install: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash', update: ['update'], login: ['setup'], logout: ['logout'], status: null, docs: 'https://hermes-agent.nousresearch.com' },
+  agy: { label: 'Antigravity', install: 'curl -fsSL https://antigravity.google/cli/install.sh | bash', update: ['update'], login: [], logout: null, status: null, docs: 'https://antigravity.google' },
 };
 
 export interface CliStatus {
@@ -52,7 +52,7 @@ export function cliPath(): string {
   return [`${home}/.local/bin`, `${home}/.local/node/bin`, '/opt/homebrew/bin', '/usr/local/bin', process.env.PATH ?? '/usr/bin:/bin'].join(':');
 }
 
-function run(file: string, args: string[], ms: number, env: Record<string, string> = {}): Promise<{ code: number | null; out: string }> {
+export function run(file: string, args: string[], ms: number, env: Record<string, string> = {}): Promise<{ code: number | null; out: string }> {
   return new Promise(resolve => {
     let out = '', done = false;
     const child = spawn(file, args, { env: { ...process.env, PATH: cliPath(), NO_COLOR: '1', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -65,7 +65,7 @@ function run(file: string, args: string[], ms: number, env: Record<string, strin
   });
 }
 
-async function resolvePath(command: string): Promise<string | null> {
+export async function resolvePath(command: string): Promise<string | null> {
   if (command.includes('/')) return (await run('/bin/test', ['-x', command], 2000)).code === 0 ? command : null;
   const r = await run('/usr/bin/which', [command], 3000);
   return r.code === 0 ? r.out.trim().split('\n')[0] || null : null;

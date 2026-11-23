@@ -3,6 +3,8 @@ import { ui } from './i18n.ts';
 import type { AccountShare, AgentAccount, AgentAccountStatus, NodeReminder, ReminderBoard, AgentName, ModelChoice, ModelChange, ModelSwitchChoice, TeamLink, TeamView, GraphEdge, GraphNode, GraphPayload, LaunchRequest, NodeDetail, Note, StatusPayload, TerminalInfo, GitRepoView, CodeTree, CodeFile, CodeSearchHit, RepoChoice, GitCommitDetail, GitCommitFile, GithubState } from '../shared/types.ts';
 
 /** One agent CLI as Impostazioni → Agenti shows it (src/server/agent-clis.ts). */
+export interface CliUpdateJob { state: 'running' | 'done' | 'failed'; startedAt: number; endedAt: number | null; from: string | null; to: string | null; log: string }
+export interface CliUpdate { id: AgentName; current: string | null; latest: string | null; available: boolean | null; checkedAt: number | null; canCheck: boolean; job: CliUpdateJob | null }
 export interface AgentCli { id: AgentName; label: string; command: string; path: string | null; version: string | null; signedIn: boolean | null; account: string | null; installCommand: string; canLogout: boolean; docs: string }
 
 let graphPreview: string | null = null;
@@ -121,6 +123,8 @@ export const api = {
   /** Names the main account of a CLI; an empty name goes back to «Principale». */
   setMainAccountName: (agent: 'claude' | 'codex', name: string) => call<{ main: Partial<Record<string, string>> }>('PUT', '/api/agents/main-name', { agent, name }),
   setAccountShare: (id: string, share: AccountShare) => call<{ account: AgentAccount; linked: string[] }>('PATCH', `/api/agents/accounts/${encodeURIComponent(id)}`, { share }),
+  cliUpdates: (fresh = false) => call<{ updates: CliUpdate[] }>('GET', `/api/agents/updates${fresh ? '?fresh=1' : ''}`),
+  upgradeCli: (id: string) => call<{ job: CliUpdateJob }>('POST', `/api/agents/${id}/upgrade`, {}),
   agentAction: (id: string, action: 'install' | 'update' | 'login' | 'logout') => call<{ info: TerminalInfo }>('POST', `/api/agents/${id}/${action}`, {}),
   githubAccountLogin: () => call<{ info: TerminalInfo }>('POST', '/api/github/login', {}),
   githubAccountLogout: () => call<{ info: TerminalInfo }>('POST', '/api/github/logout', {}),

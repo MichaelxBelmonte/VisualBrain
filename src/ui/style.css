@@ -1296,6 +1296,90 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
   .cli-row { grid-template-columns: 1fr; }
   .cli-actions { padding: 0 12px 10px 30px; }
 }
+/* Impostazioni → Agenti: one card per provider. Head (mark, name, version, state), the update line, the accounts, the
+   technical details folded away. The same update line lists the CLIs in Aggiornamenti. */
+.provider-toolbar { display: flex; gap: 6px; align-items: center; }
+.provider-list { display: grid; gap: 12px; margin: 10px 0 18px; }
+.provider { border: 1px solid var(--g2); border-radius: 10px; background: var(--bg); overflow: hidden; }
+.provider[data-installed="false"] { background: var(--g1); }
+.provider-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.provider-mark { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--g2); background: var(--g1); font: 600 11px/1 var(--mono); letter-spacing: .02em; color: var(--g5); }
+.provider[data-installed="true"] .provider-mark { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.provider-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.provider-title h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.provider-title small { color: var(--g4); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.provider-pill { --tone: var(--g3); flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--tone) 14%, transparent); font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+.provider-pill > i { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }
+.provider-pill[data-tone="ok"] { --tone: var(--role-active); }
+.provider-pill[data-tone="warn"] { --tone: var(--role-attention); }
+.provider-update { margin: 0 14px 12px; padding: 7px 12px; border-radius: 8px; background: var(--g1); }
+.provider-update:has(.cli-update[data-tone="new"]) { background: color-mix(in srgb, var(--conn-0) 9%, var(--bg)); }
+.provider-update:has(.cli-update[data-tone="error"]) { background: color-mix(in srgb, var(--role-blocked) 9%, var(--bg)); }
+.provider-update > .muted { margin: 0; }
+.cli-update { display: flex; align-items: flex-start; gap: 10px; min-height: 30px; animation: update-in .18s ease-out; }
+.cli-update-mark { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--g3); }
+.cli-update[data-tone="ok"] .cli-update-mark { width: 9px; height: 5px; margin: 0 0 3px; border-radius: 0; background: none; border: solid var(--role-active); border-width: 0 0 1.5px 1.5px; margin-top: 5px; transform: rotate(-45deg); }
+.cli-update[data-tone="new"] .cli-update-mark { background: var(--conn-0); box-shadow: 0 0 0 3px color-mix(in srgb, var(--conn-0) 22%, transparent); }
+.cli-update[data-tone="error"] .cli-update-mark { background: var(--role-blocked); }
+.cli-update[data-tone="run"] .cli-update-mark, .cli-update[data-tone="wait"] .cli-update-mark { width: 10px; height: 10px; background: none; border: 1.5px solid var(--g3); border-top-color: var(--fg); animation: cli-spin .8s linear infinite; }
+.cli-update[data-tone="wait"] .cli-update-mark { border-top-color: var(--g4); }
+.cli-update-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cli-update-text b { font-weight: 500; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.cli-update[data-tone="wait"] .cli-update-text b { font-weight: 400; color: var(--g4); }
+.cli-update-text small { color: var(--g4); font-size: 11.5px; line-height: 1.45; }
+.cli-update-actions { flex: none; display: flex; gap: 6px; align-self: center; }
+.provider-update .update-progress { background: var(--g3); }
+.provider-update .update-progress, .cli-update-list .update-progress { margin-top: 8px; border-radius: 2px; }
+.cli-update-log { margin-top: 8px; font-size: 12px; color: var(--g5); }
+.cli-update-log summary { cursor: pointer; width: fit-content; }
+.cli-update-log pre { margin: 6px 0 0; padding: 8px 10px; max-height: 180px; overflow: auto; border-radius: 6px; background: var(--g1); border: 1px solid var(--g2); font: 11px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.provider-accounts { border-top: 1px solid var(--g2); padding: 10px 14px 6px; }
+.provider-accounts h5, .provider-details summary { margin: 0 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--g4); }
+.provider-accounts ul, .provider-orphans { list-style: none; margin: 0; padding: 0; }
+.provider-orphans { border: 1px solid var(--g2); border-radius: 10px; padding: 0 14px; margin: 8px 0 18px; }
+.provider-account { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 4px 12px; padding: 8px 0; }
+.provider-account + .provider-account { border-top: 1px solid var(--g2); }
+.provider-account-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.provider-account-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.provider-account-name b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-account-name em { font-style: normal; font-size: 10.5px; color: var(--g4); border: 1px solid var(--g2); border-radius: 4px; padding: 0 5px; }
+.provider-account-main small { color: var(--g4); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-account-main small:empty { display: none; }
+.provider-account-actions { display: flex; gap: 2px; justify-content: flex-end; flex-wrap: wrap; }
+.provider-advanced { grid-column: 1 / -1; margin-top: 4px; padding: 4px 12px 8px; border-radius: 8px; background: var(--g1); }
+.provider-add { padding: 8px 0 6px; border-top: 1px solid var(--g2); }
+.provider-add > .btn { margin-left: -8px; }
+.provider-add .cli-add-account { margin: 0 0 6px; }
+.provider-add small { display: block; color: var(--g4); font-size: 11.5px; line-height: 1.45; }
+.provider-install { display: flex; align-items: center; gap: 12px; padding: 0 14px 12px 58px; }
+.provider-install .muted { flex: 1; margin: 0; }
+.provider-details { border-top: 1px solid var(--g2); padding: 9px 14px; }
+.provider-details summary { cursor: pointer; width: fit-content; margin: 0; }
+.provider-details[open] summary { margin-bottom: 4px; }
+.provider-details .cli-detail { grid-template-columns: 120px minmax(0, 1fr); }
+.provider-details a { color: var(--fg); }
+.cli-updates { margin-top: 22px; }
+.cli-update-list { list-style: none; margin: 8px 0 10px; padding: 0; border: 1px solid var(--g2); border-radius: 10px; }
+.cli-update-list > li { display: flex; gap: 12px; padding: 10px 14px; align-items: flex-start; }
+.cli-update-list > li + li { border-top: 1px solid var(--g2); }
+.cli-update-list > li > div { flex: 1; min-width: 0; }
+.cli-update-list h5 { margin: 0; font-size: 13px; font-weight: 600; }
+.cli-update-list .provider-mark { width: 28px; height: 28px; margin-top: 2px; background: var(--fg); border-color: var(--fg); color: var(--bg); font-size: 10px; }
+@keyframes cli-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cli-update { animation: none; }
+  .cli-update[data-tone="run"] .cli-update-mark, .cli-update[data-tone="wait"] .cli-update-mark { animation: none; border-color: var(--g4); }
+}
+@media (max-width: 640px) {
+  .provider-head { flex-wrap: wrap; }
+  .provider-install { padding-left: 14px; }
+  .provider-install { flex-direction: column; align-items: flex-start; }
+  .cli-update { flex-wrap: wrap; }
+  .cli-update-actions { width: 100%; padding-left: 18px; }
+  .provider-account { grid-template-columns: minmax(0, 1fr) auto; }
+  .provider-account-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .provider-title small { white-space: normal; }
+}
 .launch-cli-hint { font-size: 12px; color: var(--role-attention); margin: 8px 0 0; }
 .launch-cli-hint .link { all: unset; cursor: pointer; text-decoration: underline; color: var(--fg); }
 
