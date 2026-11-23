@@ -236,7 +236,13 @@ export interface TerminalInfo {
   /** A change of model asked from the interface: queued until the session is free, running, held by a question of the
    *  CLI that the person must answer (`confirm`, with the CLI's own words as message), then its outcome for a while. */
   modelChange?: ModelChange;
+  /** Listed, never stored: a role change the person asked for, waiting for the end of the agent's turn, or why it failed. */
+  roleChange?: RoleChange;
+  /** Listed, never stored: the agent CLI a person started by hand inside this plain terminal. */
+  inner?: 'claude' | 'codex';
 }
+/** A role (or squad, or none) asked for a session; `role: null` takes it out of its squad. */
+export interface RoleChange { role: 'orchestrator' | 'operator' | 'reviewer' | null; teamId?: string; state: 'waiting' | 'failed'; message?: string; at: number }
 export interface ModelChange { state: 'waiting' | 'running' | 'confirm' | 'done' | 'failed'; target: string; label: string; message?: string; at: number }
 export interface ModelSwitchChoice { id: string; label: string }
 

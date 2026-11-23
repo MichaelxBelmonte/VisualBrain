@@ -1801,5 +1801,10 @@ body.board-dragging, body.board-dragging * { cursor: grabbing !important; user-s
 ::selection { background: var(--signal); color: var(--signal-ink); }
 :focus-visible { outline-color: var(--focus) !important; }
 /* The highlighter: the session you are on. */
-#work-node-rail .work-session.selected { background: var(--signal); color: var(--signal-ink); }
-#work-node-rail .work-session.selected :is(span, small, b, em, code, strong):not(.tone-dot) { color: var(--signal-ink); }
+
+/* 0.2.67 · The role of a session, under its rail row next to its model; a plain terminal running an agent says so. */
+.work-role { margin-top: 3px; }
+.work-role .work-model-state { flex-basis: 100%; }
+.work-role .work-model-state:empty { display: none; }
+.work-role select { max-width: 14em; }
+#work-node-rail .work-session .work-code.inner { padding: 0 3px; border: 1px solid var(--g3); border-radius: 2px; color: var(--fg); }

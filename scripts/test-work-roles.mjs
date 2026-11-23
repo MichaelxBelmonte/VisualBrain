@@ -2,7 +2,7 @@
 // Uso: node scripts/test-work-roles.mjs — nessun server, nessuna app.
 import assert from 'node:assert/strict';
 import { setLanguage } from '../src/ui/i18n.ts';
-import { BUSY_WINDOW_MS, STALE_AFTER_MS, TONES, idleMinutes, sessionTone, toneFlag, toneReason } from '../src/ui/work-roles.ts';
+import { BUSY_WINDOW_MS, STALE_AFTER_MS, TONES, idleMinutes, parseRoleChoice, roleChangeable, roleChoices, roleLineHtml, roleTargetLabel, sessionTone, toneFlag, toneReason } from '../src/ui/work-roles.ts';
 
 setLanguage('it');
 const NOW = 10_000_000, s = n => NOW - n * 1000, min = n => NOW - n * 60_000;
@@ -82,5 +82,44 @@ assert.equal(toneReason({ ...op, attention: 'input' }, NOW), 'There is a questio
 assert.equal(toneReason({ ...op, workState: 'working', lastOutputAt: min(1), stateSource: 'hook' }, NOW), 'Working · last activity 1 min ago');
 assert.equal(toneFlag('stale'), 'Inactive');
 setLanguage('it');
+
+// The role menu of a session: each role in each squad, the orchestrator taken by someone else shown but not offered.
+{
+  const one = [{ id: '1', name: 'Bacheca', orchestrator: 'ORC1' }];
+  const op3 = roleChoices({ agent: 'claude', role: 'operator', code: 'OP3', teamId: '1' }, one);
+  assert.deepEqual(op3.map(c => c.value), ['orchestrator@1', 'operator@1', 'reviewer@1', 'none']);
+  assert.equal(op3[0].disabled, true); assert.equal(op3[0].label, 'Orchestratore · ORC1');
+  assert.equal(op3.find(c => c.selected).value, 'operator@1'); assert.equal(op3[0].group, undefined, 'one squad: no group headings');
+  const orc = roleChoices({ agent: 'claude', role: 'orchestrator', code: 'ORC1', teamId: '1' }, one);
+  assert.equal(orc[0].disabled, undefined, 'its own orchestrator role stays selectable');
+  const two = [...one, { id: '2', name: 'Stats', orchestrator: null }];
+  const shell = roleChoices({ agent: 'shell', inner: 'claude' }, two);
+  assert.deepEqual(shell[0], { value: '', label: 'Aggiungi alla squadra…', selected: true, disabled: true });
+  assert.deepEqual(shell.slice(1).map(c => c.group), ['Bacheca', 'Bacheca', 'Bacheca', 'Stats', 'Stats', 'Stats']);
+  assert.ok(!shell.some(c => c.value === 'none'), 'nothing to leave yet');
+  assert.equal(shell[4].disabled, undefined, 'a squad without orchestrator offers the role');
+  assert.deepEqual(parseRoleChoice('reviewer@2'), { role: 'reviewer', teamId: '2' });
+  assert.deepEqual(parseRoleChoice('none'), { role: null });
+  assert.equal(parseRoleChoice('brain@1'), null); assert.equal(parseRoleChoice(''), null);
+  assert.equal(roleTargetLabel({ role: 'reviewer', teamId: '2' }, two), 'Revisore · Stats');
+  assert.equal(roleTargetLabel({ role: 'reviewer', teamId: '1' }, one), 'Revisore');
+  assert.equal(roleTargetLabel({ role: null }, two), 'Nessun ruolo');
+  assert.equal(roleChangeable({ alive: true, nodeId: 1, agent: 'claude' }), true, 'a Claude session without a role can join');
+  assert.equal(roleChangeable({ alive: true, nodeId: 1, agent: 'shell' }), false, 'a plain terminal with nothing inside');
+  assert.equal(roleChangeable({ alive: true, nodeId: 1, agent: 'shell', inner: 'codex' }), true);
+  assert.equal(roleChangeable({ alive: true, nodeId: null, agent: 'claude' }), false, 'outside nodes there are no squads');
+  assert.equal(roleChangeable({ alive: true, nodeId: 1, agent: 'claude', role: 'brain' }), false);
+  assert.equal(roleChangeable({ alive: false, nodeId: 1, agent: 'claude', role: 'operator' }), false);
+  assert.equal(roleChangeable({ alive: true, nodeId: 1, agent: 'hermes', role: 'operator' }), false);
+  const waiting = roleLineHtml({ id: 'ab', agent: 'claude', role: 'operator', code: 'OP3', teamId: '1', roleChange: { role: 'reviewer', teamId: '1', state: 'waiting' } }, one);
+  assert.match(waiting, /<select data-role-select="ab" aria-label="Ruolo di OP3"[^>]* disabled>/);
+  assert.match(waiting, /→ Revisore · alla fine del turno/); assert.match(waiting, /data-role-now="ab"[^>]*>Subito</); assert.match(waiting, /data-role-cancel="ab">Annulla</);
+  const failed = roleLineHtml({ id: 'ab', agent: 'claude', role: 'operator', code: 'OP3', teamId: '1', roleChange: { role: 'orchestrator', state: 'failed', message: 'Questa <squadra>' } }, one);
+  assert.match(failed, /work-model-state warn">Questa &lt;squadra&gt;</);
+  const hand = roleLineHtml({ id: 'sh', agent: 'shell', inner: 'claude' }, [...one, { id: '2', name: 'S"tats', orchestrator: null }]);
+  assert.match(hand, /<optgroup label="Bacheca">.*<\/optgroup><optgroup label="S&quot;tats">.*<\/optgroup><\/select>/);
+  assert.match(hand, />Claude Code avviato a mano</);
+  console.log('PASS role menu: roles per squad, taken orchestrator not offered, plain terminal joins, values parsed');
+}
 
 console.log(`work-roles: ok (${cases.length} cases)`);

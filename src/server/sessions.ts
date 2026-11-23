@@ -1,8 +1,12 @@
 import type { ApiCtx } from './api.ts';
-import type { AgentName, LaunchRequest, NodeDetail, SquadRequest, TerminalInfo } from '../shared/types.ts';
+import type { AgentName, AgentRole, LaunchRequest, NodeDetail, RoleChange, SquadRequest, TerminalInfo } from '../shared/types.ts';
+import type { Term } from './terminals.ts';
+import { randomUUID } from 'node:crypto';
+import { noticeInputBlocked } from './activity.ts';
+import { findClaudeConversation, innerNow, processCwd } from './inner-agent.ts';
 import { existsSync } from 'node:fs';
 import { buildContext, findCodexSession, launchEmbedded, launchExternal, resumeEmbedded, workingDir } from './launch.ts';
-import { BRAIN_TEAM, boundedText, DEFAULT_TEAM, isTeamId, memoryFor, TeamError } from './team.ts';
+import { BRAIN_TEAM, boundedText, DEFAULT_TEAM, isTeamId, memoryFor, TeamError, teamInstructions } from './team.ts';
 import { wakeSession } from './team-delivery.ts';
 import { attachedFiles, withAttachments } from './attachments.ts';
 import { createWorktree, removeWorktree } from './worktrees.ts';
@@ -340,3 +344,185 @@ async function startBrain(ctx: ApiCtx, detail: NodeDetail, cwd: string, size: { 
   }
   return { termId: term.info.id, info: { ...term.info, code, teamId: BRAIN_TEAM } };
 }
+
+// ── Changing a session's role while it works ────────────────────────────────────────────────────────────────────────
+// The role card, the team token and the board tools reach an agent only when its process starts, so a new role means
+// starting the same conversation again under the same id (like «Riprendi»), with the new card as its first message.
+// The person decides when: at the end of the agent's turn (the default), or at once («Subito»).
+
+export type RoleTarget = { role: 'orchestrator' | 'operator' | 'reviewer' | null; teamId?: string };
+type QueuedRole = RoleChange & { timer?: ReturnType<typeof setTimeout>; size: { cols: number; rows: number } };
+const roleChanges = new Map<string, QueuedRole>();
+const ROLE_RETRY_MS = 1000, SHELL_QUIET_MS = 4000, FAILED_KEPT_MS = 30_000;
+
+/** Why a session cannot be restarted right now, or null. A plain terminal counts as busy while it still prints. */
+export function roleBlockedBy(term: Term, now = Date.now()): string | null {
+  const info = term.info, a = term.activity;
+  if (!info.alive) return null;
+  if (info.agent === 'shell') return now - (info.lastOutputAt ?? 0) < SHELL_QUIET_MS ? 'turno in corso' : null;
+  if (info.attention) return 'la sessione aspetta una tua risposta';
+  if (a.draft) return 'c’è un testo non inviato nel campo di scrittura';
+  if (info.workState === 'working' || noticeInputBlocked(a, info)) return 'turno in corso';
+  return null;
+}
+
+/** The change waiting for a session, for the sessions list. */
+export function roleChangeOf(id: string): RoleChange | undefined {
+  const c = roleChanges.get(id);
+  return c ? { role: c.role, ...(c.teamId ? { teamId: c.teamId } : {}), state: c.state, ...(c.message ? { message: c.message } : {}), at: c.at } : undefined;
+}
+export function cancelRoleChange(id: string): boolean {
+  const c = roleChanges.get(id);
+  if (!c) return false;
+  if (c.timer) clearTimeout(c.timer);
+  roleChanges.delete(id);
+  return true;
+}
+
+function roleTarget(body: { role?: unknown; teamId?: unknown }): RoleTarget {
+  const role = body.role === null || body.role === '' ? null : body.role;
+  if (role !== null && role !== 'orchestrator' && role !== 'operator' && role !== 'reviewer') throw new TeamError(400, 'Ruolo non valido');
+  if (body.teamId !== undefined && (typeof body.teamId !== 'string' || !isTeamId(body.teamId) || body.teamId === BRAIN_TEAM)) throw new TeamError(400, 'Squadra non valida');
+  return { role, ...(typeof body.teamId === 'string' ? { teamId: body.teamId } : {}) };
+}
+
+/**
+ * Asks for a new role (or squad, or none) for a Claude or Codex session, or for a plain terminal running one. Applied at
+ * once when the agent is between turns or `now` is set; otherwise queued until its turn ends. Throws with a message
+ * when the change is impossible, before anything is queued.
+ */
+export async function requestRoleChange(ctx: ApiCtx, id: string, body: { role?: unknown; teamId?: unknown; now?: unknown; cols?: unknown; rows?: unknown }) {
+  const target = roleTarget(body);
+  const size = { cols: Math.max(20, Math.min(500, Number(body.cols) || 120)), rows: Math.max(5, Math.min(200, Number(body.rows) || 30)) };
+  const term = ctx.terms.get(id);
+  if (!term) throw new TeamError(404, 'Sessione non trovata');
+  await planRole(ctx, id, target); // every refusal comes now, not after the wait
+  cancelRoleChange(id);
+  const blocked = body.now === true ? null : roleBlockedBy(term);
+  if (!blocked) return exclusive(ctx, () => changeRoleNow(ctx, id, target, size));
+  const change: QueuedRole = { ...target, state: 'waiting', message: blocked, at: Date.now(), size };
+  roleChanges.set(id, change);
+  const attempt = () => {
+    change.timer = undefined;
+    if (roleChanges.get(id) !== change) return;
+    const t = ctx.terms.get(id);
+    if (!t) { roleChanges.delete(id); return; }
+    const reason = roleBlockedBy(t);
+    if (reason) { change.message = reason; change.timer = setTimeout(attempt, ROLE_RETRY_MS); change.timer.unref?.(); return; }
+    void exclusive(ctx, () => changeRoleNow(ctx, id, target, change.size)).then(
+      () => { if (roleChanges.get(id) === change) roleChanges.delete(id); },
+      (error: unknown) => {
+        if (roleChanges.get(id) !== change) return;
+        Object.assign(change, { state: 'failed', message: error instanceof Error ? error.message : String(error), at: Date.now() });
+        change.timer = setTimeout(() => { if (roleChanges.get(id) === change) roleChanges.delete(id); }, FAILED_KEPT_MS); change.timer.unref?.();
+      });
+  };
+  change.timer = setTimeout(attempt, ROLE_RETRY_MS); change.timer.unref?.();
+  return { termId: id, change: roleChangeOf(id)! };
+}
+
+interface RolePlan { agent: 'claude' | 'codex'; cwd: string; resumeId: string; innerPid?: number; fromTeam: string | null; team: string | null }
+
+/** Every check of a role change, without changing anything. */
+async function planRole(ctx: ApiCtx, id: string, target: RoleTarget): Promise<RolePlan> {
+  const term = ctx.terms.get(id);
+  if (!term) throw new TeamError(404, 'Sessione non trovata');
+  const info = term.info, nodeId = info.nodeId;
+  if (nodeId == null) throw new TeamError(409, 'Questo terminale non appartiene a un nodo: aprilo da un nodo per aggiungerlo a una squadra');
+  if (info.role === 'brain') throw new TeamError(409, 'Il Main Brain non cambia ruolo');
+  if (info.account && !accountById(info.account)) throw new TeamError(409, 'L’account di questa sessione è stato rimosso da Impostazioni → Agenti');
+  const claimed = new Set(ctx.terms.list().filter(s => s.id !== id).map(s => s.resumeId).filter((r): r is string => Boolean(r)));
+  let agent: 'claude' | 'codex', cwd = info.cwd, resumeId = info.resumeId, innerPid: number | undefined;
+  if (info.agent === 'shell') {
+    if (!target.role) throw new TeamError(409, 'Questo terminale non fa parte di una squadra');
+    const inner = info.alive ? await innerNow(term.proc.pid) : null;
+    if (!inner) throw new TeamError(409, 'In questo terminale non è aperto Claude Code né Codex');
+    agent = inner.agent; innerPid = inner.pid;
+    cwd = (await processCwd(inner.pid)) ?? info.cwd;
+    resumeId = inner.resumeId ?? (agent === 'claude'
+      ? findClaudeConversation(agentHome('claude'), cwd, inner.startedAt, claimed)
+      : findCodexSession(cwd, inner.startedAt, claimed, agentHome('codex')));
+  } else {
+    if (info.agent !== 'claude' && info.agent !== 'codex') throw new TeamError(409, 'Il ruolo si cambia durante il lavoro solo a Claude Code e Codex');
+    agent = info.agent;
+    resumeId ??= agent === 'codex' ? findCodexSession(info.cwd, info.createdAt, claimed, agentHome('codex', info.account)) : undefined;
+  }
+  if (!resumeId) throw new TeamError(409, 'Conversazione dell’agente non trovata: scrivigli un messaggio e riprova');
+  if (!existsSync(cwd)) throw new TeamError(409, 'La cartella di lavoro della sessione non esiste più');
+  const fromTeam = info.role ? ctx.teams.teamOf(nodeId, info) : null;
+  const team = target.role ? (target.teamId ?? fromTeam ?? DEFAULT_TEAM) : null;
+  if (team && !ctx.teams.team(nodeId, team)) throw new TeamError(404, 'Squadra non trovata');
+  if ((target.role ?? null) === (info.role ?? null) && team === fromTeam) throw new TeamError(409, 'La sessione ha già questo ruolo in questa squadra');
+  if (team && target.role) {
+    const peers = squadSessions(ctx, nodeId, team).filter(s => s.id !== id && s.role);
+    const limit = ctx.teams.get(nodeId, team).policy.maxAgents;
+    if (fromTeam !== team && peers.length >= limit) throw new TeamError(409, `Limite della squadra: ${limit} agenti. Chiudi una sessione o modifica il limite.`);
+    if (target.role === 'orchestrator' && peers.some(s => s.role === 'orchestrator')) throw new TeamError(409, 'Questa squadra ha già un orchestratore attivo: cambia prima il suo ruolo');
+  }
+  return { agent, cwd, resumeId, innerPid, fromTeam, team };
+}
+
+const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const running = (pid: number | undefined) => { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; } };
+
+async function changeRoleNow(ctx: ApiCtx, id: string, target: RoleTarget, size: { cols: number; rows: number }) {
+  const plan = await planRole(ctx, id, target);
+  const old = ctx.terms.get(id)!;
+  const nodeId = old.info.nodeId!;
+  const english = ctx.cfg.language === 'en';
+  const info: TerminalInfo = { ...old.info, agent: plan.agent, cwd: plan.cwd, resumeId: plan.resumeId };
+  const wasShell = old.info.agent === 'shell', priorRole = old.info.role, priorCode = ctx.teams.get(nodeId).codes?.ids[id];
+  const node = ctx.cache.nodes.get(nodeId);
+  if (wasShell) info.title = `${plan.agent} · ${node?.name ?? short(plan.cwd)}`;
+  const code = target.role ? (target.role === priorRole && priorCode ? priorCode : ctx.teams.reserveCode(nodeId, target.role)) : undefined;
+  const token = old.teamToken || randomUUID();
+
+  // What the session leaves behind: its open tasks (unless it stays a worker of the same squad) and its operators.
+  if (plan.fromTeam && (plan.team !== plan.fromTeam || !target.role || target.role === 'orchestrator')) ctx.teams.release(nodeId, id, plan.fromTeam);
+  if (priorRole === 'orchestrator' && (target.role !== 'orchestrator' || plan.team !== plan.fromTeam)) {
+    for (const s of ctx.terms.list()) if (s.parentId === id) { const t = ctx.terms.get(s.id); if (t) t.info.parentId = undefined; }
+  }
+  const squad = plan.team ? ctx.teams.team(nodeId, plan.team)! : undefined;
+  const board = plan.team ? ctx.teams.get(nodeId, plan.team) : undefined;
+  info.role = target.role ?? undefined;
+  info.task = undefined;
+  info.parentId = target.role && target.role !== 'orchestrator' ? squadSessions(ctx, nodeId, plan.team!).find(s => s.id !== id && s.role === 'orchestrator')?.id : undefined;
+
+  const roleWord = (r: AgentRole) => english ? ({ orchestrator: 'orchestrator', operator: 'operator', reviewer: 'reviewer', brain: 'Main Brain' })[r] : ({ orchestrator: 'orchestratore', operator: 'operatore', reviewer: 'revisore', brain: 'Main Brain' })[r];
+  let notice: string;
+  if (target.role && squad) {
+    const head = english
+      ? `Visual Brain: the user ${wasShell || !priorRole ? 'added this session to' : 'changed your role in'} squad ${squad.name}. You are now ${roleWord(target.role)} ${code}. These instructions replace any earlier role. Read the board before continuing; if you were doing something, check it is still yours.`
+      : `Visual Brain: l’utente ${wasShell || !priorRole ? 'ha aggiunto questa sessione alla' : 'ti ha cambiato ruolo nella'} squadra ${squad.name}. Ora sei ${roleWord(target.role)} ${code}. Queste istruzioni sostituiscono il ruolo di prima. Rileggi la bacheca prima di continuare; se stavi facendo qualcosa, verifica che sia ancora tuo.`;
+    notice = head + '\n\n' + teamInstructions(`http://${ctx.cfg.host}:${ctx.cfg.port}/api/work/${nodeId}`, id, token, target.role, undefined, ctx.cfg.language, ctx.terms.persistent === true, true, code, ctx.teams.teams(nodeId).length > 1 ? squad.name : undefined);
+  } else notice = english
+    ? `Visual Brain: the user took this session out of its squad${priorCode ? ` (you were ${priorCode})` : ''}. Work on your own from now on: no board, no squad messages.`
+    : `Visual Brain: l’utente ha tolto questa sessione dalla squadra${priorCode ? ` (eri ${priorCode})` : ''}. Da ora lavori da solo: niente bacheca né messaggi della squadra.`;
+
+  // A worker that stays in its squad keeps its place in the messages; anyone arriving starts from now.
+  const seen = board ? (plan.fromTeam === plan.team ? old.seenMessage : board.messages.at(-1)?.id ?? 0) : 0;
+  const pids = [old.info.alive ? old.proc.pid : undefined, plan.innerPid];
+  ctx.terms.kill(id);
+  // The old process must let go of the conversation before the new one opens it.
+  for (const until = Date.now() + 3000; Date.now() < until && pids.some(running);) await pause(100);
+  const term = await resumeEmbedded(ctx.terms, ctx.cfg, info, plan.resumeId, token, seen, size,
+    target.role && board ? memoryFor(board.policy, target.role, ctx.cfg.dataDir, nodeId, plan.team!) : undefined, notice);
+  if (code) ctx.teams.bindCode(nodeId, id, code);
+  if (plan.team) ctx.teams.bindTeam(nodeId, id, plan.team);
+  if (target.role === 'orchestrator') for (const s of squadSessions(ctx, nodeId, plan.team!)) {
+    if (s.id !== id && s.role && s.role !== 'orchestrator') { const t = ctx.terms.get(s.id); if (t) t.info.parentId = id; }
+  }
+  if (info.name) ctx.terms.rename(id, info.name);
+  // The squad's orchestrator hears about a new or changed worker; a new orchestrator reads the board on its own.
+  if (plan.team && target.role !== 'orchestrator' && info.parentId) {
+    ctx.teams.message(nodeId, SYSTEM, info.parentId, english
+      ? `${code} (${plan.agent}) is now ${roleWord(target.role!)} in your squad${priorCode && priorCode !== code ? `, was ${priorCode}` : ''}. Give it work if there is any.`
+      : `${code} (${plan.agent}) ora è ${roleWord(target.role!)} nella tua squadra${priorCode && priorCode !== code ? `, prima era ${priorCode}` : ''}. Affidagli lavoro se ce n’è.`, plan.team);
+    wakeSession(ctx, info.parentId);
+  }
+  if (node) for (const team of new Set([plan.fromTeam, plan.team])) if (team) {
+    try { ctx.teams.saveSquad(nodeId, node.path, node.name, ctx.terms.list(), team); } catch { /* the saved roster is a convenience */ }
+  }
+  return { termId: id, info: ctx.teams.withCodes([term.info])[0] };
+}
+const short = (path: string) => path.split('/').filter(Boolean).at(-1) ?? path;

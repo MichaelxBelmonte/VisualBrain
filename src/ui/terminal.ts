@@ -12,7 +12,7 @@ import { bindReorder } from './work-reorder.ts';
 import { connectionGroups, linkBetween, linkRequest, moveNode, orderNodes, type LinkSide } from './work-links.ts';
 import { WorkChannel } from './work-channel.ts';
 import { clampSplit, moveTile, orderTiles, MAX_TILES, connectionEndpoints, defaultTiles, directPeers, pairTiles, focusIndex, focusTile, gridColumns, groupSuggestion, pickerGroups, reconcileTiles, removeTile, stepFocus, stepTab, tabStepKey, tileKeyAction, tileMarker, toggleTile, type TileSelection, clampPage, emptyNodeView, needsLink, nodePickerGroups, nodeViewIds, orchestratorLink, pageCount, pageIds, pageOfId, type NodeView, type PickerItem } from './work-tiles.ts';
-import { CODE_IN_TEXT, inRailFilter, railCounts, resumable, roleName, sessionTone, sessionWorking, toneFlag, toneReason, type RailFilter, type SessionTone, ROLE_WORDS } from './work-roles.ts';
+import { CODE_IN_TEXT, inRailFilter, parseRoleChoice, railCounts, resumable, roleChangeable, roleLineHtml, roleName, sessionTone, sessionWorking, toneFlag, toneReason, type RailFilter, type RoleSquad, type SessionTone, ROLE_WORDS } from './work-roles.ts';
 import { DEFAULT_FONT_SIZE, dropText, fontZoomKey, isNewTerminalKey, isPlainTerminalKey, parseFileDrop, zoomFont } from './work-input.ts';
 import { api } from './api.ts';
 import { accountTag, refreshAccountNames } from './account-names.ts';
@@ -135,6 +135,9 @@ export class Terminals {
   /** What each agent's own model selector offers (or why an agent has none), asked once. */
   private modelChoices: { claude: ModelSwitchChoice[]; codex: ModelSwitchChoice[]; limits: Record<string, string | null> } | null = null;
   private modelWatch: ReturnType<typeof setTimeout> | null = null;
+  /** The squads of each node for the role menu, read again after ten seconds or after a role change. */
+  private squads = new Map<number, { at: number; list: RoleSquad[] }>();
+  private squadsLoading = new Set<number>();
   private control<T extends Element = HTMLElement>(selector: string): T | null { return this.root.querySelector<T>(selector) ?? document.querySelector<T>(selector); }
 
   constructor(root: HTMLElement, cb: Callbacks) {
@@ -200,6 +203,15 @@ export class Terminals {
     this.listEl.addEventListener('change', e => {
       const select = e.target instanceof HTMLSelectElement ? e.target : null;
       if (select?.dataset.modelSelect) void this.switchModel(select.dataset.modelSelect, select.value);
+      if (select?.dataset.roleSelect) void this.changeRole(select.dataset.roleSelect, select.value);
+    });
+    // A queued role change: apply it now (the agent's turn is interrupted) or drop it.
+    this.listEl.addEventListener('click', e => {
+      const button = (e.target as HTMLElement).closest<HTMLElement>('[data-role-now], [data-role-cancel]');
+      if (!button) return;
+      e.stopPropagation();
+      if (button.dataset.roleNow) void this.roleNow(button.dataset.roleNow);
+      else void this.cancelRole(button.dataset.roleCancel!);
     });
     this.listEl.addEventListener('click', e => {
       const button = (e.target as HTMLElement).closest<HTMLElement>('[data-model-confirm], [data-model-cancel]');
@@ -279,8 +291,11 @@ export class Terminals {
       const list = await api.terminals();
       for (const info of list) {
         const tab = this.tabs.get(info.id);
-        if (!tab) this.attach(info, false);
-        else tab.info = info;
+        if (!tab) { this.attach(info, false); continue; }
+        // A role change the server applied at the end of the turn started the process again: show the new one.
+        const restarted = tab.info.roleChange?.state === 'waiting' && !info.roleChange && (info.role !== tab.info.role || info.agent !== tab.info.agent || info.teamId !== tab.info.teamId);
+        tab.info = info;
+        if (restarted) { if (info.nodeId != null) this.squads.delete(info.nodeId); if (tab.pane) this.connect(tab); }
       }
       for (const tab of this.tabs.values()) if (!list.some(info => info.id === tab.info.id)) tab.info.alive = false;
       if (this.railPreviewId) this.showRailPreview(this.railPreviewId); // the last words of the highlighted session move on
@@ -683,7 +698,7 @@ export class Terminals {
       const t = this.tabs.get(id)!, on = id === this.active, tone = sessionTone(t.info);
       const label = t.info.role ? this.roleName(t) : t.info.name || this.generatedName(t);
       const keys = i < 9 ? ` · Ctrl+Alt+${i + 1}` : '';
-      return ui`<button type="button" role="tab" class="term-tab" data-tab="${id}" aria-selected="${on}"${tone ? ` data-tone="${tone}"` : ''} title="${esc(this.sessionLabel(t) + ' · ' + toneReason(t.info) + keys)}"><span class="work-dot"></span><span class="term-tab-label">${esc(label)}</span>${accountChip(t.info)}${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}</button>`;
+      return ui`<button type="button" role="tab" class="term-tab" data-tab="${id}" aria-selected="${on}"${tone ? ` data-tone="${tone}"` : ''} title="${esc(this.sessionLabel(t) + ' · ' + toneReason(t.info) + keys)}"><span class="work-dot"></span><span class="term-tab-label">${esc(label)}</span>${accountChip(t.info)}${t.info.code ? ui`<span class="work-code">${esc(t.info.code)}</span>` : ''}${t.info.agent === 'shell' && t.info.inner && t.info.alive ? `<span class="work-code inner" title="${tr('Avviato a mano in questo terminale: puoi aggiungerlo a una squadra')}">${t.info.inner}</span>` : ''}</button>`;
     }).join('');
     this.tabStrip.classList.toggle('hidden', !html);
     this.bodyEl.classList.toggle('with-tabs', Boolean(html)); // the tab already names the session: the pane header does not repeat it
@@ -758,8 +773,62 @@ export class Terminals {
   }
   /** While a change is on its way the list is read again often, so its outcome shows as soon as the CLI confirms it. */
   private watchModels(): void {
-    if (this.modelWatch || ![...this.tabs.values()].some(t => ['waiting', 'running', 'confirm'].includes(t.info.modelChange?.state ?? ''))) return;
+    if (this.modelWatch || ![...this.tabs.values()].some(t => ['waiting', 'running', 'confirm'].includes(t.info.modelChange?.state ?? '') || t.info.roleChange?.state === 'waiting')) return;
     this.modelWatch = setTimeout(() => { this.modelWatch = null; void this.syncSessions(); }, 700);
+  }
+
+  /** The squads of a node for the role menu: null until the first read arrives (the menu then appears). */
+  private squadsOf(nodeId: number): RoleSquad[] | null {
+    const hit = this.squads.get(nodeId);
+    if ((!hit || Date.now() - hit.at > 10_000) && !this.squadsLoading.has(nodeId)) {
+      this.squadsLoading.add(nodeId);
+      void api.team(nodeId).then(view => {
+        const list = (view.teamList ?? []).filter(q => !q.archived).map(q => ({ id: q.id, name: q.name, orchestrator: q.orchestrator }));
+        this.squads.set(nodeId, { at: Date.now(), list: list.length ? list : [{ id: '1', name: '', orchestrator: null }] });
+        this.renderDetails();
+      }).catch(() => {}).finally(() => this.squadsLoading.delete(nodeId));
+    }
+    return hit?.list ?? null;
+  }
+
+  /**
+   * A new role for a session, chosen on its row. The agent's process starts again under the same id with the new role
+   * card and the same conversation; while the agent is in a turn the change waits for its end.
+   */
+  private async changeRole(id: string, value: string, now = false): Promise<void> {
+    const tab = this.tabs.get(id), target = parseRoleChoice(value);
+    if (!tab || !target) return;
+    try {
+      const result = await api.changeRole(id, { ...target, now, cols: tab.term?.cols ?? 120, rows: tab.term?.rows ?? 30 });
+      if (result.info) this.restarted(tab, result.info);
+      else tab.info.roleChange = result.change;
+    } catch (err) { this.message(tr(String(err instanceof Error ? err.message : err))); }
+    if (tab.info.nodeId != null) this.squads.delete(tab.info.nodeId);
+    this.renderDetails(); this.watchModels();
+    await this.syncSessions();
+  }
+  private async roleNow(id: string): Promise<void> {
+    const change = this.tabs.get(id)?.info.roleChange;
+    if (change) await this.changeRole(id, change.role ? `${change.role}@${change.teamId ?? this.tabs.get(id)!.info.teamId ?? '1'}` : 'none', true);
+  }
+  private async cancelRole(id: string): Promise<void> {
+    try { await api.cancelRole(id); } catch (err) { this.message(tr(String(err instanceof Error ? err.message : err))); }
+    const tab = this.tabs.get(id); if (tab) delete tab.info.roleChange;
+    this.renderDetails();
+    this.listEl.querySelector<HTMLElement>(`.work-session[data-sid="${id}"] [data-role-select]`)?.focus({ preventScroll: true });
+  }
+  /** The same session with a new process: the terminal reconnects to it. */
+  private restarted(tab: Tab, info: TerminalInfo): void {
+    tab.info = info;
+    if (tab.pane) this.connect(tab);
+    this.updateCard(tab); this.renderList(); this.renderTabs();
+  }
+
+  /** The role of a Claude Code or Codex session in its node's squads, or of one started by hand in a plain terminal. */
+  private roleLine(info: TerminalInfo): string {
+    if (info.nodeId == null || !roleChangeable(info)) return '';
+    const squads = this.squadsOf(info.nodeId);
+    return squads ? roleLineHtml(info, squads) : '';
   }
 
   /** The row the keyboard highlights stays marked while the keyboard is on its model. */
@@ -802,16 +871,17 @@ export class Terminals {
     const box = row.querySelector<HTMLElement>('.work-session-detail'), info = this.tabs.get(row.dataset.sid!)?.info;
     if (!box || !info) return;
     const highlighted = this.railPreviewId === info.id, onScreen = this.active === info.id || !!this.sel?.ids.includes(info.id);
-    const model = highlighted || this.active === info.id ? this.modelLine(info) : '';
+    const model = highlighted || this.active === info.id ? this.modelLine(info) + this.roleLine(info) : '';
     const data = highlighted && !onScreen && this.railPreviewData?.id === info.id ? this.railPreviewData.preview : null;
     const words = !data ? '' : (data.text ? `<p class="work-session-preview">${esc(data.text)}</p>` : '') + (data.error ? `<p class="work-session-preview error">${esc(data.error)}</p>` : '')
       + (!data.text && !data.error ? `<p class="work-session-preview none">${tr('Nessuna attività leggibile')}</p>` : '');
     const html = model + words;
     if (box.dataset.shown === html) return;
     const focused = box.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
-    const refocus = focused?.dataset.modelSelect !== undefined ? 'select' : focused ? 'button' : '';
+    const refocus = !focused ? '' : focused.dataset.modelSelect !== undefined ? '[data-model-select]' : focused.dataset.roleSelect !== undefined ? '[data-role-select]'
+      : focused.closest('.work-role') ? '.work-role :is(select, button)' : '.work-model:not(.work-role) button';
     box.dataset.shown = html; box.innerHTML = html; box.hidden = !html;
-    if (refocus) (box.querySelector<HTMLElement>(`.work-model ${refocus}:not([disabled])`) ?? row.querySelector<HTMLElement>('button[data-session]'))?.focus({ preventScroll: true });
+    if (refocus) (box.querySelector<HTMLElement>(`${refocus}:not([disabled])`) ?? row.querySelector<HTMLElement>('button[data-session]'))?.focus({ preventScroll: true });
     if (highlighted && html) row.scrollIntoView({ block: 'nearest' });
   }
 
@@ -1007,7 +1077,7 @@ export class Terminals {
     if (!groups.length) groups.push({ key: 'empty', html: tr('<div class="work-list-empty">Nessun nodo trovato.</div>') });
     const focused = this.listEl.contains(document.activeElement) && document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const actionKey = ['addAgent', 'nodeLink', 'sessionLink'].find(key => focused?.dataset[key]);
-    const focusKey = actionKey ? `[${actionKey.replace(/[A-Z]/g, c => '-' + c.toLowerCase()).replace(/^/, 'data-')}="${focused!.dataset[actionKey]}"]` : focused?.dataset.nodeGrip ? `[data-node-grip="${focused.dataset.nodeGrip}"]` : focused?.dataset.sessionGrip ? `[data-session-grip="${focused.dataset.sessionGrip}"]` : focused?.dataset.fold ? `[data-fold="${focused.dataset.fold}"]` : focused?.dataset.node ? `[data-node="${focused.dataset.node}"]` : focused?.dataset.session ? `[data-session="${focused.dataset.session}"]` : focused?.dataset.modelSelect ? `[data-model-select="${focused.dataset.modelSelect}"]` : null;
+    const focusKey = actionKey ? `[${actionKey.replace(/[A-Z]/g, c => '-' + c.toLowerCase()).replace(/^/, 'data-')}="${focused!.dataset[actionKey]}"]` : focused?.dataset.nodeGrip ? `[data-node-grip="${focused.dataset.nodeGrip}"]` : focused?.dataset.sessionGrip ? `[data-session-grip="${focused.dataset.sessionGrip}"]` : focused?.dataset.fold ? `[data-fold="${focused.dataset.fold}"]` : focused?.dataset.node ? `[data-node="${focused.dataset.node}"]` : focused?.dataset.session ? `[data-session="${focused.dataset.session}"]` : focused?.dataset.modelSelect ? `[data-model-select="${focused.dataset.modelSelect}"]` : focused?.dataset.roleSelect ? `[data-role-select="${focused.dataset.roleSelect}"]` : null;
     // The highlighted session may leave the list (closed, filtered out): the highlight stays at the same place.
     const focusedAt = focused?.dataset.session ? [...this.listEl.querySelectorAll('button[data-session]')].indexOf(focused) : -1;
     if (this.patchRail(groups)) {

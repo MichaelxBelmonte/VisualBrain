@@ -59,7 +59,7 @@ try {
     // session passed off as a change of model.
     assert.doesNotMatch(source, /work-rail-preview|data-preview-native|data-preview-model|navigator\.clipboard\?\.writeText\('\/model'\)|nativeModel|changeModel/, 'the docked preview and its two buttons are gone');
     assert.match(source, /<div class="work-session-detail" hidden><\/div><\/div>` \}\);/, 'each row carries its own detail, empty until the row is open or highlighted');
-    assert.match(source, /const model = highlighted \|\| this\.active === info\.id \? this\.modelLine\(info\) : '';/, 'the model is shown on the open row and on the highlighted one');
+    assert.match(source, /const model = highlighted \|\| this\.active === info\.id \? this\.modelLine\(info\) \+ this\.roleLine\(info\) : '';/, 'the model and the role are shown on the open row and on the highlighted one');
     assert.match(source, /const data = highlighted && !onScreen && this\.railPreviewData\?\.id === info\.id \? this\.railPreviewData\.preview : null;/, 'the last words only for a highlighted session whose terminal is not on screen');
     assert.match(source, /if \(box\.dataset\.shown === html\) return;/, 'a poll that changes nothing leaves the row (and an open choice list) alone');
     assert.match(source, /if \(select\?\.dataset\.modelSelect\) void this\.switchModel\(select\.dataset\.modelSelect, select\.value\);/, 'the choice is made in place');

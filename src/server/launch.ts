@@ -148,10 +148,11 @@ export function resumeCommand(agent: 'claude' | 'codex', cfg: Config, cwd: strin
 }
 
 /** An ended session started again under the same id: same team token, code, role and node, so the board still knows it. */
-export function resumeEmbedded(terms: TerminalStore, cfg: Config, info: TerminalInfo, resumeId: string, teamToken: string, seenMessage: number, size?: { cols: number; rows: number }, memory?: string) {
+export function resumeEmbedded(terms: TerminalStore, cfg: Config, info: TerminalInfo, resumeId: string, teamToken: string, seenMessage: number, size?: { cols: number; rows: number }, memory?: string, notice?: string) {
   const agent = info.agent as 'claude' | 'codex';
   const options: LaunchOptions = { model: info.model, effort: info.effort, role: info.role, parentId: info.parentId, task: info.task, ...(info.account ? { account: info.account } : {}) };
-  const prompt = info.role ? (cfg.language === 'en'
+  // A role change brings its own notice (the new role card); otherwise a team member is told to reread the board.
+  const prompt = notice !== undefined ? notice || undefined : info.role ? (cfg.language === 'en'
     ? 'Visual Brain restarted this session after its process ended. Read the board before resuming. Check each task’s current owner, blocker and checkpoint. Claim available work before starting.'
     : 'Visual Brain ha riavviato questa sessione dopo la chiusura del processo. Prima di riprendere, rileggi la bacheca. Verifica proprietario, blocco e checkpoint di ogni incarico. Rivendica il lavoro disponibile prima di iniziare.') : undefined;
   const { file, args } = embeddedCommand(agent, resumeCommand(agent, cfg, info.cwd, resumeId, options, prompt), info.role, memory, info.account, info.cwd);

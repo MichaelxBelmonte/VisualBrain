@@ -128,3 +128,71 @@ export const CODE_IN_TEXT = /\b(?:ORC|OP|REV|BRAIN)\d{1,4}\b/g;
 export function resumable(s: { alive: boolean; agent: string; resumeId?: string }): boolean {
   return !s.alive && (s.agent === 'shell' || s.agent === 'codex' || (s.agent === 'claude' && Boolean(s.resumeId)));
 }
+
+/** A squad as the role menu needs it: its name and the code of its live orchestrator, if any. */
+export interface RoleSquad { id: string; name: string; orchestrator: string | null }
+export interface RoleChoice { value: string; label: string; group?: string; selected?: boolean; disabled?: boolean }
+type RoleSession = { agent: string; role?: string; code?: string; teamId?: string; inner?: string };
+
+/**
+ * The entries of a session's role menu: each role in each squad of the node («Orchestratore» taken by another session is
+ * shown but not offered), and «Nessun ruolo». The value is "role@squad" or "none". Pure.
+ */
+export function roleChoices(s: RoleSession, squads: RoleSquad[]): RoleChoice[] {
+  const many = squads.length > 1;
+  const out: RoleChoice[] = [];
+  if (!s.role) out.push({ value: '', label: s.agent === 'shell' ? tr('Aggiungi alla squadra…') : tr('Nessun ruolo'), selected: true, disabled: true });
+  for (const q of squads) for (const r of ['orchestrator', 'operator', 'reviewer'] as const) {
+    const taken = r === 'orchestrator' && !!q.orchestrator && q.orchestrator !== s.code;
+    out.push({
+      value: `${r}@${q.id}`, label: ROLE_WORDS[r] + (taken ? ` · ${q.orchestrator}` : ''),
+      ...(many ? { group: q.name } : {}), ...(s.role === r && s.teamId === q.id ? { selected: true } : {}), ...(taken ? { disabled: true } : {}),
+    });
+  }
+  if (s.role) out.push({ value: 'none', label: tr('Nessun ruolo') });
+  return out;
+}
+
+/** What a menu value asks the server for. Pure. */
+export function parseRoleChoice(value: string): { role: 'orchestrator' | 'operator' | 'reviewer' | null; teamId?: string } | null {
+  if (value === 'none') return { role: null };
+  const m = /^(orchestrator|operator|reviewer)@([\w-]+)$/.exec(value);
+  return m ? { role: m[1] as 'orchestrator' | 'operator' | 'reviewer', teamId: m[2] } : null;
+}
+
+/** "Revisore · Bacheca" for a queued change (the squad named only when the node has more than one). Pure. */
+export function roleTargetLabel(change: { role: string | null; teamId?: string }, squads: RoleSquad[]): string {
+  if (!change.role) return tr('Nessun ruolo');
+  const word = ROLE_WORDS[change.role as keyof typeof ROLE_WORDS] ?? change.role;
+  const squad = squads.length > 1 ? squads.find(q => q.id === change.teamId)?.name : undefined;
+  return squad ? `${word} · ${squad}` : word;
+}
+
+const escape = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+/** Whether a session's role can be changed while it works: Claude Code and Codex in a node, or a plain terminal running one. Pure. */
+export function roleChangeable(s: { alive: boolean; nodeId?: number | null; agent: string; role?: string; inner?: string }): boolean {
+  return s.alive && s.nodeId != null && s.role !== 'brain' && (s.agent === 'claude' || s.agent === 'codex' || (s.agent === 'shell' && !!s.inner));
+}
+
+/**
+ * The role line under a session's rail row: the menu, then what is happening — a change waiting for the end of the
+ * turn (with «Subito» and «Annulla»), why one failed, or that the agent was started by hand. Pure.
+ */
+export function roleLineHtml(s: RoleSession & { id: string; name?: string; roleChange?: { role: string | null; teamId?: string; state: string; message?: string } }, squads: RoleSquad[]): string {
+  const change = s.roleChange, waiting = change?.state === 'waiting';
+  let options = '', group: string | undefined;
+  for (const c of roleChoices(s, squads)) {
+    if (c.group !== group) { options += (group !== undefined ? '</optgroup>' : '') + (c.group !== undefined ? `<optgroup label="${escape(c.group)}">` : ''); group = c.group; }
+    options += `<option value="${escape(c.value)}"${c.selected ? ' selected' : ''}${c.disabled ? ' disabled' : ''}>${escape(c.label)}</option>`;
+  }
+  if (group !== undefined) options += '</optgroup>';
+  let state = '', tone = '', actions = '';
+  if (waiting) {
+    state = `→ ${escape(roleTargetLabel(change!, squads))} · ${tr('alla fine del turno')}`;
+    actions = `<button type="button" class="work-model-act" data-role-now="${escape(s.id)}" title="${tr('Interrompe il turno e riavvia subito con il nuovo ruolo')}">${tr('Subito')}</button><button type="button" class="work-model-act" data-role-cancel="${escape(s.id)}">${tr('Annulla')}</button>`;
+  } else if (change?.state === 'failed') { state = escape(tr(change.message ?? 'Cambio non riuscito')); tone = ' warn'; }
+  else if (s.agent === 'shell') state = s.inner === 'codex' ? tr('Codex avviato a mano') : tr('Claude Code avviato a mano');
+  const name = s.code ?? s.name ?? s.id;
+  return `<div class="work-model work-role"><select data-role-select="${escape(s.id)}" aria-label="${tr('Ruolo di')} ${escape(name)}" title="${tr('Il cambio di ruolo riavvia la conversazione con le nuove istruzioni, alla fine del turno')}"${waiting ? ' disabled' : ''}>${options}</select><span class="work-model-state${tone}">${state}</span>${actions}</div>`;
+}

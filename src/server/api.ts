@@ -27,7 +27,8 @@ import { answerModelChange, cancelModelChange, forgetModelChange, modelFields, r
 import { forgetSessionModel } from './session-model.ts';
 import { sessionPreview } from '../shared/session-preview.ts';
 import { Screen } from './screen.ts';
-import { resumeSession, startSession, startSquad } from './sessions.ts';
+import { cancelRoleChange, requestRoleChange, resumeSession, roleChangeOf, startSession, startSquad } from './sessions.ts';
+import { innerOf } from './inner-agent.ts';
 import { removeWorktree } from './worktrees.ts';
 import { gitCommit, gitFetch, gitOverview, gitTop, githubState } from './git.ts';
 import { codeDiff, codeFile, codeSearch, codeTree, localCodeSearch, insideRepo, openInEditor } from './code.ts';
@@ -1127,7 +1128,12 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
     }
     // Conversations already bound to a session: a Codex session still looking for its own never takes one of them.
     const claimed = () => new Set(ctx.terms.list().map(s => s.resumeId).filter((r): r is string => Boolean(r)));
-    if (path === '/api/terminals' && method === 'GET') return send(res, 200, ctx.teams.withCodes(ctx.terms.list()).map(info => ({ ...info, ...modelFields(info, claimed) })));
+    if (path === '/api/terminals' && method === 'GET') return send(res, 200, ctx.teams.withCodes(ctx.terms.list()).map(info => {
+      const roleChange = roleChangeOf(info.id);
+      // A Claude Code or Codex started by hand in a node's plain terminal can join a squad.
+      const inner = info.agent === 'shell' && info.alive && info.nodeId != null ? innerOf(ctx.terms.get(info.id)?.proc.pid)?.agent : undefined;
+      return { ...info, ...modelFields(info, claimed), ...(roleChange ? { roleChange } : {}), ...(inner ? { inner } : {}) };
+    }));
     if (path === '/api/model-switch' && method === 'GET') return send(res, 200, { claude: switchChoices('claude'), codex: switchChoices('codex'), limits: { hermes: switchLimit('hermes'), agy: switchLimit('agy') } });
     m = /^\/api\/terminals\/([a-z0-9-]+)\/model\/confirm$/.exec(path);
     if (m && method === 'POST') {
@@ -1156,6 +1162,12 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       else lines = stripAnsi(term.buffer.join('')).trimEnd().split('\n').slice(-60);
       return sendJson(res, 200, sessionPreview(lines));
     }
+    m = /^\/api\/terminals\/([a-z0-9-]+)\/role$/.exec(path);
+    if (m && (method === 'POST' || method === 'DELETE')) {
+      if (req.headers.authorization) throw new HttpError(403, 'Il ruolo di una sessione si cambia dall’interfaccia');
+      if (method === 'DELETE') return send(res, 200, { ok: cancelRoleChange(m[1]) });
+      return send(res, 200, await requestRoleChange(ctx, m[1], await readJson(req)));
+    }
     m = /^\/api\/terminals\/([a-z0-9-]+)\/resume$/.exec(path);
     if (m && method === 'POST') {
       if (req.headers.authorization) throw new HttpError(403, 'Le sessioni si riprendono dall’interfaccia');
@@ -1178,7 +1190,7 @@ export async function handleApi(ctx: ApiCtx, req: IncomingMessage, res: ServerRe
       const cwd = ctx.terms.get(m[1])?.info.cwd;
       if (nodeId != null) ctx.teams.release(nodeId, m[1]);
       ctx.terms.kill(m[1]);
-      forgetModelChange(m[1]); forgetSessionModel(m[1]);
+      forgetModelChange(m[1]); forgetSessionModel(m[1]); cancelRoleChange(m[1]);
       // A closed operator's worktree goes away only when Git can remove it without losing anything; its branch stays.
       // A squad's own worktree stays while the squad exists: its other sessions work there.
       if (cwd && !(nodeId != null && ctx.teams.isTeamWorktree(nodeId, cwd))) void removeWorktree(ctx.cfg.dataDir, cwd);

@@ -1,6 +1,6 @@
 import { ui } from './i18n.ts';
 // Typed client of the local API.
-import type { AccountShare, AgentAccount, AgentAccountStatus, NodeReminder, ReminderBoard, AgentName, ModelChoice, ModelChange, ModelSwitchChoice, TeamLink, TeamView, GraphEdge, GraphNode, GraphPayload, LaunchRequest, NodeDetail, Note, StatusPayload, TerminalInfo, GitRepoView, CodeTree, CodeFile, CodeSearchHit, RepoChoice, GitCommitDetail, GitCommitFile, GithubState } from '../shared/types.ts';
+import type { AccountShare, AgentAccount, AgentAccountStatus, NodeReminder, ReminderBoard, AgentName, ModelChoice, ModelChange, ModelSwitchChoice, RoleChange, TeamLink, TeamView, GraphEdge, GraphNode, GraphPayload, LaunchRequest, NodeDetail, Note, StatusPayload, TerminalInfo, GitRepoView, CodeTree, CodeFile, CodeSearchHit, RepoChoice, GitCommitDetail, GitCommitFile, GithubState } from '../shared/types.ts';
 
 /** One agent CLI as Impostazioni → Agenti shows it (src/server/agent-clis.ts). */
 export interface CliUpdateJob { state: 'running' | 'done' | 'failed'; startedAt: number; endedAt: number | null; from: string | null; to: string | null; log: string }
@@ -69,6 +69,10 @@ export const api = {
   switchModel: (id: string, model: string) => call<{ change: ModelChange }>('POST', `/api/terminals/${encodeURIComponent(id)}/model`, { model }),
   confirmModel: (id: string) => call<{ ok: boolean }>('POST', `/api/terminals/${encodeURIComponent(id)}/model/confirm`, {}),
   cancelModel: (id: string) => call<{ ok: boolean }>('DELETE', `/api/terminals/${encodeURIComponent(id)}/model`),
+  /** A new role (or squad, or none) for a session: applied at the end of its turn unless `now`; `change` while it waits. */
+  changeRole: (id: string, body: { role: 'orchestrator' | 'operator' | 'reviewer' | null; teamId?: string; now?: boolean; cols: number; rows: number }) =>
+    call<{ termId: string; info?: TerminalInfo; change?: RoleChange }>('POST', `/api/terminals/${encodeURIComponent(id)}/role`, body),
+  cancelRole: (id: string) => call<{ ok: boolean }>('DELETE', `/api/terminals/${encodeURIComponent(id)}/role`),
   killTerminal: (id: string) => call<{ ok: boolean }>('DELETE', ui`/api/terminals/${id}`),
   models: () => call<Record<AgentName, ModelChoice[]>>('GET', '/api/models'),
   harnesses: () => call<Array<{ id: string; label: string; installed: boolean; canInstall: boolean; install: { state: 'installing' | 'ready' | 'error'; step: string; error?: string } | null; version?: string | null; latest?: string; outdated?: boolean }>>('GET', '/api/harnesses'),
