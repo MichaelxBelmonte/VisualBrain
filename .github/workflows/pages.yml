@@ -1,0 +1,39 @@
+name: Publish the site
+# Publishes site/ to GitHub Pages. The download label on the page is stamped with the latest published release,
+# so run this workflow by hand after publishing one (gh workflow run pages.yml).
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stamp the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh api repos/MichaelxBelmonte/VisualBrain-releases/releases/latest --jq .tag_name || true)
+          if printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            sed -i -E "s|(<!--version-->)[^<]*(<!--/version-->)|\1${tag}\2|" site/index.html
+          fi
+          grep -o '<!--version-->[^<]*<!--/version-->' site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
