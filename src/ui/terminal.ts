@@ -342,7 +342,7 @@ export class Terminals {
     const glass = document.documentElement.classList.contains('vb-glass') && !matchMedia('(prefers-reduced-transparency: reduce)').matches;
     const hex = /^#[0-9a-f]{6}$/i.test(bg);
     const dark = !hex || parseInt(bg.slice(1, 3), 16) + parseInt(bg.slice(3, 5), 16) + parseInt(bg.slice(5, 7), 16) < 384;
-    return { background: glass ? (hex ? bg + '00' : '#00000000') : bg, foreground: fg, cursor: fg, selectionBackground: cs.getPropertyValue('--g3').trim(), ...(dark ? ANSI_DARK : ANSI_LIGHT) };
+    return { background: glass ? (hex ? bg + '00' : '#00000000') : bg, foreground: fg, cursor: dark ? cs.getPropertyValue('--signal').trim() || fg : fg, cursorAccent: dark ? '#000000' : bg, selectionBackground: cs.getPropertyValue('--g3').trim(), ...(dark ? ANSI_DARK : ANSI_LIGHT) };
   }
   retheme(): void { for (const t of this.tabs.values()) if (t.term) t.term.options.theme = this.theme(); }
 
