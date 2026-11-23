@@ -112,6 +112,21 @@ function fixture() {
   f('venv/lib/site.py', 'pass');
   f('venv/lib/.git/x', 'excluded inside aggregate');
   symlinkSync('../lib/site.py', join(root, 'venv/python'));
+  // linked Git worktrees (`.git` is a file): one total when the main checkout is under a mapped root, walked otherwise
+  f('wt-copy/.git', `gitdir: ${join(root, 'proj/.git/worktrees/wt-copy')}\n`);
+  f('wt-copy/src/a.ts', 'export const a = 2;\n');
+  f('wt-copy/node_modules/x/index.js', 'x');
+  symlinkSync('src/a.ts', join(root, 'wt-copy/link'));
+  f('wt-rel/.git', 'gitdir:   ../proj/.git/worktrees/wt-rel  \r\n');
+  f('wt-rel/b.ts', 'b');
+  f('wt-outside/.git', 'gitdir: /somewhere/else/repo/.git/worktrees/wt-outside\n');
+  f('wt-outside/c.ts', 'c');
+  f('wt-bare/.git', `gitdir: ${join(root, 'repo.git/worktrees/wt-bare')}\n`);
+  f('wt-bare/e.ts', 'e');
+  f('submodule/.git', 'gitdir: ../proj/.git/modules/submodule\n');
+  f('submodule/d.ts', 'd');
+  f('notgit/.git', 'a file that happens to be called .git');
+  f('notgit/f.ts', 'f');
   for (let i = 0; i < 120; i++) f(`dump/r${i}.csv`, 'a,b\n'.repeat(i + 1));
   f('dump/notes.md', 'n');
   for (let i = 0; i < 25; i++) f(`media/p${i}.png`, 'png');
@@ -151,6 +166,24 @@ try {
     const nat = await runNative(cfg, cfg.roots, threads);
     compare(`fixture threads=${threads}`, ts, nat);
     results.push(`fixture threads=${threads}: ${nat.entries.length} voci identiche`);
+  }
+  {
+    // what the two engines agree on, said once: copies of a mapped repository are totals, everything else is walked
+    const ts = await walk(cfg, cfg.roots);
+    const at = (rel) => ts.find((e) => e.path === join(root, rel));
+    for (const rel of ['wt-copy', 'wt-rel']) {
+      assert.equal(at(rel).aggregate, 1, `${rel} is one total`);
+      assert.equal(at(rel).cls, 'vendor');
+      assert.ok(!ts.some((e) => e.path.startsWith(join(root, rel) + '/')), `nothing below ${rel} is an entry`);
+    }
+    assert.equal(at('wt-copy').stats.files, 2, 'its files are counted, the .git file and the symlink are not');
+    for (const rel of ['wt-outside/c.ts', 'wt-bare/e.ts', 'submodule/d.ts', 'notgit/f.ts']) assert.ok(at(rel), `${rel} is walked`);
+    // a root the person chose is always walked, even when it is a worktree
+    const own = cfgFor([root, join(root, 'wt-copy')].slice(1).concat(root), { excludePaths: [join(root, 'skipme')] });
+    const chosen = await walk(own, [join(root, 'wt-copy')]);
+    assert.ok(chosen.some((e) => e.path === join(root, 'wt-copy/src/a.ts')), 'a chosen root is walked');
+    compare('copia di lavoro scelta come radice', chosen, await runNative(own, [join(root, 'wt-copy')]));
+    results.push('copie di lavoro Git: totale se il repository è mappato, percorse negli altri casi');
   }
   // partial rescan of a subtree: parent = dirname(subtree)
   const sub = [join(root, 'proj'), join(root, 'spazi e àccenti')];

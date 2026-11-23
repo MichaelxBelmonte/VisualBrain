@@ -1,5 +1,5 @@
 // Filesystem walk of the roots → node rows. Incremental: unchanged files keep their row and extraction.
-import { readdir, lstat, readlink, stat } from 'node:fs/promises';
+import { readdir, lstat, readlink, stat, open } from 'node:fs/promises';
 import { lstatSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, basename, relative, sep } from 'node:path';
 import type { Dirent } from 'node:fs';
@@ -111,6 +111,44 @@ function tick(ctx: WalkCtx): void {
   if (ctx.progress && ctx.counter % 2000 === 0) ctx.progress({ phase: 'scan', done: ctx.counter });
 }
 
+/**
+ * The main checkout of a linked Git worktree (`git worktree add`), from the text of its `.git` file:
+ * `gitdir: <main>/.git/worktrees/<name>`. Null for anything else: a submodule points into `.git/modules/`, the
+ * worktree of a bare repository into `<repo>.git/worktrees/`.
+ */
+export function worktreeMain(gitFile: string, dir: string): string | null {
+  const m = /^gitdir:[ \t]*(.+?)[ \t]*\r?$/m.exec(gitFile);
+  if (!m) return null;
+  const gitDir = m[1].startsWith('/') ? resolve(m[1]) : resolve(dir, m[1]);
+  const at = gitDir.indexOf('/.git/worktrees/');
+  return at > 0 ? gitDir.slice(0, at) : null;
+}
+
+/**
+ * A linked worktree whose main checkout is under a mapped root is a second copy of files already on the map: it is
+ * counted like a vendor folder (one node with totals) instead of file by file. A root the person chose is always walked.
+ */
+async function isMappedWorktree(ctx: WalkCtx, dir: string, names: Dirent[]): Promise<boolean> {
+  if (!names.some((d) => d.name === '.git' && d.isFile()) || ctx.cfg.roots.includes(dir)) return false;
+  try {
+    const main = worktreeMain(await ctx.sem.run(() => readHead(join(dir, '.git'), 1024)), dir);
+    return main !== null && ctx.cfg.roots.some((r) => main === r || main.startsWith(r + '/'));
+  } catch {
+    return false;
+  }
+}
+
+/** The first `bytes` of a file as text: a `.git` file is one short line, whatever else carries that name is not read whole. */
+async function readHead(path: string, bytes: number): Promise<string> {
+  const handle = await open(path, 'r');
+  try {
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(bytes), 0, bytes, 0);
+    return buffer.toString('utf8', 0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+}
+
 async function walkDir(ctx: WalkCtx, dir: string, depth: number, parent: string | null): Promise<DirStats> {
   const stats = emptyDirStats();
   const entry: Entry = {
@@ -129,7 +167,7 @@ async function walkDir(ctx: WalkCtx, dir: string, depth: number, parent: string 
     return stats;
   }
   const isVenv = names.some((d) => d.name === 'pyvenv.cfg');
-  if (isVenv) {
+  if (isVenv || await isMappedWorktree(ctx, dir, names)) {
     const agg = await aggregate(ctx, dir, names);
     entry.aggregate = 1;
     entry.cls = 'vendor';
