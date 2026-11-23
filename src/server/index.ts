@@ -222,6 +222,8 @@ export async function runIndex(db: Db, cfg: Config, opts: { subtrees?: string[];
   }
   // names and paths only change when paths appear, vanish or change kind
   if (!narrow) m.measure('fts', () => db.rebuildFts());
+  // A full pass has just told which paths are gone: rows that have been gone long enough, with nothing attached, leave now.
+  if (!opts.subtrees?.length) m.measure('prune', () => db.pruneDeleted(), (n) => ({ pruned: n }));
   const ms = Date.now() - t0;
   db.setMeta('lastScan', Date.now());
   db.setMeta('extractor', EXTRACTOR);

@@ -106,6 +106,34 @@ try {
   ok(!live(db, join(root, 'a_b/file1.txt')) || live(db, join(root, 'a_b/file1.txt')).deleted === 1, 'a_b rows are gone');
   ok(live(db, join(root, 'axb/file2.txt')).deleted === 0, 'axb survives the deletion of a_b');
 
+  // rows of paths that are gone: removed after a wait, unless something is attached to them
+  {
+    const gone = join(root, 'deep/one/note.txt');
+    const kept = join(root, 'a_b/file1.txt');
+    const day = 86_400_000, now = Date.now();
+    ok(live(db, gone).deleted === 1 && live(db, gone).deleted_at > 0, 'a vanished path is marked with the time it went');
+    eq(db.pruneDeleted(now), 0, 'nothing leaves before its wait is over');
+    db.run("INSERT INTO notes (node_id, text, created_at) VALUES (?, 'ricordo', ?)", live(db, kept).id, now);
+    const keptId = live(db, kept).id;
+    ok(db.pruneDeleted(now + 8 * day) >= 1 && !live(db, gone), 'a file gone for more than a week leaves the database');
+    ok(live(db, kept)?.deleted === 1, 'a row with a note stays, however old');
+    ok(live(db, join(root, 'a_b'))?.deleted === 1, 'a folder waits longer than its files');
+    db.pruneDeleted(now + 91 * day);
+    ok(!live(db, join(root, 'a_b')) && live(db, kept), 'the folder leaves after its own wait, the annotated file stays');
+    eq(db.get('SELECT COUNT(*) c FROM nodes WHERE deleted = 0 AND path = ?', join(root, 'axb/file2.txt')).c, 1, 'live rows are never touched');
+    // the path comes back: same row, same note
+    put(root, 'a_b/file1.txt', 'one again');
+    await scan(db, cfg, { subtrees: [join(root, 'a_b')] });
+    ok(live(db, kept).id === keptId && live(db, kept).deleted === 0, 'a path that comes back keeps its id');
+    eq(parentPath(db, kept), join(root, 'a_b'), 'and hangs from its folder again');
+    // a database from before deleted_at: old rows start their wait at the first call
+    db.run('UPDATE nodes SET deleted = 1, deleted_at = NULL WHERE path = ?', join(root, 'axb/file2.txt'));
+    eq(db.pruneDeleted(now), 0, 'a row marked before the column existed is not removed at once');
+    ok(live(db, join(root, 'axb/file2.txt')).deleted_at === now, 'its wait starts at the first call');
+    await scan(db, cfg, { subtrees: [join(root, 'axb')] });
+    ok(live(db, join(root, 'axb/file2.txt')).deleted === 0, 'and the scan brings it back');
+  }
+
   // an external identity at the path of a file that now exists keeps its id
   const futurePath = join(root, 'future.txt');
   db.run("INSERT INTO nodes (path, name, kind, ext, cls, depth, gen, extracted) VALUES (?, 'future.txt', 'external', '', 'other', 0, 0, 1)", futurePath);
