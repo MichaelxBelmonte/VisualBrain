@@ -1,6 +1,6 @@
 [package]
 name = "visual-brain-app"
-version = "0.2.62"
+version = "0.2.63"
 edition = "2021"
 description = "Finestra nativa del Visual Brain: avvia il server locale e mostra la mappa"
 

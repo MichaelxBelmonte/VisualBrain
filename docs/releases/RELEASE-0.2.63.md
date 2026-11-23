@@ -1,0 +1,6 @@
+# Visual Brain 0.2.63
+
+- **Grafici nelle Stats.** In Panoramica, «Andamento» mostra i token per account e le richieste agli agenti intervallo per intervallo (5 minuti, un'ora o sei ore secondo il periodo). Passando sopra una colonna, o con le frecce, compaiono i valori di quell'intervallo; «Mostra i dati» apre la tabella. Colori controllati per chi distingue male i colori, in chiaro e in scuro.
+- **Nuova scheda «Qualità».** Come vanno gli incarichi delle squadre: tempo fino a «fatto», rilavorazione (incarichi riaperti), tempo bloccato, con il grafico dei chiusi e riaperti. Quanto aspettano te gli agenti per permessi e domande, con la distribuzione dei tempi di risposta. Chi chiude gli incarichi per agente, modello e ruolo, con i token per incarico; i numeri per squadra; e «Cosa migliorare», suggerimenti da regole fisse su questi numeri.
+- **Dettagli tecnici più chiari.** «Errori per funzione» dice quali chiamate falliscono; gli errori diventano rossi solo sopra il 5%; «HTTP senza attribuzione» ora si chiama «Richieste generali dell'app».
+- **Solo sul Mac.** Le misure di qualità registrano conteggi e tempi, mai titoli, risultati o prompt, e partono da questa versione. Il registro scrive solo quando qualcosa cambia e non rallenta bacheca e terminali.
