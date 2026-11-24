@@ -1,25 +1,24 @@
 name: Publish the site
 # Publishes site/ to GitHub Pages. The download label on the page is stamped with the latest published release,
 # so run this workflow by hand after publishing one (gh workflow run pages.yml).
+# Two jobs, as in GitHub's Pages starter workflows: deploy-pages starts only after the build job has finished, so the
+# uploaded github-pages artifact is always visible to it (in one job it sometimes found "0 artifact(s)").
 on:
   push:
     branches: [main]
     paths: ['site/**', '.github/workflows/pages.yml']
   workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
     steps:
       - uses: actions/checkout@v4
       - name: Stamp the latest release
@@ -35,5 +34,16 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
