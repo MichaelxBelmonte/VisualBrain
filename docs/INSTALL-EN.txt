@@ -1,4 +1,4 @@
-VISUAL BRAIN 0.2.67 — MAC
+VISUAL BRAIN 0.2.68 — MAC
 
 1. Unzip the package and drag Visual Brain.app into Applications BEFORE opening it.
    Opened from Downloads or the unzipped folder, macOS runs it from a read-only

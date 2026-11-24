@@ -1,0 +1,7 @@
+# Visual Brain 0.2.68
+
+- **Più leggera sui Mac pieni di file.** Quando compare o sparisce un file, Visual Brain aggiorna solo i collegamenti che lo riguardano invece di ricalcolarli tutti. Nelle nostre misure su un indice grande: da circa 11 secondi e 3,6 GB di memoria a mezzo secondo e meno di 1 GB.
+- **Copie di lavoro Git contate una volta sola.** Le copie di lavoro (worktree) di un repository già in mappa compaiono solo come totale: i loro file non vengono indicizzati una seconda volta.
+- **Database che non cresce all'infinito.** Le voci dei file cancellati escono dal database dopo 7 giorni, quelle delle cartelle dopo 90. Restano le voci a cui sono legati note, promemoria, bacheche e squadre. Da riga di comando, con Visual Brain chiuso, `vb compact` recupera lo spazio su disco e `vb compact --drop-gone` toglie subito le voci sparite.
+- **Niente copie vecchie dell'app dimenticate.** Dopo un aggiornamento, la copia tenuta per le sessioni ancora aperte viene tolta quando si chiude l'ultima sessione che la usa. Il collegamento degli agenti e gli harness usano una copia di Node nel profilo, così non tengono occupata la versione precedente.
+- **Etichette e numeri uniformi.** I numeri arancioni sono tondi ovunque, lo stato dei fornitori è una pillola come nelle Stats, le etichette ferme (stato di un file, categoria, tecnologie) sono più basse e in carattere monospazio, i filtri non attivi hanno il testo grigio.
