@@ -1,7 +1,7 @@
 // Integration tests of the scan stage: partial/incremental updates, wildcard-safe paths, engine selector and fallback.
 // Uso: node scripts/test-index-integration.mjs — tutto su cartelle e database temporanei; nessun dato reale viene letto.
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, appendFileSync, chmodSync, symlinkSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, appendFileSync, chmodSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DEFAULTS } from '../src/server/config.ts';
@@ -180,6 +180,46 @@ try {
     eq(snapshot(after).length, snapshot(db).length - 1, 'and nothing else');
     after.close();
     ok(cli(join(tmp, 'missing.db')).status === 1, 'compact does not create a database that is not there');
+    // --drop-gone keeps the rows of vanished paths the profile still files something under (the folder the database is in)
+    {
+      const profile = join(tmp, 'profile-gone');
+      mkdirSync(join(profile, 'teams'), { recursive: true });
+      const home = join(profile, 'brain.db');
+      copyFileSync(file, home);
+      const seed = new Db(home);
+      const gone = ['deep', 'deep/one', 'brand', 'proj/src/main.ts', 'p%q'].map(rel => ({ rel, id: seed.get('SELECT id FROM nodes WHERE path = ?', join(root, rel)).id }));
+      const [board, squad, session, attached, plain] = gone;
+      seed.run(`UPDATE nodes SET deleted = 1, deleted_at = NULL WHERE id IN (${gone.map(g => g.id).join(',')})`);
+      const before = seed.get('SELECT COUNT(*) c FROM nodes').c;
+      seed.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+      seed.close();
+      writeFileSync(join(profile, 'teams', `${board.id}.json`), '{"tasks":[]}');
+      writeFileSync(join(profile, 'teams', `${squad.id}-2.json`), '{"tasks":[]}');
+      writeFileSync(join(profile, 'teams/links.json'), '[]');
+      writeFileSync(join(profile, 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ info: { id: 'aaaa', nodeId: session.id } }, { info: { id: 'bbbb', nodeId: null } }] }));
+      mkdirSync(join(profile, 'attachments', String(attached.id)), { recursive: true });
+      mkdirSync(join(profile, 'attachments/dropped'), { recursive: true });
+      const run = cli(home, '--drop-gone');
+      eq(run.status, 0, run.stderr);
+      const left = new Db(home);
+      const there = rel => Boolean(left.get('SELECT 1 FROM nodes WHERE path = ? AND deleted = 1', join(root, rel)));
+      eq([board, squad, session, attached, plain].map(g => there(g.rel)), [true, true, true, true, false], 'a vanished path with a board, a squad, a saved session or attachments keeps its row; one with nothing leaves');
+      eq(left.get('SELECT COUNT(*) c FROM nodes').c, before - 1, 'and only that one leaves');
+      left.close();
+      ok(/tenute[^\n]*: 4 \(/.test(run.stdout) && /bacheca: 2/.test(run.stdout) && /sessione salvata: 1/.test(run.stdout) && /allegati: 1/.test(run.stdout) && run.stdout.includes(join(root, 'deep/one')), `the command says how many it kept and why: ${run.stdout}`);
+      // a profile that cannot be read: nothing is removed
+      writeFileSync(join(profile, 'sessions.json'), '{ not json');
+      const second = new Db(home);
+      second.run('UPDATE nodes SET deleted = 1, deleted_at = NULL WHERE path = ?', join(root, 'brand/new'));
+      second.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+      second.close();
+      const refused = cli(home, '--drop-gone');
+      const still = new Db(home);
+      ok(refused.status === 1 && /Nulla è stato modificato/.test(refused.stderr) && Boolean(still.get('SELECT 1 FROM nodes WHERE path = ?', join(root, 'brand/new'))), 'profile data that cannot be read stop --drop-gone before it removes anything');
+      still.close();
+      // without --drop-gone nothing changes: the wait is the protection
+      ok(cli(home).status === 0, 'plain compact does not read the profile');
+    }
   }
 
   // --- planning helpers -------------------------------------------------------------------------
