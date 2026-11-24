@@ -10,6 +10,7 @@ import { buildEdges, lazyIndex, namedBy, similarityEdges } from './graph.ts';
 import { importSeeds } from './seed.ts';
 import { provisionalRank, rank } from './rank.ts';
 import { IndexMetrics, splitter, type PhaseMetric } from './metrics.ts';
+import { profileNodes } from './profile-nodes.ts';
 
 export interface IndexSummary {
   scan: ScanSummary;
@@ -297,7 +298,16 @@ export async function runIndex(db: Db, cfg: Config, opts: { subtrees?: string[];
   // names and paths only change when paths appear, vanish or change kind
   if (!narrow) m.measure('fts', () => db.rebuildFts());
   // A full pass has just told which paths are gone: rows that have been gone long enough, with nothing attached, leave now.
-  if (!opts.subtrees?.length) m.measure('prune', () => db.pruneDeleted(), (n) => ({ pruned: n }));
+  if (!opts.subtrees?.length) m.measure('prune', () => {
+    // A vanished path the profile still files something under (a board, a session to resume…) keeps its row however long
+    // it has been gone. If the profile cannot be read, nothing leaves in this pass: the next one tries again.
+    let keep: number[];
+    try { keep = [...profileNodes(cfg.dataDir).keys()]; } catch (error) {
+      console.warn('[index] dati del profilo non leggibili: nessuna voce di percorsi spariti tolta in questo passaggio:', error instanceof Error ? error.message : String(error));
+      return 0;
+    }
+    return db.pruneDeleted(undefined, undefined, undefined, undefined, keep);
+  }, (n) => ({ pruned: n }));
   const ms = Date.now() - t0;
   db.setMeta('lastScan', Date.now());
   db.setMeta('extractor', EXTRACTOR);

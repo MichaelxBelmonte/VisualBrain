@@ -282,7 +282,7 @@ export class Db {
    * The candidates are listed once, then removed `chunk` at a time, each chunk in its own short transaction: other
    * connections can write in between and the write-ahead log never has to hold the whole clean-up.
    * `keep`: rows that stay whatever their age, because something outside this database is filed under their id (see
-   * profileNodes in cli.ts).
+   * profile-nodes.ts).
    */
   pruneDeleted(now = Date.now(), filesAfterMs = PRUNE_FILES_AFTER_MS, dirsAfterMs = PRUNE_DIRS_AFTER_MS, chunk = 50_000, keep: readonly number[] = []): number {
     // `NOT attached` is checked when the candidates are listed and again when each chunk is removed: a row that got a

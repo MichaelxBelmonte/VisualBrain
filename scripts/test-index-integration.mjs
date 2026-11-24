@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { DEFAULTS } from '../src/server/config.ts';
 import { Db } from '../src/server/db.ts';
 import { scan, walk, walkTs, planSubtrees, coalesceSubtrees } from '../src/server/scan.ts';
+import { runIndex } from '../src/server/index.ts';
 import { nativeCandidates } from '../src/server/native-indexer.ts';
 import { existsSync, accessSync, constants, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -220,6 +221,44 @@ try {
       // without --drop-gone nothing changes: the wait is the protection
       ok(cli(home).status === 0, 'plain compact does not read the profile');
     }
+  }
+
+  // The clean-up that ends every full pass keeps them too: a folder gone for longer than its wait stays while the
+  // profile has a board filed under its id; if the profile cannot be read, nothing leaves in that pass.
+  {
+    const base = join(tmp, 'auto'), tree = join(base, 'root'), profile = join(base, 'profile');
+    for (const rel of ['con-bacheca/a.txt', 'senza/b.txt', 'dopo/c.txt', 'resta/d.txt']) put(tree, rel, rel);
+    const own = { ...structuredClone(cfg), roots: [tree], dataDir: profile, excludePaths: [] };
+    const auto = new Db(join(base, 'i.db'));
+    await runIndex(auto, own);
+    const row = rel => auto.get('SELECT id, deleted FROM nodes WHERE path = ?', join(tree, rel));
+    const board = row('con-bacheca').id;
+    const longAgo = Date.now() - 100 * 86_400_000;
+    const vanish = async (...rels) => {
+      for (const rel of rels) rmSync(join(tree, rel), { recursive: true });
+      await runIndex(auto, own);
+      auto.run('UPDATE nodes SET deleted_at = ? WHERE deleted = 1', longAgo);
+    };
+    await vanish('con-bacheca', 'senza');
+    ok(row('con-bacheca').deleted === 1 && row('senza').deleted === 1, 'both folders are gone, a hundred days ago');
+    mkdirSync(join(profile, 'teams'), { recursive: true });
+    writeFileSync(join(profile, 'teams', `${board}.json`), '{"tasks":[]}');
+    const pass = await runIndex(auto, own);
+    eq([row('con-bacheca')?.deleted, row('senza'), row('con-bacheca/a.txt'), row('resta').deleted], [1, undefined, undefined, 0],
+      'the full pass removes the folder with nothing attached and keeps the one with a board (its files leave)');
+    ok(pass.phases.find(p => p.phase === 'prune').counts.pruned >= 2, 'and counts what it removed');
+    await vanish('dopo');
+    writeFileSync(join(profile, 'sessions.json'), '{ not json');
+    const warn = console.warn, said = [];
+    console.warn = (...words) => said.push(words.join(' '));
+    let blind;
+    try { blind = await runIndex(auto, own); } finally { console.warn = warn; }
+    ok(row('dopo')?.deleted === 1 && blind.phases.find(p => p.phase === 'prune').counts.pruned === 0 && said.some(line => /profilo non leggibili/.test(line)),
+      'a profile that cannot be read: the pass completes, removes nothing and says so');
+    rmSync(join(profile, 'sessions.json'));
+    await runIndex(auto, own);
+    ok(!row('dopo') && row('con-bacheca')?.deleted === 1, 'the next pass, with the profile readable again, removes what was due');
+    auto.close();
   }
 
   // --- planning helpers -------------------------------------------------------------------------
