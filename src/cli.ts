@@ -1,5 +1,7 @@
-// Command line: vb index | serve | stats | analyze | help
-import { join } from 'node:path';
+// Command line: vb index | serve | stats | analyze | compact | help
+import { dirname, join } from 'node:path';
+import { existsSync, statSync, statfsSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { spawn } from 'node:child_process';
 import { loadConfig, parseEngine, PROJECT_ROOT } from './server/config.ts';
 import { findNativeBinary } from './server/native-indexer.ts';
@@ -10,7 +12,7 @@ import { GraphCache } from './server/cache.ts';
 import { makeProvider } from './server/llm/provider.ts';
 import { analyze, buildPayload } from './server/llm/analyze.ts';
 
-interface Flags { roots: string[]; port?: number; db?: string; watch: boolean; watchUi: boolean; open: boolean; consent: 'metadata' | 'excerpts'; dryRun: boolean; model?: string; provider?: string; subtrees: string[]; index: boolean; reextract: boolean; engine?: string }
+interface Flags { roots: string[]; port?: number; db?: string; watch: boolean; watchUi: boolean; open: boolean; consent: 'metadata' | 'excerpts'; dryRun: boolean; model?: string; provider?: string; subtrees: string[]; index: boolean; reextract: boolean; engine?: string; dropGone?: boolean }
 
 function parse(argv: string[]): { cmd: string; flags: Flags } {
   const flags: Flags = { roots: [], watch: true, watchUi: false, open: false, consent: 'metadata', dryRun: false, subtrees: [], index: false, reextract: false };
@@ -34,6 +36,7 @@ function parse(argv: string[]): { cmd: string; flags: Flags } {
       case '--provider': flags.provider = next(); break;
       case '--subtree': flags.subtrees.push(next()); break;
       case '--engine': flags.engine = next(); break;
+      case '--drop-gone': flags.dropGone = true; break;
       default: console.error(`opzione sconosciuta: ${a}`); process.exit(2);
     }
   }
@@ -46,11 +49,56 @@ const HELP = `vb — Visual Brain
   vb serve   [--port N] [--no-watch] [--watch-ui] [--open] [--index]   avvia il server (http://127.0.0.1:4747)
   vb stats                                        numeri dell'indice
   vb analyze [--consent metadata|excerpts] [--dry-run] [--model M] [--provider P]   analisi semantica con l'LLM
+  vb compact [--drop-gone]                        toglie le voci dei percorsi spariti e rimpicciolisce il database (con Visual Brain chiuso)
 
   --root DIR   radice da indicizzare (ripetibile; predefinita: ~/Desktop)
   --db FILE    file SQLite (predefinito: data/brain.db)
   --engine E   motore di indicizzazione: ts (predefinito), native, auto (nativo se presente, altrimenti ts); anche VB_ENGINE
+  --drop-gone  con compact: toglie subito le voci sparite, senza aspettare 7 giorni (file) o 90 (cartelle); restano quelle con note, promemoria o collegamenti fatti a mano
 `;
+
+/**
+ * `vb compact`: removes the rows of vanished paths that are due, then rewrites the database without its free pages.
+ * The rewrite needs the file to itself, so it first asks SQLite for it: with Visual Brain (or anything else) connected to
+ * the same database the answer is no, and the command stops before changing anything.
+ */
+function compact(file: string, dropGone: boolean): void {
+  const stop = (message: string): never => { console.error(message); process.exit(1); };
+  const mb = (bytes: number) => `${(bytes / 1048576).toFixed(1)} MB`;
+  if (!existsSync(file)) stop(`Database non trovato: ${file}`);
+  const alone = (raw: DatabaseSync): boolean => {
+    try {
+      raw.exec('PRAGMA busy_timeout = 0');
+      raw.prepare('PRAGMA locking_mode = EXCLUSIVE').get();
+      raw.prepare('SELECT COUNT(*) FROM sqlite_master').get();   // the first access takes the file, or fails if someone else has it
+      return true;
+    } catch { return false; }
+  };
+  const inUse = 'Il database è in uso: chiudi Visual Brain (⌘Q) e riprova. Nulla è stato modificato.';
+  const probe = new DatabaseSync(file);
+  const free = alone(probe);
+  probe.close();
+  if (!free) stop(inUse);
+  const db = new Db(file);
+  if (!alone(db.raw)) { db.close(); stop(inUse); }
+  const size = () => statSync(file).size + (existsSync(file + '-wal') ? statSync(file + '-wal').size : 0);
+  const before = size();
+  let t = Date.now();
+  const removed = dropGone ? db.pruneDeleted(Date.now(), 0, 0) : db.pruneDeleted();
+  console.log(`Voci di percorsi spariti tolte: ${removed.toLocaleString('it-IT')} (${Date.now() - t} ms)${dropGone ? '' : '. Con --drop-gone escono subito anche quelle ancora in attesa.'}`);
+  const space = db.space();
+  const live = (space.pages - space.free) * space.pageSize;
+  const disk = statfsSync(dirname(file));
+  const available = Number(disk.bavail) * Number(disk.bsize);
+  // SQLite writes a second copy of the live data and then copies it back through the log: twice the live size, to be safe
+  if (available < live * 2) { db.close(); stop(`Spazio libero insufficiente per riscrivere il file: servono circa ${mb(live * 2)}, ce ne sono ${mb(available)}. Le voci sono state tolte, il file non è stato rimpicciolito.`); }
+  console.log(`Prima: ${mb(before)}, pagine libere ${Math.round(100 * space.free / Math.max(1, space.pages))}%.`);
+  t = Date.now();
+  db.compact();
+  db.close();
+  const after = size();
+  console.log(`Dopo:  ${mb(after)} (${mb(before - after)} in meno, ${Date.now() - t} ms).`);
+}
 
 async function main(): Promise<void> {
   const { cmd, flags } = parse(process.argv.slice(2));
@@ -118,6 +166,9 @@ async function main(): Promise<void> {
       db.close();
       break;
     }
+    case 'compact':
+      compact(dbFile, flags.dropGone === true);
+      break;
     default:
       console.log(HELP);
   }

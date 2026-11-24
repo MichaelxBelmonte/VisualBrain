@@ -607,10 +607,12 @@ export async function scan(db: Db, cfg: Config, opts: { subtrees?: string[] } = 
     } else {
       rows = db.all<{ id: number }>('SELECT id FROM nodes WHERE deleted = 0 AND gen < ? AND kind IN (\'file\', \'dir\', \'symlink\')', gen);
     }
-    const mark = db.prepare('UPDATE nodes SET deleted = 1 WHERE id = ?');
+    // deleted_at starts the wait after which Db.pruneDeleted may remove the row
+    const mark = db.prepare('UPDATE nodes SET deleted = 1, deleted_at = ? WHERE id = ?');
+    const goneAt = Date.now();
     const dropEdges = db.prepare("DELETE FROM edges WHERE (src = ? OR dst = ?) AND origin = 'scan'");
     for (const r of rows) {
-      mark.run(r.id);
+      mark.run(goneAt, r.id);
       dropEdges.run(r.id, r.id);
       delRefs.run(r.id);
       delIds.run(r.id);
