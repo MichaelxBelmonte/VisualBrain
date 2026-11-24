@@ -279,30 +279,44 @@ export class Db {
    * old, while a note, a reminder or a link that was not found by the scan (written by hand, by an agent, by the model,
    * from a seed) is attached to it: those are kept for the day the path comes back. Returns how many rows were removed.
    * Rows marked before `deleted_at` existed start waiting at the first call.
+   * The candidates are listed once, then removed `chunk` at a time, each chunk in its own short transaction: other
+   * connections can write in between and the write-ahead log never has to hold the whole clean-up.
    */
-  pruneDeleted(now = Date.now(), filesAfterMs = PRUNE_FILES_AFTER_MS, dirsAfterMs = PRUNE_DIRS_AFTER_MS): number {
-    return this.tx(() => {
-      this.run('UPDATE nodes SET deleted_at = ? WHERE deleted = 1 AND deleted_at IS NULL', now);
-      this.exec('CREATE TEMP TABLE IF NOT EXISTS prune_ids (id INTEGER PRIMARY KEY)');
-      this.exec('DELETE FROM prune_ids');
-      this.run(`INSERT INTO prune_ids SELECT n.id FROM nodes n
-        WHERE n.deleted = 1 AND n.kind IN ('file', 'dir', 'symlink')
-          AND n.deleted_at <= CASE n.kind WHEN 'dir' THEN ?2 ELSE ?1 END
-          AND NOT EXISTS (SELECT 1 FROM notes x WHERE x.node_id = n.id)
-          AND NOT EXISTS (SELECT 1 FROM reminders x WHERE x.node_id = n.id)
-          AND NOT EXISTS (SELECT 1 FROM reminder_folders x WHERE x.node_id = n.id)
-          AND NOT EXISTS (SELECT 1 FROM edges x INDEXED BY edges_src WHERE x.src = n.id AND x.origin <> 'scan')
-          AND NOT EXISTS (SELECT 1 FROM edges x INDEXED BY edges_dst WHERE x.dst = n.id AND x.origin <> 'scan')`,
-        now - filesAfterMs, now - dirsAfterMs);
-      // what the scan already removed when it marked the row; repeated here so a pruned id never leaves anything behind
-      this.exec('DELETE FROM edges WHERE src IN (SELECT id FROM prune_ids) OR dst IN (SELECT id FROM prune_ids)');
-      this.exec('DELETE FROM refs WHERE node_id IN (SELECT id FROM prune_ids)');
-      this.exec('DELETE FROM identifiers WHERE node_id IN (SELECT id FROM prune_ids)');
-      this.exec('DELETE FROM nodes_fts WHERE rowid IN (SELECT id FROM prune_ids)');
-      const removed = Number(this.run('DELETE FROM nodes WHERE id IN (SELECT id FROM prune_ids)').changes);
-      this.exec('DELETE FROM prune_ids');
-      return removed;
-    });
+  pruneDeleted(now = Date.now(), filesAfterMs = PRUNE_FILES_AFTER_MS, dirsAfterMs = PRUNE_DIRS_AFTER_MS, chunk = 50_000): number {
+    // `NOT attached` is checked when the candidates are listed and again when each chunk is removed: a row that got a
+    // note, or whose path came back, between the two is left alone
+    const free = `n.deleted = 1 AND n.kind IN ('file', 'dir', 'symlink')
+      AND NOT EXISTS (SELECT 1 FROM notes x WHERE x.node_id = n.id)
+      AND NOT EXISTS (SELECT 1 FROM reminders x WHERE x.node_id = n.id)
+      AND NOT EXISTS (SELECT 1 FROM reminder_folders x WHERE x.node_id = n.id)
+      AND NOT EXISTS (SELECT 1 FROM edges x INDEXED BY edges_src WHERE x.src = n.id AND x.origin <> 'scan')
+      AND NOT EXISTS (SELECT 1 FROM edges x INDEXED BY edges_dst WHERE x.dst = n.id AND x.origin <> 'scan')`;
+    this.run('UPDATE nodes SET deleted_at = ? WHERE deleted = 1 AND deleted_at IS NULL', now);
+    this.exec('CREATE TEMP TABLE IF NOT EXISTS prune_ids (id INTEGER PRIMARY KEY)');
+    this.exec('CREATE TEMP TABLE IF NOT EXISTS prune_now (id INTEGER PRIMARY KEY)');
+    this.exec('DELETE FROM prune_ids');
+    this.run(`INSERT INTO prune_ids SELECT n.id FROM nodes n
+      WHERE ${free} AND n.deleted_at <= CASE n.kind WHEN 'dir' THEN ?2 ELSE ?1 END`, now - filesAfterMs, now - dirsAfterMs);
+    let removed = 0;
+    for (;;) {
+      const done = this.tx(() => {
+        this.exec('DELETE FROM prune_now');
+        const listed = Number(this.run('INSERT INTO prune_now SELECT id FROM prune_ids ORDER BY id LIMIT ?', chunk).changes);
+        if (!listed) return -1;
+        this.exec('DELETE FROM prune_ids WHERE id IN (SELECT id FROM prune_now)');
+        this.exec(`DELETE FROM prune_now WHERE id NOT IN (SELECT n.id FROM nodes n WHERE n.id IN (SELECT id FROM prune_now) AND ${free})`);
+        // what the scan already removed when it marked the row; repeated here so a pruned id never leaves anything behind
+        this.exec('DELETE FROM edges WHERE src IN (SELECT id FROM prune_now) OR dst IN (SELECT id FROM prune_now)');
+        this.exec('DELETE FROM refs WHERE node_id IN (SELECT id FROM prune_now)');
+        this.exec('DELETE FROM identifiers WHERE node_id IN (SELECT id FROM prune_now)');
+        this.exec('DELETE FROM nodes_fts WHERE rowid IN (SELECT id FROM prune_now)');
+        return Number(this.run('DELETE FROM nodes WHERE id IN (SELECT id FROM prune_now)').changes);
+      });
+      if (done < 0) break;
+      removed += done;
+    }
+    this.exec('DELETE FROM prune_now');
+    return removed;
   }
 
   /** Pages of the file and how many of them are free: removed rows leave free pages that new rows reuse. */

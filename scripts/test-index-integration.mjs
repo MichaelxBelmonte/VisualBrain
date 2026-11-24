@@ -8,7 +8,9 @@ import { DEFAULTS } from '../src/server/config.ts';
 import { Db } from '../src/server/db.ts';
 import { scan, walk, walkTs, planSubtrees, coalesceSubtrees } from '../src/server/scan.ts';
 import { nativeCandidates } from '../src/server/native-indexer.ts';
-import { existsSync, accessSync, constants } from 'node:fs';
+import { existsSync, accessSync, constants, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const tmp = mkdtempSync(join(tmpdir(), 'vb-int-'));
 let checks = 0;
@@ -115,7 +117,7 @@ try {
     eq(db.pruneDeleted(now), 0, 'nothing leaves before its wait is over');
     db.run("INSERT INTO notes (node_id, text, created_at) VALUES (?, 'ricordo', ?)", live(db, kept).id, now);
     const keptId = live(db, kept).id;
-    ok(db.pruneDeleted(now + 8 * day) >= 1 && !live(db, gone), 'a file gone for more than a week leaves the database');
+    ok(db.pruneDeleted(now + 8 * day, undefined, undefined, 1) >= 1 && !live(db, gone), 'a file gone for more than a week leaves the database (one row per transaction here)');
     ok(live(db, kept)?.deleted === 1, 'a row with a note stays, however old');
     ok(live(db, join(root, 'a_b'))?.deleted === 1, 'a folder waits longer than its files');
     db.pruneDeleted(now + 91 * day);
@@ -148,6 +150,37 @@ try {
   await scan(db2, cfg);
   eq(snapshot(db), snapshot(db2), 'partial updates == full scan (paths, sizes, totals, parents)');
   db2.close();
+
+  // `vb compact`: refuses a database someone else has open, shrinks one that is free
+  {
+    const cli = (file, ...flags) => spawnSync(process.execPath, [fileURLToPath(new URL('../src/cli.ts', import.meta.url)), 'compact', '--db', file, ...flags], {
+      encoding: 'utf8', env: { ...process.env, VISUAL_BRAIN_DATA_DIR: join(tmp, 'cli-profile'), VISUAL_BRAIN_CONFIG: '' },
+    });
+    const busy = cli(join(tmp, 'inc.db'));   // this process still has it open
+    ok(busy.status === 1 && /in uso/.test(busy.stderr), 'compact refuses a database another process has open');
+    ok(live(db, join(root, 'axb/file2.txt')).deleted === 0, 'and leaves it as it was');
+    const file = join(tmp, 'full.db');
+    const big = new Db(file);
+    big.exec('CREATE TABLE filler (t TEXT)');
+    big.tx(() => { for (let i = 0; i < 4000; i++) big.run('INSERT INTO filler VALUES (?)', 'x'.repeat(500)); });
+    big.exec('DROP TABLE filler');
+    big.run('UPDATE nodes SET deleted = 1, deleted_at = NULL WHERE path = ?', join(root, 'axb/file2.txt'));
+    big.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    big.close();
+    const sizeBefore = statSync(file).size;
+    const kept = cli(file);
+    ok(kept.status === 0 && statSync(file).size < sizeBefore, `compact shrinks a free database (${sizeBefore} -> ${statSync(file).size} bytes)`);
+    const check = new Db(file);
+    ok(check.get('SELECT deleted FROM nodes WHERE path = ?', join(root, 'axb/file2.txt'))?.deleted === 1, 'without --drop-gone a row that is still waiting stays');
+    eq(check.get('PRAGMA integrity_check').integrity_check, 'ok', 'the rewritten file is sound');
+    check.close();
+    ok(cli(file, '--drop-gone').status === 0, 'compact --drop-gone runs');
+    const after = new Db(file);
+    ok(!after.get('SELECT 1 FROM nodes WHERE path = ?', join(root, 'axb/file2.txt')), '--drop-gone removes it at once');
+    eq(snapshot(after).length, snapshot(db).length - 1, 'and nothing else');
+    after.close();
+    ok(cli(join(tmp, 'missing.db')).status === 1, 'compact does not create a database that is not there');
+  }
 
   // --- planning helpers -------------------------------------------------------------------------
   const plan = planSubtrees(db, cfg, [join(root, 'deep'), join(root, 'deep/one'), three, join(tmp, 'ignored/s.txt'), join(tmp, 'elsewhere/x')]);
