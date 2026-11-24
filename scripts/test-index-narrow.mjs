@@ -1,13 +1,14 @@
-// A pass over files only rewritten in place rebuilds just their edges, and ends where a full pass would.
+// A pass over files only rewritten in place rebuilds just their edges, and one in which a few paths appeared or vanished
+// just the edges of the files that name them: both end where a full pass would.
 // Uso: node scripts/test-index-narrow.mjs — cartelle e database temporanei, nessun modello.
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Db } from '../src/server/db.ts';
 import { DEFAULTS } from '../src/server/config.ts';
-import { GLOBAL_EVERY_MS, runIndex } from '../src/server/index.ts';
-import { lazyIndex, loadIndex, resolveExisting, resolveRefs } from '../src/server/graph.ts';
+import { GLOBAL_EVERY_MS, LOCAL_MAX_PATHS, runIndex } from '../src/server/index.ts';
+import { lazyIndex, loadIndex, namedBy, resolveExisting, resolveRefs } from '../src/server/graph.ts';
 import { GraphCache } from '../src/server/cache.ts';
 
 const temp = realpathSync(mkdtempSync(join(tmpdir(), 'vb-narrow-')));
@@ -30,9 +31,17 @@ try {
     'app/py/pkg/util.py': 'def x():\n    return 1\n',
     'app/py/main.py': 'import os\nfrom pkg.util import x\n',
     'app/py/sub/deep.py': 'from pkg import util\n',
+    // references to paths that do not exist yet
+    'app/src/g.ts': "import { n } from './nuovo';\nimport lib from './lib';\nexport const g = n + lib;\n",
+    'app/py/other.py': 'from pkg.extra import y\n',
+    'app/docs/todo.md': 'Vedi [[futuro]], [[unico]] e src/nuovo.ts.\n',
+    'app/docs/unico.md': '# Unico\n',
   };
   const write = (rel, text, at = Date.now() / 1000) => { const p = join(root, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); utimesSync(p, at, at); return p; };
   for (const [rel, text] of Object.entries(files)) write(rel, text, Date.now() / 1000 - 60);
+  write('app/docs/assoluto.md', `Il file ${join(root, 'app/src/poi.ts')} arriva dopo.\n`, Date.now() / 1000 - 60);
+  write('app/avvia.sh', `#!/bin/sh\nnode "${join(root, 'app/src/poi.ts')}"\nsource ${join(root, 'app/src/poi.ts')}\n`, Date.now() / 1000 - 60);
+  symlinkSync(join(root, 'app/src/poi.ts'), join(root, 'app/collegamento'));
   const db = new Db(join(temp, 'i.db'));
   const cfg = { ...DEFAULTS, roots: [root], dataDir: join(temp, 'profile'), excludePaths: [join(temp, 'profile')], llm: { ...DEFAULTS.llm, provider: 'none' } };
   await runIndex(db, cfg);
@@ -73,12 +82,93 @@ try {
   db.setMeta('rankAt', Date.now() - GLOBAL_EVERY_MS - 1); db.setMeta('similarAt', Date.now() - GLOBAL_EVERY_MS - 1);
   const due = await runIndex(db, cfg, { subtrees: [write('app/src/c.ts', 'export const c = 20;\n')] });
   assert.ok(due.phases.some(p => p.phase === 'rank') && due.phases.some(p => p.phase === 'edges:similar'), 'rank and similarity are due');
-  // A new file is not narrow: names can resolve differently, everything is rebuilt.
-  const added = await runIndex(db, cfg, { subtrees: [write('app/src/f.ts', "import { b } from './b';\n")] });
-  assert.equal(added.scan.added, 1);
-  assert.ok(added.phases.some(p => p.phase === 'fts'), 'a new path refreshes the search index');
-  assert.ok(has(snapshot(), 'app/src/f.ts → app/src/b.ts imports'));
-  console.log('PASS deferred phases run when due; a new file takes the full path');
+  console.log('PASS deferred phases run when due');
+
+  // Paths that appear: the files naming them resolve again, the rest of the graph is not read.
+  await runIndex(db, cfg);
+  const phasesOf = r => r.phases.map(p => p.phase);
+  const local = (r, what) => {
+    const ph = phasesOf(r);
+    assert.ok(ph.includes('edges:named') && !ph.includes('rank') && !ph.includes('edges:similar'), `${what}: a local pass, global phases wait (${ph.join(', ')})`);
+    const here = snapshot();
+    return here;
+  };
+  const sameAsFull = async (here, what) => { await runIndex(db, cfg); assert.deepEqual(snapshot(), here, `${what}: local and full passes agree`); };
+  const start = snapshot();
+  const ends = (list, text) => list.some(e => e.split(' ', 3).join(' ').includes(text));
+  assert.ok(has(start, 'app/docs/todo.md → app/docs/unico.md') && !ends(start, 'nuovo') && !ends(start, 'futuro') && !ends(start, 'poi.ts'));
+  const arrived = [
+    write('app/src/f.ts', "import { b } from './b';\n"),
+    write('app/src/nuovo.ts', 'export const n = 1;\n'),
+    write('app/src/lib/index.ts', 'export default 2;\n'),
+    write('app/py/pkg/extra.py', 'y = 1\n'),
+    write('app/docs/futuro.md', '# Futuro\n'),
+    write('app/altro/unico.md', '# Un altro unico\n'),
+    write('app/copie/quattro.txt', copy),
+    write('app/src/poi.ts', 'export const poi = 1;\n'),
+  ];
+  const grown = await runIndex(db, cfg, { subtrees: [...arrived.filter(p => !p.endsWith('index.ts')), join(root, 'app/src/lib'), join(root, 'app/altro')] });
+  assert.equal(grown.scan.added, 10, 'eight files and two folders');
+  const afterAdd = local(grown, 'added');
+  assert.ok(has(afterAdd, 'app/src/f.ts → app/src/b.ts imports'), 'a new file has its own edges');
+  assert.ok(has(afterAdd, 'app/src/g.ts → app/src/nuovo.ts imports'), 'an import waiting for the file finds it');
+  assert.ok(has(afterAdd, 'app/src/g.ts → app/src/lib imports'), 'an import of a folder finds the folder');
+  assert.ok(has(afterAdd, 'app/py/other.py → app/py/pkg/extra.py imports'), 'a dotted module finds its file');
+  assert.ok(has(afterAdd, 'app/docs/todo.md → app/docs/futuro.md') && has(afterAdd, 'app/docs/todo.md → app/src/nuovo.ts'), 'names and paths written in a note find the files');
+  assert.ok(!has(afterAdd, 'app/docs/todo.md → app/docs/unico.md') && !has(afterAdd, 'app/docs/todo.md → app/altro/unico.md'), 'a name that is no longer the only one stops resolving');
+  assert.ok(has(afterAdd, 'app/collegamento → app/src/poi.ts symlink'), 'a symbolic link finds its target');
+  assert.ok(afterAdd.some(e => e.includes('quattro.txt') && e.includes('duplicate')), 'a new copy joins its group');
+  const nuovo = db.get('SELECT id, importance FROM nodes WHERE path = ?', join(root, 'app/src/nuovo.ts'));
+  assert.ok(nuovo.importance >= 0.25, `a new file is shown before the next ranking (${nuovo.importance})`);
+  assert.equal(db.all('SELECT rowid FROM nodes_fts WHERE nodes_fts MATCH ?', '"nuovo.ts"').length, 1, 'and found by the search');
+  await sameAsFull(afterAdd, 'added');
+
+  // Paths that vanish: what pointed at them falls back, a name that is unique again resolves again.
+  for (const p of ['app/src/nuovo.ts', 'app/altro/unico.md', 'app/copie/uno.txt', 'app/src/lib', 'app/src/poi.ts']) rmSync(join(root, p), { recursive: true });
+  const shrunk = await runIndex(db, cfg, { subtrees: ['app/src/nuovo.ts', 'app/altro/unico.md', 'app/copie/uno.txt', 'app/src/lib', 'app/src/poi.ts'].map(p => join(root, p)) });
+  assert.equal(shrunk.scan.removed, 6);
+  const afterGone = local(shrunk, 'removed');
+  assert.ok(!['nuovo.ts', 'lib/index.ts', 'uno.txt', 'poi.ts'].some(p => ends(afterGone, p)), 'no edge is left on a path that is gone');
+  assert.ok(has(afterGone, 'app/docs/todo.md → app/docs/unico.md'), 'the name is unique again');
+  assert.ok(afterGone.some(e => e.includes('quattro.txt') && e.includes('tre.txt') && e.includes('duplicate')), 'the copies left pick another hub');
+  assert.equal(db.all('SELECT rowid FROM nodes_fts WHERE nodes_fts MATCH ?', '"nuovo.ts"').length, 0, 'gone from the search');
+  await sameAsFull(afterGone, 'removed');
+  // The same path back: the row and its id are the ones it had.
+  const back = await runIndex(db, cfg, { subtrees: [write('app/src/nuovo.ts', 'export const n = 3;\n')] });
+  const afterBack = local(back, 'back');
+  assert.equal(db.get('SELECT id FROM nodes WHERE path = ? AND deleted = 0', join(root, 'app/src/nuovo.ts')).id, nuovo.id);
+  assert.ok(has(afterBack, 'app/src/g.ts → app/src/nuovo.ts imports'));
+  await sameAsFull(afterBack, 'back');
+  console.log('PASS local pass: paths that appear, vanish or come back rebuild only the files naming them, same edges as a full pass; new files ranked and searchable');
+
+  // What cannot be local: a new project (files resolve names through it), too many paths, too many files naming them.
+  write('app/tools/package.json', '{"name":"tools"}\n'); write('app/tools/t.ts', 'export {};\n');
+  const project = await runIndex(db, cfg, { subtrees: [join(root, 'app/tools')] });
+  assert.equal(db.get('SELECT cls FROM nodes WHERE path = ?', join(root, 'app/tools')).cls, 'project');
+  assert.ok(phasesOf(project).includes('rank') && !phasesOf(project).includes('edges:named'), 'a new project takes the full path');
+  const many = [];
+  for (let i = 0; i <= LOCAL_MAX_PATHS; i++) many.push(write(`app/tanti/f${i}.txt`, `file numero ${i}\n`));
+  const crowd = await runIndex(db, cfg, { subtrees: [join(root, 'app/tanti')] });
+  assert.ok(phasesOf(crowd).includes('rank') && !phasesOf(crowd).includes('edges:named'), 'many new paths take the full path');
+  assert.equal(namedBy(db, [nuovo.id], 0), null, 'more files than the limit: no list');
+  assert.deepEqual(namedBy(db, [nuovo.id], 100).map(id => rel(db.get('SELECT path FROM nodes WHERE id = ?', id).path)).sort(), ['app/docs/todo.md', 'app/src/g.ts']);
+  console.log('PASS full path kept for a new project, for many paths and for names written in too many files');
+
+  // Nothing new since the last global run: nothing is computed, however old that run is.
+  await runIndex(db, cfg);
+  db.setMeta('rankAt', Date.now() - GLOBAL_EVERY_MS - 1); db.setMeta('similarAt', Date.now() - GLOBAL_EVERY_MS - 1);
+  const idle = await runIndex(db, cfg, { subtrees: [join(root, 'app/src/b.ts')] });
+  assert.equal(idle.scan.changed + idle.scan.added + idle.scan.removed, 0);
+  assert.ok(!phasesOf(idle).some(p => p === 'rank' || p.startsWith('edges')), `a pass that found nothing computes nothing: ${phasesOf(idle).join(', ')}`);
+  // A change waiting for its turn: when the time comes, similarity and rank run on their own.
+  db.setMeta('rankAt', Date.now()); db.setMeta('similarAt', Date.now());
+  await runIndex(db, cfg, { subtrees: [write('app/src/d.ts', 'export const d = 30;\n')] });
+  db.setMeta('rankAt', Date.now() - GLOBAL_EVERY_MS - 1); db.setMeta('similarAt', Date.now() - GLOBAL_EVERY_MS - 1);
+  const turn = await runIndex(db, cfg, { subtrees: [join(root, 'app/src/b.ts')] });
+  assert.ok(phasesOf(turn).includes('rank') && phasesOf(turn).includes('edges:similar') && !phasesOf(turn).includes('edges:refs'), `only the global phases: ${phasesOf(turn).join(', ')}`);
+  const again = await runIndex(db, cfg, { subtrees: [join(root, 'app/src/b.ts')] });
+  assert.ok(!phasesOf(again).some(p => p === 'rank' || p.startsWith('edges')));
+  console.log('PASS global phases: never when nothing changed since their last run, alone when a change was waiting');
 
   // The lazy index answers like the loaded one.
   const full = loadIndex(db, cfg), lazy = lazyIndex(db, cfg);

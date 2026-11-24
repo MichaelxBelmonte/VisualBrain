@@ -36,6 +36,9 @@ export interface ScanSummary {
   changedFiles: number[];
   /** A path changed kind or a folder changed class: other files may resolve differently, nothing can be narrowed. */
   structural: boolean;
+  /** The rows that appeared (new, or back after having gone) and the rows that vanished in this pass. */
+  addedIds: number[];
+  removedIds: number[];
 }
 
 export type Progress = (p: { phase: string; done: number; total?: number; message?: string }) => void;
@@ -536,6 +539,8 @@ export async function scan(db: Db, cfg: Config, opts: { subtrees?: string[] } = 
   let structural = false;
   let reclassed = false;
   const changedFiles: number[] = [];
+  const addedIds: number[] = [];
+  const removedIds: number[] = [];
   const restyled: string[] = [];
   const idByPath = new Map<string, number>();
 
@@ -552,7 +557,7 @@ export async function scan(db: Db, cfg: Config, opts: { subtrees?: string[] } = 
           if (!prev.deleted && dumpish(prev.cls) !== dumpish(e.cls)) restyled.push(e.path);
           updDir.run(parentId, e.cls, s.bytes, s.files, e.depth, e.mtime, e.inode, e.aggregate, gen, s.childCount, prev.id);
           idByPath.set(e.path, prev.id);
-          if (prev.deleted) added++;
+          if (prev.deleted) { added++; addedIds.push(prev.id); }
         } else if (prev) {
           // the path changed kind (file -> dir): reuse the row with a stable id
           updDir.run(parentId, e.cls, s.bytes, s.files, e.depth, e.mtime, e.inode, e.aggregate, gen, s.childCount, prev.id);
@@ -565,7 +570,7 @@ export async function scan(db: Db, cfg: Config, opts: { subtrees?: string[] } = 
         } else {
           const r = ins.run(e.path, parentId, e.name, 'dir', '', e.cls, null, 0, s.bytes, s.files, e.depth, e.mtime, e.inode, e.aggregate, null, gen, s.childCount);
           idByPath.set(e.path, Number(r.lastInsertRowid));
-          added++;
+          added++; addedIds.push(Number(r.lastInsertRowid));
         }
       } else {
         // class/ext/lang are compared too: a new secret pattern or class rule must invalidate the extracted content of an untouched file
@@ -579,13 +584,13 @@ export async function scan(db: Db, cfg: Config, opts: { subtrees?: string[] } = 
           delRefs.run(prev.id);
           delIds.run(prev.id);
           idByPath.set(e.path, prev.id);
-          if (prev.deleted) added++; else changed++;
+          if (prev.deleted) { added++; addedIds.push(prev.id); } else changed++;
           if (!prev.deleted && prev.kind === e.kind) changedFiles.push(prev.id); else if (!prev.deleted) structural = true;
           if (prev.cls !== e.cls) reclassed = true;
         } else {
           const r = ins.run(e.path, parentId, e.name, e.kind, e.ext, e.cls, e.lang, e.size, e.size, 0, e.depth, e.mtime, e.inode, 0, e.linkTarget, gen, 0);
           idByPath.set(e.path, Number(r.lastInsertRowid));
-          added++;
+          added++; addedIds.push(Number(r.lastInsertRowid));
         }
       }
       if (++i % 5000 === 0) progress?.({ phase: 'write', done: i, total: entries.length });
@@ -616,12 +621,12 @@ export async function scan(db: Db, cfg: Config, opts: { subtrees?: string[] } = 
       dropEdges.run(r.id, r.id);
       delRefs.run(r.id);
       delIds.run(r.id);
-      removed++;
+      removed++; removedIds.push(r.id);
     }
     if (plan) refreshAncestors(db, cfg, plan.refresh, added > 0 || removed > 0 || structural || reclassed || restyled.length > 0);
   });
 
   db.setMeta('gen', gen);
   const ms = Date.now() - t0;
-  return { gen, seen: entries.length, added, changed, removed, ms, changedFiles, structural: structural || restyled.length > 0 };
+  return { gen, seen: entries.length, added, changed, removed, ms, changedFiles, structural: structural || restyled.length > 0, addedIds, removedIds };
 }

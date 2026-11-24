@@ -26,6 +26,9 @@ function percentile(values: Float64Array): Float64Array {
 
 export interface Ranked { importance: number; pagerank: number; indeg: number; outdeg: number }
 
+const clsBonus: Record<string, number> = { code: 1, doc: 1, notebook: 0.9, config: 0.6, sheet: 0.5, data: 0.3, image: 0.2, video: 0.3, archive: 0.2, binary: 0.05, log: 0.2, other: 0.2, secret: 0.3 };
+const recent = (mtime: number, now: number) => Math.exp(-Math.max(0, now - mtime) / (90 * 86400e3));
+
 /**
  * The ranking itself, on rows already in memory: what `rank` stores. The cache uses it, without edges, to show a first map
  * before the database has been ranked (the same function, so what is shown is what the first ranking would store).
@@ -103,7 +106,7 @@ export function computeRank(nodes: NodeRow[], edges: Iterable<EdgeRow> & { lengt
     for (let j = 0; j < lb; j++) if (markA[upB[j]] !== stamp) cross[upB[j]]++;
   }
 
-  const recency = (mtime: number) => Math.exp(-Math.max(0, now - mtime) / (90 * 86400e3));
+  const recency = (mtime: number) => recent(mtime, now);
   const files: number[] = [], dirs: number[] = [], others: number[] = [];
   for (let i = 0; i < N; i++) (nodes[i].kind === 'file' ? files : nodes[i].kind === 'dir' ? dirs : others).push(i);
   const of = (list: number[], value: (i: number) => number) => percentile(Float64Array.from(list, value));
@@ -114,7 +117,6 @@ export function computeRank(nodes: NodeRow[], edges: Iterable<EdgeRow> & { lengt
   const bytesDir = of(dirs, (i) => nodes[i].bytes);
   const crossDir = of(dirs, (i) => cross[i]);
   const degOther = of(others, (i) => indeg[i] + outdeg[i]);
-  const clsBonus: Record<string, number> = { code: 1, doc: 1, notebook: 0.9, config: 0.6, sheet: 0.5, data: 0.3, image: 0.2, video: 0.3, archive: 0.2, binary: 0.05, log: 0.2, other: 0.2, secret: 0.3 };
 
   const out = new Map<number, Ranked>();
   const put = (i: number, imp: number) => out.set(nodes[i].id, { importance: Math.round(imp * 1000) / 1000, pagerank: pr[i], indeg: indeg[i], outdeg: outdeg[i] });
@@ -149,4 +151,28 @@ export function rank(db: Db, progress?: (m: string) => void): void {
     }
   });
   progress?.(`pesi calcolati su ${nodes.length} nodi e ${edges.length} archi`);
+}
+
+/**
+ * A weight for the nodes that appeared since the last ranking, until the next one: the formula of computeRank with every
+ * rank among the other nodes at its midpoint (and no edge across a new folder), so a new file is neither hidden as
+ * unranked nor placed above the ones that were measured. Rows that already have a weight (a path that came back) keep it.
+ */
+export function provisionalRank(db: Db, ids: number[], now = Date.now()): void {
+  const rows = db.all<{ id: number; kind: string; cls: string; mtime: number }>(
+    'SELECT id, kind, cls, mtime FROM nodes WHERE deleted = 0 AND importance = 0 AND id IN (SELECT value FROM json_each(?))', JSON.stringify(ids));
+  if (!rows.length) return;
+  const into = db.prepare('SELECT COUNT(*) c FROM edges INDEXED BY edges_dst WHERE dst = ? AND hidden = 0');
+  const from = db.prepare('SELECT COUNT(*) c FROM edges INDEXED BY edges_src WHERE src = ? AND hidden = 0');
+  const upd = db.prepare('UPDATE nodes SET importance = ?, indeg = ?, outdeg = ? WHERE id = ?');
+  db.tx(() => {
+    for (const r of rows) {
+      const indeg = Number((into.get(r.id) as { c: number }).c), outdeg = Number((from.get(r.id) as { c: number }).c);
+      let imp: number;
+      if (r.kind === 'file') imp = (indeg + outdeg ? 0.65 * 0.5 : 0) + 0.15 * 0.5 + 0.10 * recent(r.mtime, now) + 0.10 * (clsBonus[r.cls] ?? 0.2);
+      else if (r.kind === 'dir') imp = (0.45 * 0.5 + 0.10 * (r.cls === 'project' ? 1 : 0) + 0.10 * recent(r.mtime, now)) * (r.cls === 'vendor' ? 0.3 : r.cls === 'dump' ? 0.7 : 1);
+      else imp = r.kind === 'symlink' ? 0.12 : 0;
+      upd.run(Math.round(imp * 1000) / 1000, indeg, outdeg, r.id);
+    }
+  });
 }

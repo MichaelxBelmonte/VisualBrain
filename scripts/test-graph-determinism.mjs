@@ -158,6 +158,34 @@ try {
     const index = getOrCreateExternal(db, idx, '/outside/n/index.ts'); getOrCreateExternal(db, idx, '/outside/n/__init__.py');
     eq(resolveExisting(idx, '/outside/n')?.id, index, '/index.ts comes before /__init__.py');
   }
+  // A file added and a file removed through a partial pass, then a full pass: the graph is the one a single full pass
+  // builds on the same files (every edge of the scan, the nodes and their weights), whatever happened on the way.
+  {
+    const walked = await build('partial', 'ts', null);
+    const added = [
+      put(root, 'docs/c0/note-zz9.md', `# Cluster 0\n\n${WORDS(0).map((w) => `${w} ${w} ${w}`).join('\n')}\n` + ' '.repeat(12)),
+      put(root, 'src/extra.ts', "import { a } from '../res/a';\nexport function own_extra() { return a; }\n// ticket VBX-777 and commit c0ffee11aa\n"),
+      put(root, 'res/c.ts', "import { b } from './b';\nexport const c = b;\n"),
+    ];
+    put(root, 'dup/t/same.txt', 'identical content '.repeat(10));
+    const removed = [join(root, 'docs/c1/note-a0.md'), join(root, 'dup/p/same.txt'), join(root, 'src/m0.ts'), join(root, 'res/a.ts')];
+    for (const p of removed) rmSync(p);
+    const partial = await runIndex(walked.db, walked.cfg, { subtrees: [...added, join(root, 'dup/t'), ...removed] });
+    const phases = partial.phases.map((p) => p.phase);
+    eq([partial.scan.added, partial.scan.removed], [5, 4], 'four files and a folder appeared, four files vanished');
+    ok(phases.includes('edges:named') && !phases.includes('rank') && !phases.includes('edges:similar'), `the partial pass rebuilt only what names those paths (${phases.join(', ')})`);
+    await runIndex(walked.db, walked.cfg);
+    const once = await build('once', 'ts', null);
+    const all = (db) => db.all(`SELECT s.path AS src, d.path AS dst, e.kind, e.verified, e.confidence, e.evidence, e.count
+      FROM edges e JOIN nodes s ON s.id = e.src JOIN nodes d ON d.id = e.dst WHERE e.origin = 'scan'`)
+      .map((r) => (r.kind !== 'similar' && r.kind !== 'shared_id') || r.src <= r.dst ? r : { ...r, src: r.dst, dst: r.src })
+      .map((r) => JSON.stringify(r)).sort();
+    const live = (db) => db.all("SELECT path, kind, cls, ROUND(importance, 9) AS importance, ROUND(pagerank, 9) AS pagerank, indeg, outdeg FROM nodes WHERE deleted = 0 ORDER BY path");
+    ok(all(once.db).some((e) => e.includes('src/extra.ts')) && !all(once.db).some((e) => e.includes('"src":"' + removed[2]) || e.includes('"dst":"' + removed[2])), 'the change is in the graph');
+    eq(all(walked.db), all(once.db), 'partial pass (file added, file removed) then full pass: same edges as one full pass');
+    eq(live(walked.db), live(once.db), 'and the same nodes, weights and degrees');
+    walked.db.close(); once.db.close();
+  }
   for (const v of built) v.db.close();
   console.log(`test-graph-determinism: ${checks} controlli ok`);
 } finally {

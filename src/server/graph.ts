@@ -356,7 +356,8 @@ export function resolveRefs(db: Db, cfg: Config, idx: Index, only?: number[]): n
     ? db.all<RefRow>("SELECT node_id, kind, target, line, snippet, relative_to FROM refs WHERE kind <> 'package' AND node_id IN (SELECT value FROM json_each(?))", JSON.stringify(only))
     : db.iterate<RefRow>("SELECT node_id, kind, target, line, snippet, relative_to FROM refs WHERE kind <> 'package'");
   const projectRoot = new Map<number, string>();
-  for (const r of db.all<{ id: number; path: string }>('SELECT p.id, n.path FROM projects p JOIN nodes n ON n.id = p.node_id')) projectRoot.set(r.id, r.path);
+  // the projects first, then the folder of each: left to choose, SQLite walks every node to look for a few hundred projects
+  for (const r of db.all<{ id: number; path: string }>('SELECT p.id, n.path FROM projects p CROSS JOIN nodes n ON n.id = p.node_id')) projectRoot.set(r.id, r.path);
   const folders = hitFolders(idx);
 
   for (const r of refs) {
@@ -621,13 +622,84 @@ export function similarityEdges(db: Db, idx: Index): number {
 }
 
 /**
- * All edges of the scan. `only`: just these files changed, in place (no path appeared, vanished or changed kind), so the
- * references of the other files resolve as before: only theirs and their duplicate groups are rebuilt. `similar` is
- * global (tf-idf over every text) and runs only when `similar` is true.
+ * The files whose references may resolve differently now that the paths `ids` appeared or vanished. A reference finds a node
+ * by building a path and asking for it, alone or with a known ending (tryVariants), or by asking for a name (byName): the
+ * last segment it writes is then the node's name, the name without that ending, or the folder of an index file. The
+ * references ending that way are read, and kept when one of the paths they can build is such a path. An absolute target
+ * also goes through symbolic links and vendor folders: it counts as soon as one of its segments is one of those names,
+ * whatever the case (so does the target of a symbolic link).
+ * Null when more than `max` files would have to be resolved again: reading every node once is then the cheaper way.
+ * Not seen: an absolute target that reaches the path only through a symbolic link with another name; a full pass does.
  */
-export function buildEdges(db: Db, cfg: Config, progress?: (m: string) => void, opts: { only?: number[]; similar?: boolean } = {}): number {
+export function namedBy(db: Db, ids: number[], max: number): number[] | null {
+  if (!ids.length) return [];
+  const home = homedir();
+  const paths = new Map<string, string[]>();   // last segment -> the paths a reference has to build to find one of the nodes
+  const names = new Set<string>();             // what a reference by name has to say
+  const loose = new Set<string>();             // the last segments again, lower case
+  const last = (p: string) => p.slice(p.lastIndexOf('/') + 1);
+  const add = (p: string) => {
+    const list = paths.get(last(p));
+    if (list) list.push(p); else paths.set(last(p), [p]);
+    loose.add(last(p).toLowerCase());
+  };
+  for (const n of db.all<{ path: string; name: string }>('SELECT path, name FROM nodes WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(ids))) {
+    add(n.path);
+    names.add(n.name);
+    if (n.name.endsWith('.md')) names.add(n.name.slice(0, -3));
+    // every stem this path is a variant of, as addVariants registers them
+    const dot = n.path.lastIndexOf('.');
+    if (dot >= 0 && VARIANT_AT.has(n.path.slice(dot))) add(n.path.slice(0, dot));
+    for (const v of SLASH_VARIANTS) if (n.path.endsWith(v)) add(n.path.slice(0, n.path.length - v.length));
+  }
+  const built = (p: string) => paths.get(last(p))?.includes(p) ?? false;
+  // `rel` joined under some folder: a path that ends with it (a relative path climbing out of that folder can end anywhere)
+  const under = (rel: string) => {
+    const n = normalize(rel);
+    return n === '.' || n === '..' || n.startsWith('../') || (paths.get(last(n))?.some((p) => p.endsWith('/' + n)) ?? false);
+  };
+  const named = (p: string) => p.startsWith('/') && p.split('/').some((seg) => loose.has(seg.toLowerCase()));
+  const tails = new Set<string>(['', '.', '..', ...paths.keys()]);
+  for (const n of names) for (const t of [n, `[[${n}]]`, `[[${n}`, `${n}]]`]) tails.add(t);
+
+  const hit = new Set<number>();
+  // the text after the last slash, in SQL: rtrim drops every trailing character that is not a slash
+  const rows = db.iterate<{ id: number; target: string; rel: string; path: string }>(`SELECT r.node_id AS id, r.target, r.relative_to AS rel, n.path
+    FROM refs r CROSS JOIN nodes n ON n.id = r.node_id
+    WHERE r.kind NOT IN ('package', 'external') AND n.deleted = 0
+      AND (r.relative_to = 'absolute' OR substr(r.target, length(rtrim(r.target, replace(r.target, '/', ''))) + 1) IN (SELECT value FROM json_each(?)))`, JSON.stringify([...tails]));
+  for (const r of rows) {
+    if (hit.has(r.id)) continue;
+    let yes = false;
+    if (r.rel === 'absolute') yes = named(normalizePath(r.target, home));
+    else if (r.rel === 'name') yes = names.has(r.target.replace(/^\[\[|\]\]$/g, ''));
+    else if (r.rel === 'file') {
+      const t = r.target.replace(/^\.\//, '');
+      // next to the file, or (a dotted module written as a/b) under the project root or its src
+      yes = built(normalize(join(dirname(r.path), t))) || (!/^\.\.?(\/|$)/.test(r.target) && under(t));
+    } else if (r.rel === 'root') {
+      const t = r.target.replace(/^\.\//, '').replace(/^\/+/, '');
+      // under the project root or a folder above the file, or the only node with that name
+      yes = under(t) || names.has(basename(t));
+    }
+    if (yes) hit.add(r.id);
+    if (hit.size > max) return null;
+  }
+  for (const l of db.all<{ id: number; link_target: string }>("SELECT id, link_target FROM nodes WHERE kind = 'symlink' AND deleted = 0 AND link_target IS NOT NULL")) {
+    if (named(normalizePath(l.link_target, home))) hit.add(l.id);
+  }
+  return hit.size > max ? null : [...hit];
+}
+
+/**
+ * All edges of the scan. `only`: just these files changed (rewritten in place, new or gone), and every path that appeared
+ * or vanished is among them, so the references of the other files resolve as before: only theirs and their duplicate
+ * groups are rebuilt, together with the references of `also`, the files that name one of those paths (see namedBy).
+ * `similar` is global (tf-idf over every text) and runs only when `similar` is true.
+ */
+export function buildEdges(db: Db, cfg: Config, progress?: (m: string) => void, opts: { only?: number[]; also?: number[]; similar?: boolean } = {}): number {
   const idx = opts.only ? lazyIndex(db, cfg) : loadIndex(db, cfg);
-  const a = resolveRefs(db, cfg, idx, opts.only);
+  const a = resolveRefs(db, cfg, idx, opts.only && (opts.also?.length ? [...new Set([...opts.only, ...opts.also])] : opts.only));
   progress?.(`${a} archi da riferimenti`);
   const b = duplicateEdges(db, idx, opts.only);
   progress?.(`${b} duplicati`);

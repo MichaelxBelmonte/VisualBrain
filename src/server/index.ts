@@ -6,9 +6,9 @@ import { scan, type Progress, type ScanSummary } from './scan.ts';
 import { ExtractPool, extractFile, extractWorkers, type ExtractJob, type ExtractOutcome } from './extract-pool.ts';
 import { PROJECT_MARKERS, TEXT_CLASSES } from './classify.ts';
 import { detectProjects } from './projects.ts';
-import { buildEdges } from './graph.ts';
+import { buildEdges, lazyIndex, namedBy, similarityEdges } from './graph.ts';
 import { importSeeds } from './seed.ts';
-import { rank } from './rank.ts';
+import { provisionalRank, rank } from './rank.ts';
 import { IndexMetrics, splitter, type PhaseMetric } from './metrics.ts';
 
 export interface IndexSummary {
@@ -51,8 +51,15 @@ export async function extractAll(db: Db, cfg: Config, progress?: Progress, stats
     inDumpCache.set(dirId, v);
     return v;
   };
+  // Folders, links, secrets and paths that are gone have nothing to read: they leave the list of what is waiting, so that
+  // looking for the files to read does not walk a few hundred thousand of them at every pass.
+  // (a slice at a time: the first pass after an update finds all of them, and must not hold the database for seconds)
+  const settle = db.prepare(`UPDATE nodes SET extracted = 1 WHERE id IN (SELECT id FROM nodes INDEXED BY nodes_pending
+    WHERE extracted = 0 AND (kind <> 'file' OR deleted = 1 OR cls = 'secret') LIMIT 20000)`);
+  while (Number(settle.run().changes) > 0);
   const projectRootOf = new Map<number, string>();
-  for (const r of db.all<{ id: number; path: string }>('SELECT p.id, n.path FROM projects p JOIN nodes n ON n.id = p.node_id')) projectRootOf.set(r.id, r.path);
+  // the projects first, then the folder of each: left to choose, SQLite walks every node to look for a few hundred projects
+  for (const r of db.all<{ id: number; path: string }>('SELECT p.id, n.path FROM projects p CROSS JOIN nodes n ON n.id = p.node_id')) projectRootOf.set(r.id, r.path);
   const projectByNode = new Map<number, number | null>();
   for (const r of db.all<{ id: number; project_id: number | null }>("SELECT id, project_id FROM nodes INDEXED BY nodes_pending WHERE deleted = 0 AND kind = 'file' AND extracted = 0")) projectByNode.set(r.id, r.project_id);
 
@@ -129,8 +136,12 @@ export async function extractAll(db: Db, cfg: Config, progress?: Progress, stats
 
 /** Version of the import readers: 2 = tree-sitter for Python, Go, Java and C/C++ and the Kotlin rule (0.2.32). */
 const EXTRACTOR = '2';
-/** After a pass that only rewrote some files, the global weights (rank, similarity) wait at most this long. */
+/** After a pass over a few files, the global weights (rank, similarity) wait at most this long. */
 export const GLOBAL_EVERY_MS = 10 * 60_000;
+/** A pass in which at most this many paths appeared or vanished rebuilds only the edges that can see them. */
+export const LOCAL_MAX_PATHS = 400;
+/** ...as long as the files naming those paths are at most this many: beyond, reading every node once is cheaper. */
+export const LOCAL_MAX_FILES = 1500;
 
 /** Drops provisional external identities inside the roots and the edges left without an end (rebuilt by the pass). */
 function dropProvisional(db: Db, cfg: Config): void {
@@ -149,8 +160,8 @@ export async function runIndex(db: Db, cfg: Config, opts: { subtrees?: string[];
   const m = opts.metrics ?? new IndexMetrics();
   // First start of a full pass: the structure is shown as soon as it is scanned, extraction and edges follow in background.
   const firstMap = !opts.subtrees?.length && db.getMeta('lastScan') === null;
-  // A pass over some paths of an index already built by this extractor may turn out to have only rewritten files in place;
-  // its clean-up then waits until the scan says so (see `narrow` below).
+  // A pass over some paths of an index already built by this extractor may turn out to have only rewritten files in place,
+  // or to have met a few new or vanished paths; its clean-up then waits until the scan says so (see `inPlace` and `local` below).
   const narrowable = Boolean(opts.subtrees?.length) && !opts.reextract && db.getMeta('lastScan') !== null && db.getMeta('extractor') === EXTRACTOR;
   m.measure('prepare', () => {
     // A newer extractor for some languages: their files are read again once, the others keep what they had.
@@ -172,18 +183,56 @@ export async function runIndex(db: Db, cfg: Config, opts: { subtrees?: string[];
     // unless annotated (the scan then turns them into the real file in place when it appears, keeping the id)
     if (!narrowable) dropProvisional(db, cfg);
   });
+  const lastId = Number(db.get<{ m: number | null }>('SELECT MAX(id) m FROM nodes')?.m ?? 0);
   const s = await m.measureAsync('scan', () => scan(db, cfg, opts, progress), (r) => ({ seen: r.seen, added: r.added, changed: r.changed, removed: r.removed }));
   // Only files rewritten in place: every other file resolves its references as before, so only the rewritten (and
   // re-read) files get their edges rebuilt, and the provisional identities the others point at must stay.
-  const narrow = narrowable && s.added === 0 && s.removed === 0 && !s.structural;
-  if (narrowable && !narrow) m.measure('prepare', () => dropProvisional(db, cfg));
+  const inPlace = narrowable && s.added === 0 && s.removed === 0 && !s.structural;
+  // A few paths appeared or vanished, none changed kind or class: the files that name them resolve again, the others as
+  // before. Settled below, once the projects are known to be the same and those files are counted.
+  let local = narrowable && !inPlace && !s.structural && s.added + s.removed <= LOCAL_MAX_PATHS;
+  const widen = () => { local = false; m.measure('prepare', () => dropProvisional(db, cfg)); };
+  if (narrowable && !inPlace && !local) m.measure('prepare', () => dropProvisional(db, cfg));
   progress?.({ phase: 'scan', done: s.seen, message: `scansione: ${s.seen} voci, ${s.added} nuove, ${s.changed} cambiate, ${s.removed} sparite (${s.ms} ms)` });
   // After a narrow scan, projects can change only through their manifests (technologies, dependencies).
   const manifests = new Set([...PROJECT_MARKERS, 'requirements-dev.txt']);
-  const manifestChanged = narrow && s.changedFiles.length > 0
+  const manifestChanged = inPlace && s.changedFiles.length > 0
     && db.all<{ name: string }>('SELECT name FROM nodes WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(s.changedFiles)).some((r) => manifests.has(r.name));
-  const projects = narrow && !manifestChanged ? Number(db.get<{ c: number }>('SELECT COUNT(*) c FROM projects')?.c ?? 0)
+  const moved = [...s.addedIds, ...s.removedIds];
+  // A folder is a project through the marker files in it. With no manifest among the paths that came or went, and every
+  // folder above them (the only ones whose role the scan looked at again) still a project or still not one, the projects
+  // are the ones already stored.
+  const projectsStay = (): boolean => {
+    const row = db.prepare('SELECT parent_id, name, kind, cls, deleted FROM nodes WHERE id = ?');
+    const known = new Set(db.all<{ node_id: number }>('SELECT node_id FROM projects').map((r) => r.node_id));
+    const seen = new Set<number>();
+    for (const id of moved) {
+      let cur: number | null = id;
+      for (let guard = 0; cur !== null && !seen.has(cur) && guard < 64; guard++) {
+        seen.add(cur);
+        const r = row.get(cur) as { parent_id: number | null; name: string; kind: string; cls: string; deleted: number } | undefined;
+        if (!r) break;
+        if (cur === id && manifests.has(r.name)) return false;
+        if ((r.kind === 'dir' && r.cls === 'project' && !r.deleted) !== known.has(cur)) return false;
+        cur = r.parent_id;
+      }
+    }
+    return true;
+  };
+  const sameProjects = (inPlace && !manifestChanged) || (local && projectsStay());
+  // which folder each project is: a file resolves names through its project, so the others resolve as before only if this stays
+  const projectDirs = () => JSON.stringify(db.all('SELECT id, node_id FROM projects ORDER BY id'));
+  const dirsBefore = local && !sameProjects ? projectDirs() : '';
+  const projects = sameProjects ? Number(db.get<{ c: number }>('SELECT COUNT(*) c FROM projects')?.c ?? 0)
     : m.measure('projects', () => detectProjects(db, (msg) => progress?.({ phase: 'projects', done: 0, message: msg })), (n) => ({ projects: n }));
+  if (local && !sameProjects && projectDirs() !== dirsBefore) widen();
+  if (local && sameProjects && s.addedIds.length) {
+    // new paths belong to the project of the folder they are in (parents first)
+    const own = db.prepare('UPDATE nodes SET project_id = (SELECT p.project_id FROM nodes p WHERE p.id = ?1) WHERE id = ?2');
+    db.tx(() => {
+      for (const r of db.all<{ id: number; parent_id: number | null }>('SELECT id, parent_id FROM nodes WHERE deleted = 0 AND id IN (SELECT value FROM json_each(?)) ORDER BY depth, id', JSON.stringify(s.addedIds))) own.run(r.parent_id, r.id);
+    });
+  }
   if (firstMap) {
     // Folders, files and projects are in the database: the server publishes the map now (its cache ranks the nodes in memory
     // while the database is still unranked, see GraphCache.load); the stored ranking comes at the end of the pass.
@@ -196,15 +245,25 @@ export async function runIndex(db: Db, cfg: Config, opts: { subtrees?: string[];
     readMs: Math.round(xs.readMs), hashMs: Math.round(xs.hashMs), extractMs: Math.round(xs.extractMs), writeMs: Math.round(xs.writeMs),
   }));
   progress?.({ phase: 'extract', done: extracted, total: extracted, message: `estratti ${extracted} file` });
-  // projects again: technologies from manifests do not change, but new project dirs may have appeared
+  let also: number[] = [];
+  if (local) {
+    const naming = m.measure('edges:named', () => namedBy(db, moved, LOCAL_MAX_FILES), (r) => ({ files: r?.length ?? -1 }));
+    if (naming) also = naming; else widen();
+  }
+  const narrow = inPlace || local;
   const edgeSteps = splitter('edges', ['refs', 'duplicate', 'shared_id', 'similar'], m, (msg) => progress?.({ phase: 'edges', done: 0, message: msg }));
-  // Rank and similarity read the whole graph: after a narrow pass they run again only when their last run is old enough.
-  const due = (key: string) => !narrow || Date.now() - Number(db.getMeta(key) ?? 0) >= GLOBAL_EVERY_MS;
-  const only = narrow ? [...new Set([...s.changedFiles, ...reread])] : undefined;
-  const similar = due('similarAt');
-  const edges = only && only.length === 0 && !similar ? 0
-    : m.measure('edges', () => buildEdges(db, cfg, edgeSteps, { only, similar }), (n) => ({ edges: n }));
-  if (similar) db.setMeta('similarAt', Date.now());
+  const only = narrow ? [...new Set([...moved, ...s.changedFiles, ...reread])] : undefined;
+  // Rank and similarity read the whole graph. After a narrow pass they wait until their last run is old enough, and run
+  // only if something they read has changed since: a pass that found nothing new computes nothing.
+  const touched = !only || only.length > 0;
+  const edgesNow = () => { const r = db.get<{ c: number; m: number | null; h: number | null }>('SELECT COUNT(*) c, MAX(id) m, SUM(hidden) h FROM edges')!; return `${r.c}:${r.m ?? 0}:${r.h ?? 0}`; };
+  const stale = (key: string) => touched || db.getMeta(key) !== '0' || (key === 'rankStale' && db.getMeta('rankEdges') !== edgesNow());
+  const due = (key: string, staleKey: string) => !narrow || (stale(staleKey) && Date.now() - Number(db.getMeta(key) ?? 0) >= GLOBAL_EVERY_MS);
+  const similar = due('similarAt', 'similarStale');
+  const edges = touched
+    ? m.measure('edges', () => buildEdges(db, cfg, edgeSteps, { only, also, similar }), (n) => ({ edges: n }))
+    : similar ? m.measure('edges:similar', () => similarityEdges(db, lazyIndex(db, cfg)), (n) => ({ edges: n })) : 0;
+  if (similar) { db.setMeta('similarAt', Date.now()); db.setMeta('similarStale', '0'); } else if (touched) db.setMeta('similarStale', '1');
   m.measure('seed', () => importSeeds(db, cfg, (msg) => progress?.({ phase: 'seed', done: 0, message: msg })));
   // external identities that no edge uses any more (and empty external groups)
   m.measure('externals', () => {
@@ -216,9 +275,24 @@ export async function runIndex(db: Db, cfg: Config, opts: { subtrees?: string[];
       if (Number(r.changes) === 0) break;
     }
   });
-  if (due('rankAt')) {
+  if (due('rankAt', 'rankStale')) {
     m.measure('rank', () => rank(db, (msg) => progress?.({ phase: 'rank', done: 0, message: msg })));
     db.setMeta('rankAt', Date.now());
+    db.setMeta('rankStale', '0');
+    db.setMeta('rankEdges', edgesNow());
+  } else {
+    if (touched) db.setMeta('rankStale', '1');
+    // new paths are shown with an estimate until the weights are computed again
+    if (s.addedIds.length) m.measure('rank:new', () => provisionalRank(db, s.addedIds));
+  }
+  // In a local pass the search index follows the paths that came or went (and the external identities their references added).
+  if (narrow && moved.length) {
+    m.measure('fts', () => db.tx(() => {
+      const ids = JSON.stringify(moved);
+      db.run('DELETE FROM nodes_fts WHERE rowid IN (SELECT value FROM json_each(?))', ids);
+      db.run('INSERT INTO nodes_fts(rowid, name, path) SELECT id, name, path FROM nodes WHERE deleted = 0 AND id IN (SELECT value FROM json_each(?))', ids);
+      db.run("INSERT INTO nodes_fts(rowid, name, path) SELECT id, name, path FROM nodes WHERE id > ?1 AND kind = 'external' AND deleted = 0 AND id NOT IN (SELECT rowid FROM nodes_fts WHERE rowid > ?1)", lastId);
+    }));
   }
   // names and paths only change when paths appear, vanish or change kind
   if (!narrow) m.measure('fts', () => db.rebuildFts());
