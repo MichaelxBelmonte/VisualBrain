@@ -103,7 +103,9 @@ const termTs = readFileSync(new URL('../src/ui/terminal.ts', import.meta.url), '
     assert.ok(g >= 3, `${theme} ⠿ handle at rest: ${g.toFixed(2)}:1`);
   }
   // The measurements reproduce what was seen before the change.
-  const before = ratio(hex(light['role-attention']), mix(hex(light['role-attention']), mix(hex(light.fg), hex(light.bg), selected), tint));
+  // The ochre attention colour of that time (#956916): the token is orange now, and the loop above measures it.
+  const ochre = hex('#956916');
+  const before = ratio(ochre, mix(ochre, mix(hex(light.fg), hex(light.bg), selected), tint));
   assert.ok(Math.abs(before - 3.29) < 0.05, `the old «Permesso richiesto» on a selected light row was 3.29:1, measured ${before.toFixed(2)}`);
   assert.ok(Math.abs(ratio(mix(hex(light.g4), hex(light.bg), 0.45), hex(light.bg)) - 1.94) < 0.02, 'the old handle in light was 1.94:1');
 }
