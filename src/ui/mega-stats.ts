@@ -165,7 +165,7 @@ function sessionState(s: StatsSession): { text: string; tone: Tone } {
 }
 
 function pill(text: string, tone: string): HTMLElement {
-  const p = el('span', undefined, 'mega-stats-pill');
+  const p = el('span', undefined, 'pill mega-stats-pill');
   p.dataset.tone = tone;
   p.append(el('i'), text);
   return p;
@@ -613,7 +613,7 @@ export function mountMegaStats(root: HTMLElement): () => void {
     const overviewButton = tabButtons.get('overview')!;
     overviewButton.replaceChildren(t('Panoramica'));
     if (attention) {
-      const badge = el('span', String(attention), 'mega-stats-badge');
+      const badge = el('span', String(attention), 'badge mega-stats-badge');
       badge.title = t('{n} richiedono attenzione').replace('{n}', String(attention));
       overviewButton.append(badge);
     }

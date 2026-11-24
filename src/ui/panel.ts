@@ -85,7 +85,7 @@ export class Panel {
     const d = this.detail!;
     const isDir = d.kind === 'dir' || d.kind === 'external';
     const expanded = this.store.expanded.has(d.id);
-    const chips = [d.kind === 'external' ? d.kind : '', d.cls === 'folder' ? '' : d.cls, d.lang ?? ''].filter(Boolean).map((c) => ui`<span class="chip">${esc(c)}</span>`).join('');
+    const chips = [d.kind === 'external' ? d.kind : '', d.cls === 'folder' ? '' : d.cls, d.lang ?? ''].filter(Boolean).map((c) => ui`<span class="tag">${esc(c)}</span>`).join('');
     const metrics = [
       [tr('Dimensione'), fmtBytes(d.bytes)],
       isDir ? ['File', d.files.toLocaleString(tr('it-IT'))] : [tr('Righe'), d.lines ? d.lines.toLocaleString(tr('it-IT')) : '–'],
@@ -97,12 +97,12 @@ export class Panel {
         <div><span class="link" data-reveal="${d.project.nodeId}">${esc(d.project.label ?? d.project.name)}</span> <span class="muted">· ${esc(d.project.type)}</span></div>
         ${d.project.description ? ui`<div class="summary">${esc(d.project.description)}</div>` : ''}
         ${d.project.remote ? ui`<div class="mono muted">${esc(d.project.remote)}</div>` : ''}
-        ${d.project.technologies.length ? ui`<div class="chips" style="margin-top:6px">${d.project.technologies.slice(0, 14).map((t) => ui`<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
+        ${d.project.technologies.length ? ui`<div class="chips" style="margin-top:6px">${d.project.technologies.slice(0, 14).map((t) => ui`<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
       </section>` : '';
     const summary = d.summary || d.tags?.length ? ui`
       <section><h3>Descrizione</h3>
         ${d.summary ? ui`<div class="summary">${esc(d.summary)}</div>` : tr('<div class="muted">Nessuna descrizione. Usa «Menu app → Trova collegamenti con l\'AI» per farla scrivere al modello.</div>')}
-        ${d.tags?.length ? ui`<div class="chips" style="margin-top:6px">${d.tags.map((t) => ui`<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
+        ${d.tags?.length ? ui`<div class="chips" style="margin-top:6px">${d.tags.map((t) => ui`<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
       </section>` : '';
     const rels = this.renderRelations(d);
     const children = d.children.length ? ui`
@@ -123,7 +123,7 @@ export class Panel {
         <button class="close" title="Chiudi (Esc)">×</button>
         <h2>${esc(d.name)}</h2>
         <div class="path mono">${esc(shortPath(d.path))}</div>
-        <div class="chips" style="margin-top:8px">${d.area ? ui`<span class="chip solid">${esc(d.area.name)}</span>` : ''}${status ? ui`<span class="chip">${esc(statusLabel[status] ?? status)}</span>` : ''}${chips}${d.aggregate ? tr('<span class="chip">solo totale</span>') : ''}</div>
+        <div class="chips" style="margin-top:8px">${d.area ? ui`<span class="tag solid">${esc(d.area.name)}</span>` : ''}${status ? ui`<span class="tag">${esc(statusLabel[status] ?? status)}</span>` : ''}${chips}${d.aggregate ? tr('<span class="tag">solo totale</span>') : ''}</div>
       </div>
       <section>
         <div class="metrics">${metrics}
@@ -163,7 +163,7 @@ export class Panel {
         return ui`<div class="rel ${e.hidden ? 'hiddenrel' : ''}">
           <span class="dir">${dir}</span>
           <div><span class="name" data-reveal="${other}" title="${esc(n ? shortPath(n.path) : '')}">${esc(name)}</span>
-            <div class="meta"><span class="kind">${esc(EDGE_KIND_LABELS[e.kind] ?? e.kind)}</span>${e.verified ? '' : ui`<span class="inf">ipotizzato ${Math.round(e.confidence * 100)}%</span>`}${e.count > 1 ? ui` ×${e.count}` : ''}${e.origin !== 'scan' ? ui` · ${esc(e.origin)}` : ''}${ev ? ui` · ${esc(ev)}` : ''}</div></div>
+            <div class="meta"><span class="kind">${esc(EDGE_KIND_LABELS[e.kind] ?? e.kind)}</span>${e.verified ? '' : ui`<span class="tag inf">ipotizzato ${Math.round(e.confidence * 100)}%</span>`}${e.count > 1 ? ui` ×${e.count}` : ''}${e.origin !== 'scan' ? ui` · ${esc(e.origin)}` : ''}${ev ? ui` · ${esc(ev)}` : ''}</div></div>
           <button class="x" data-edge="${e.id}" data-hidden="${e.hidden ? 1 : 0}" title="${e.hidden ? tr('Ripristina') : tr('Nascondi o elimina')}">${e.hidden ? '↺' : '×'}</button>
         </div>`;
       }).join('');

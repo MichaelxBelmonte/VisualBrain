@@ -47,7 +47,7 @@ export async function openSettings(firstRun = false, section?: SettingsSection):
   dismantle?.();
   overlay.dataset.mode = 'settings'; overlay.classList.remove('hidden');
   let busy = false;
-  overlay.innerHTML = ui`<div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><nav class="settings-nav" aria-label="Sezioni"><h2 id="settings-title">Impostazioni</h2>${SECTIONS.map(([id, label]) => `<button type="button" data-section="${id}">${esc(tr(label))}<span class="settings-badge" data-badge="${id}" hidden></span></button>`).join('')}</nav><div class="settings-main"><div class="settings-head"><h3 data-heading></h3><button class="plain-icon" data-close aria-label="Chiudi">×</button></div><div class="settings-body" data-body></div></div></div>`;
+  overlay.innerHTML = ui`<div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><nav class="settings-nav" aria-label="Sezioni"><h2 id="settings-title">Impostazioni</h2>${SECTIONS.map(([id, label]) => `<button type="button" data-section="${id}">${esc(tr(label))}<span class="badge settings-badge" data-badge="${id}" hidden></span></button>`).join('')}</nav><div class="settings-main"><div class="settings-head"><h3 data-heading></h3><button class="plain-icon" data-close aria-label="Chiudi">×</button></div><div class="settings-body" data-body></div></div></div>`;
   const views = sectionViews(overlay.querySelector<HTMLElement>('[data-body]')!);
   const leave = () => { views.close(); document.removeEventListener('keydown', onKey, true); if (dismantle === leave) dismantle = null; };
   const close = () => { if (busy) return; leave(); overlay.classList.add('hidden'); overlay.innerHTML = ''; delete overlay.dataset.mode; };
@@ -220,7 +220,7 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
     const nameCell = (key: string, name: string) => renaming !== key ? `<b>${esc(name)}</b>`
       : ui`<form class="cli-rename" data-rename-form="${esc(key)}"><input name="name" maxlength="40" value="${esc(name)}" aria-label="Nome dell’account"><button class="btn small primary" type="submit">Salva</button><button class="btn small ghost" type="button" data-rename-cancel>Annulla</button></form>`;
     const renameButton = (key: string) => renaming === key ? '' : ui`<button class="btn small ghost" data-rename-start="${esc(key)}">Rinomina</button>`;
-    const pill = (tone: string, text: string) => `<span class="provider-pill" data-tone="${tone}"><i></i>${esc(text)}</span>`;
+    const pill = (tone: string, text: string) => `<span class="pill provider-pill" data-tone="${tone}"><i></i>${esc(text)}</span>`;
     const accountState = (signedIn: boolean | null) => signedIn === false ? pill('warn', tr('Accesso richiesto')) : signedIn === true ? pill('ok', tr('Connesso')) : pill('off', tr('Stato sconosciuto'));
     // The account the CLI uses on its own. Claude Code and Codex let you name it: the name is the label on the sessions.
     const mainRow = (c: AgentCli) => {
@@ -277,7 +277,7 @@ async function agents(root: HTMLElement, ctx: Ctx): Promise<void> {
       const text = installing ? steps[h.install!.step] || tr('Installazione in corso…') : h.install?.state === 'error' ? tr('Errore') : h.outdated ? ui`Aggiornamento ${h.latest ?? ''}` : h.installed ? tr('Installato') : h.canInstall ? tr('Non installato') : tr('Solo nel pacchetto Mac');
       const tone = h.installed && !h.outdated ? 'ok' : installing || h.outdated ? 'warn' : 'off';
       const button = installing ? '' : !h.installed ? ui`<button class="btn small primary" data-harness="${h.id}" ${h.canInstall ? '' : 'disabled'}>Installa</button>` : h.outdated ? ui`<button class="btn small" data-harness="${h.id}">Aggiorna</button>` : '';
-      return `<div class="cli-row"><div class="cli-summary static"><span class="cli-dot" data-tone="${tone}"></span><span class="cli-name"><b>${esc(h.label)}</b><small>${esc(h.version ? String(h.version).slice(0, 12) : tr('nel profilo di Visual Brain'))}</small></span><span class="cli-state" data-tone="${tone}" title="${esc(h.install?.error ? tr(h.install.error) : '')}">${esc(text)}</span></div><span class="cli-actions">${button}</span></div>`;
+      return `<div class="cli-row"><div class="cli-summary static"><span class="dot cli-dot" data-tone="${tone}"></span><span class="cli-name"><b>${esc(h.label)}</b><small>${esc(h.version ? String(h.version).slice(0, 12) : tr('nel profilo di Visual Brain'))}</small></span><span class="cli-state" data-tone="${tone}" title="${esc(h.install?.error ? tr(h.install.error) : '')}">${esc(text)}</span></div><span class="cli-actions">${button}</span></div>`;
     };
     const waiting = (ups ?? []).filter(updateWaiting);
     const ordered = [...clis].sort((a, b) => Number(!a.path) - Number(!b.path));
@@ -407,8 +407,8 @@ async function github(root: HTMLElement, ctx: Ctx): Promise<void> {
   const account = await api.githubRepos(1);
   if (!root.isConnected) return;
   const state = account.state === 'ok'
-    ? ui`<div class="cli-row"><div class="cli-summary static"><span class="cli-dot" data-tone="ok"></span><span class="cli-name"><b>${esc(account.login)}</b><small>github.com · gh</small></span><span class="cli-state" data-tone="ok">Collegato</span></div><span class="cli-actions"><button class="btn small ghost" data-gh="logout">Esci</button></span></div>`
-    : ui`<div class="cli-row"><div class="cli-summary static"><span class="cli-dot" data-tone="${account.state === 'signed-out' ? 'warn' : 'off'}"></span><span class="cli-name"><b>GitHub</b><small>${esc(tr(account.message))}</small></span></div><span class="cli-actions">${account.state === 'signed-out' ? ui`<button class="btn small primary" data-gh="login">Accedi</button>` : ''}</span></div>${account.state === 'signed-out' ? '' : ui`<p class="muted">Installa la CLI di GitHub: <code>brew install gh</code></p>`}`;
+    ? ui`<div class="cli-row"><div class="cli-summary static"><span class="dot cli-dot" data-tone="ok"></span><span class="cli-name"><b>${esc(account.login)}</b><small>github.com · gh</small></span><span class="cli-state" data-tone="ok">Collegato</span></div><span class="cli-actions"><button class="btn small ghost" data-gh="logout">Esci</button></span></div>`
+    : ui`<div class="cli-row"><div class="cli-summary static"><span class="dot cli-dot" data-tone="${account.state === 'signed-out' ? 'warn' : 'off'}"></span><span class="cli-name"><b>GitHub</b><small>${esc(tr(account.message))}</small></span></div><span class="cli-actions">${account.state === 'signed-out' ? ui`<button class="btn small primary" data-gh="login">Accedi</button>` : ''}</span></div>${account.state === 'signed-out' ? '' : ui`<p class="muted">Installa la CLI di GitHub: <code>brew install gh</code></p>`}`;
   root.innerHTML = ui`${state}<p class="muted">Serve per PR e controlli CI nella scheda Codice. Il collegamento di un repository a una cartella si fa da Codice, progetto per progetto.</p><p class="work-launch-error" role="alert"></p>`;
   const error = root.querySelector('[role=alert]')!;
   root.querySelectorAll<HTMLButtonElement>('[data-gh]').forEach(b => b.addEventListener('click', async () => {

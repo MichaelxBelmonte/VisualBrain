@@ -64,6 +64,22 @@ kbd { font: 11px var(--mono); border: 1px solid var(--g3); border-radius: 2px; p
 .mono { font-family: var(--mono); font-size: 12px; }
 .hidden { display: none !important; }
 
+/* Kit UI primitives (Badge, Pill, Tag, Chip, Dot). One look each; the old class names further down only place them
+   or keep what is theirs (a squad colour, a git state, the tint of a provider state). */
+.dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--tone, var(--g4)); }
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-pill); background: var(--role-attention); color: var(--bg); font: 600 11px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.badge[hidden] { display: none; }
+.pill { --tone: var(--g4); display: inline-flex; align-items: center; gap: var(--space-2); height: 22px; padding: 0 9px 0 7px; border: 1px solid var(--g3); border-radius: var(--radius-pill); background: var(--bg); color: var(--fg); font: 500 12px/1 var(--font); white-space: nowrap; }
+.pill > i { flex: none; width: 6px; height: 6px; border-radius: var(--radius-pill); background: var(--tone); }
+.tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--g3); border-radius: var(--radius-xs); color: var(--g5); font: 11px/1 var(--mono); white-space: nowrap; }
+.tag.solid { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.chip { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-h-sm); padding: 0 10px; border: 1px solid var(--g3); border-radius: var(--radius-xs); background: var(--bg); color: var(--g5); font: 500 12px/1 var(--font); white-space: nowrap; cursor: pointer; }
+.chip.sm { height: var(--control-h-xs); padding: 0 8px; }
+.chip:hover:not(:disabled) { border-color: var(--g4); color: var(--fg); }
+.chip:is([aria-pressed="true"], [aria-checked="true"]) { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.chip:disabled { opacity: .4; cursor: not-allowed; }
+.chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
 #app { display: grid; height: 100%; grid-template-rows: var(--top-h) 1fr auto var(--status-h); grid-template-columns: 1fr auto; grid-template-areas: "top top" "stage panel" "term panel" "status status"; }
 #stage { grid-area: stage; position: relative; overflow: hidden; }
 #app.stats-open { grid-template-columns: minmax(0,1fr); }
@@ -102,8 +118,6 @@ kbd { font: 11px var(--mono); border: 1px solid var(--g3); border-radius: 2px; p
 .panel section { padding: 10px 16px; border-bottom: 1px solid var(--g2); }
 .panel h3 { margin: 0 0 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--g4); }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.chip { font-size: 11px; border: 1px solid var(--g3); padding: 1px 6px; color: var(--g5); }
-.chip.solid { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
 .metric .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--g4); }
 .metric .v { font-family: var(--mono); font-size: 12px; }
@@ -123,7 +137,7 @@ textarea.prompt:focus, input:focus { outline: none; border-color: var(--fg); }
 .rel .name:hover { text-decoration: underline; }
 .rel .meta { font-size: 11px; color: var(--g4); word-break: break-word; }
 .rel .meta .kind { font-family: var(--mono); color: var(--g5); }
-.rel .meta .inf { border: 1px dashed var(--g4); padding: 0 4px; margin-left: 4px; }
+.rel .meta .inf { margin-left: 4px; border-style: dashed; }
 .rel .x { border: 0; background: none; color: var(--g4); cursor: pointer; padding: 0 2px; }
 .rel .x:hover { color: var(--fg); }
 .rel.hiddenrel { opacity: 0.4; }
@@ -340,11 +354,7 @@ button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2p
 .member-field { display: flex; flex-direction: column; gap: 4px; font-size: 10px; color: var(--g4); min-width: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .chips.hidden { display: none; }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px solid var(--g3); background: var(--bg); color: var(--fg); border-radius: 2px; font-size: 12px; cursor: pointer; }
-.chip:hover:not(:disabled) { border-color: var(--fg); }
-.chip[aria-checked="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.chip:disabled { opacity: .4; cursor: not-allowed; }
-.chip:focus-visible, .member-field input:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+.member-field input:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
 .agent-mark { font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 4px; border: 1px solid currentColor; border-radius: 2px; }
 .role-tag { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; padding-top: 5px; }
 .role-tag i { display: inline-block; width: 8px; height: 8px; border: 1px solid var(--tone); background: var(--tone); border-radius: 50%; }
@@ -878,7 +888,6 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .git-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--g2); }
 .git-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .git-title strong { font-size: 14px; }
-.git-chip { font: 12px var(--mono); border: 1px solid var(--g3); border-radius: 2px; padding: 1px 8px; }
 .git-meta { color: var(--g4); font-size: 12px; }
 .git-meta.warn { color: var(--role-blocked); }
 .git-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -914,9 +923,9 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .git-lanes circle.merge { fill: var(--bg) !important; }
 .git-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .git-ref { font: 10px var(--mono); border: 1px solid var(--g3); border-radius: 2px; padding: 0 4px; margin-right: 5px; }
-.git-ref.head { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.git-ref.remote { color: var(--g4); }
-.git-ref.tag { border-style: dashed; }
+.git-ref.ref-head { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.git-ref.ref-remote { color: var(--g4); }
+.git-ref.ref-tag { border-style: dashed; }
 .git-author, .git-date { color: var(--g4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .git-hash { font: 11px var(--mono); color: var(--g4); }
 .git-detail { width: min(380px, 34vw); overflow: auto; border-left: 1px solid var(--g2); padding: 10px 14px 18px; }
@@ -1007,7 +1016,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .code-pathbar:empty { display: none; }
 .code-crumbs { font-family: var(--mono); font-size: 11px; color: var(--g5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .code-sep { color: var(--g3); padding: 0 3px; }
-.code-badge { font-size: 10px; padding: 1px 6px; border-radius: 0; border: 1px solid currentColor; white-space: nowrap; }
+.code-badge { border-color: currentColor; }
 .code-badge.st-M, .code-badge.st-R { color: var(--role-attention); }
 .code-badge.st-A, .code-badge.st-U { color: var(--role-active); }
 .code-badge.st-D, .code-badge.st-C { color: var(--role-blocked); }
@@ -1072,7 +1081,6 @@ input.switch:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; 
 
 /* Search types, persisted team configurations and project connection. */
 .search-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--g2); }
-.search-filters .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
 .launch-saved { font-size: 12px; }
 .launch-saved label, .github-field { display: flex; align-items: center; gap: 12px; }
 .launch-saved select, .github-field select, .github-field input { min-width: 0; flex: 1; padding: 7px; background: var(--bg); color: var(--fg); border: 1px solid var(--g3); border-radius: 2px; }
@@ -1094,8 +1102,8 @@ input.switch:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; 
 [data-team-color="2"] { --squad: var(--squad-2); } [data-team-color="3"] { --squad: var(--squad-3); }
 [data-team-color="4"] { --squad: var(--squad-4); } [data-team-color="5"] { --squad: var(--squad-5); }
 [data-team-color="6"] { --squad: var(--squad-6); } [data-team-color="7"] { --squad: var(--squad-7); }
-.team-swatch { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--squad, var(--g4)); }
-.team-swatch.brain { width: auto; height: auto; background: none; color: var(--role-orch); font-size: 12px; line-height: 1; }
+.team-swatch { --tone: var(--squad, var(--g4)); }
+.team-swatch.brain { display: inline-block; flex: none; color: var(--role-orch); font-size: 12px; line-height: 1; }
 
 /* Map: squads as coloured bands inside the node card, the Main Brain above them. */
 
@@ -1147,7 +1155,6 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .board-row:has(> .board-memory) { margin-top: 10px; align-items: center; }
 .board-delivery > span, .board-memory > span { min-width: 150px; }
 .board-delivery > span, .board-memory > span { font-size: 12px; color: var(--g4); margin-right: 4px; }
-.board-delivery .chip, .board-memory .chip { padding: 4px 10px; font-size: 11px; }
 [data-memory-hint] { flex: 1 1 260px; align-self: center; font-size: 11px; }
 
 .member-chip { display: inline-grid; grid-template-columns: 7px auto; align-items: center; gap: 0 7px; max-width: 260px; padding: 5px 10px; border: 1px solid var(--g2); border-radius: 0; background: var(--bg); font: 11px var(--mono); text-align: left; cursor: pointer; }
@@ -1177,8 +1184,7 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .sort-card footer { display: flex; flex-wrap: wrap; gap: 4px; }
 .sort-card footer:empty { display: none; }
 .sort-card footer .btn { min-height: 24px; padding: 2px 7px; font-size: 10px; }
-.kind-chip { padding: 1px 7px; border: 1px solid var(--kind, var(--g3)); border-radius: 0; background: color-mix(in srgb, var(--kind, var(--g3)) 12%, transparent); color: var(--fg); font-size: 10px; white-space: nowrap; cursor: pointer; }
-.kind-chip:disabled { cursor: default; }
+.kind-chip { border-color: var(--kind, var(--g3)); background: color-mix(in srgb, var(--kind, var(--g3)) 12%, transparent); color: var(--fg); }
 .sort-note { width: 100%; padding: 5px 7px; border: 1px solid var(--g2); border-radius: 2px; background: var(--g1); color: var(--fg); font-size: 11px; }
 .sort-note:focus { border-color: var(--g4); outline: none; }
 .forwarded { color: var(--role-active) !important; }
@@ -1207,7 +1213,6 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .proposal-card small { font-size: 10px; color: var(--g4); }
 .proposal-card p { margin: 0; font-size: 12px; }
 .proposal-members { display: flex; flex-wrap: wrap; gap: 4px; }
-.proposal-members .chip { padding: 2px 7px; font-size: 10px; cursor: default; }
 .proposal-card footer { display: flex; gap: 6px; }
 @media (max-width: 900px) {
   .board { padding: 14px 16px 32px; }
@@ -1224,7 +1229,6 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .settings-nav button:hover { background: var(--g2); }
 .settings-nav button[aria-current="true"] { background: var(--fg); color: var(--bg); }
 .settings-nav button:focus-visible { outline: 2px solid var(--fg); outline-offset: -2px; }
-.settings-badge { font-size: 11px; min-width: 16px; padding: 0 4px; text-align: center; background: var(--role-attention); color: var(--bg); border-radius: 0; }
 .settings-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .settings-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--g2); }
 .settings-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
@@ -1269,9 +1273,9 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .cli-summary.static { cursor: default; }
 .cli-summary:not(.static):hover { background: var(--g1); }
 .cli-summary:focus-visible { outline: 2px solid var(--fg); outline-offset: -2px; }
-.cli-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--g3); }
-.cli-dot[data-tone="ok"] { background: var(--role-active); }
-.cli-dot[data-tone="warn"] { background: var(--role-attention); }
+.cli-dot { --tone: var(--g3); }
+.cli-dot[data-tone="ok"] { --tone: var(--role-active); }
+.cli-dot[data-tone="warn"] { --tone: var(--role-attention); }
 .cli-name { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .cli-name b { font-weight: 500; }
 .cli-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1315,8 +1319,7 @@ header.board-row .muted { font-size: 11px; flex: 1 1 280px; }
 .provider-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .provider-title h4 { margin: 0; font-size: 14px; font-weight: 600; }
 .provider-title small { color: var(--g4); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.provider-pill { --tone: var(--g3); flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 2px; background: color-mix(in srgb, var(--tone) 14%, transparent); font-size: 11.5px; font-weight: 500; white-space: nowrap; }
-.provider-pill > i { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }
+.provider-pill { --tone: var(--g3); flex: none; border-color: transparent; background: color-mix(in srgb, var(--tone) 14%, transparent); }
 .provider-pill[data-tone="ok"] { --tone: var(--role-active); }
 .provider-pill[data-tone="warn"] { --tone: var(--role-attention); }
 .provider-update { margin: 0 14px 12px; padding: 7px 12px; border-radius: 0; background: var(--g1); }
@@ -1404,7 +1407,6 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .lavoro-filters .squad-tab.selected { background: var(--g2); color: var(--fg); box-shadow: none; }
 .lavoro-filters .squad-tab small { font-size: 10.5px; }
 .lavoro-filters .squad-tab.add { border: 0; color: var(--g4); }
-.needs-badge { display: inline-block; min-width: 16px; padding: 0 4px; border-radius: 0; background: var(--role-attention); color: var(--bg); font-size: 10.5px; line-height: 16px; text-align: center; font-weight: 600; }
 .needs-badge[hidden] { display: none; }
 .squad-tab .needs-badge { grid-row: 1 / span 2; grid-column: 3; }
 #work-board .needs-badge { margin-left: 4px; }
@@ -1477,7 +1479,6 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .lavoro-card[data-status="done"] { padding: 7px 12px; border-color: transparent; background: var(--g1); }
 .lavoro-card[data-status="done"]:hover, .lavoro-card[data-status="done"].open { border-color: var(--g3); }
 .lavoro-card[data-status="done"] strong { font-weight: 500; color: var(--g5); }
-.label-chip { font-size: 10.5px; padding: 1px 6px; }
 .lavoro-messages { border-top: 1px solid var(--g2); padding: 12px 2px 0; }
 .lavoro-messages > summary { cursor: pointer; font-size: 12.5px; font-weight: 500; color: var(--g5); }
 .lavoro-messages > summary:hover, .lavoro-messages[open] > summary { color: var(--fg); }
@@ -1515,8 +1516,6 @@ select.lavoro-node { padding: 5px 8px; border: 1px solid var(--g3); border-radiu
 .card-row.card-result { align-items: start; }
 .card-key { font-size: 11px; color: var(--g4); }
 .card-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.card-chips .chip { padding: 2px 9px; font-size: 11.5px; border-radius: 2px; }
-.card-chips .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .card-labels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .card-labels input, .lavoro-card .card-scope { min-width: 0; padding: 3px 7px; border: 1px solid var(--g2); border-radius: 2px; background: transparent; color: var(--fg); font: inherit; font-size: 12px; }
 .card-labels input { width: 110px; }
