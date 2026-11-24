@@ -1,9 +1,10 @@
 // Durable task API, model/effort validation and safe harness dispatch. No model calls.
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { constants, copyFileSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, readlinkSync, realpathSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
 import { DEFAULTS } from '../src/server/config.ts';
 import { Db } from '../src/server/db.ts';
@@ -84,6 +85,41 @@ try {
   assert.deepEqual(JSON.parse(readFileSync(log, 'utf8').trim()), ['headless', '--', manifest.prompt]);
   assert.ok(!existsSync(join(temp, 'injected')));
   console.log('PASS installed/missing harnesses, auth and input guards, shell-safe prompt forwarding; no team role');
+
+  // A server that runs inside the app: the runner of a harness terminal, and the `node` a harness finds on its PATH, are
+  // the copy of Node kept in the profile. A harness left open through an update keeps nothing of the old app in use.
+  if (process.platform === 'darwin') {
+    const app = join(temp, 'Live/Visual Brain.app'), runtime = join(app, 'Contents/Resources/runtime');
+    mkdirSync(join(runtime, 'server/src/server'), { recursive: true });
+    const bundled = join(runtime, `node-${process.arch}`), runner = join(runtime, 'server/src/server/harness-runner.mjs');
+    copyFileSync(process.execPath, bundled, constants.COPYFILE_FICLONE);
+    copyFileSync(fileURLToPath(new URL('../src/server/harness-runner.mjs', import.meta.url)), runner);
+    const ready = join(temp, 'dsh-ready'), stop = join(temp, 'dsh-stop');
+    // a harness that stays open, started through `node` on PATH as the real dsh is
+    writeFileSync(harnessPaths(cfg).deepseek, `#!/usr/bin/env node
+const fs = require('node:fs');
+fs.writeFileSync(process.env.VB_READY, process.execPath);
+const wait = setInterval(() => { if (fs.existsSync(process.env.VB_STOP)) clearInterval(wait); }, 50);
+`, { mode: 0o755 });
+    const own = process.execPath;
+    process.execPath = bundled;
+    try { await launchHarness(terms, cfg, detail, null, { harness: 'deepseek', action: 'run', prompt: 'task' }); } finally { process.execPath = own; }
+    const node = join(temp, 'agent-runtime/node');
+    assert.equal(spawned.file, node, 'the runner starts on the Node of the profile');
+    assert.equal(readlinkSync(join(temp, 'harnesses/tools/node')), node, 'and so does what a harness starts with `node`');
+    const child = spawn(spawned.file, [runner, spawned.args[1]], { cwd: temp, stdio: 'ignore', env: { ...spawned.env, VB_READY: ready, VB_STOP: stop } });
+    const ended = new Promise(done => child.once('exit', done));
+    try {
+      for (let i = 0; i < 200 && !existsSync(ready); i++) await new Promise(r => setTimeout(r, 50));
+      assert.equal(readFileSync(ready, 'utf8'), realpathSync(node), 'the harness itself runs on that Node');
+      const users = spawnSync('/usr/sbin/lsof', ['-F', 'p', '+D', app], { encoding: 'utf8' }).stdout;
+      assert.equal(users.split('\n').filter(line => line.startsWith('p')).length, 0, 'neither the runner nor the harness keeps a file of the app open');
+      rmSync(app, { recursive: true, force: true });   // the copy of the app they were started from leaves the disk
+      writeFileSync(stop, '');
+      assert.equal(await ended, 0, 'and the run ends cleanly without it');
+    } finally { child.kill(); }
+    console.log('PASS harness terminal, live: runner and harness on the Node of the profile, nothing of the app held, clean end after the app copy is removed');
+  }
 } finally {
   db.close();
   if (oldHarnessRoot === undefined) delete process.env.VISUAL_BRAIN_HARNESSES_DIR; else process.env.VISUAL_BRAIN_HARNESSES_DIR = oldHarnessRoot;

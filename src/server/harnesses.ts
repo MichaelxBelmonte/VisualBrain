@@ -7,7 +7,7 @@ import type { Config } from './config.ts';
 import type { NodeDetail } from '../shared/types.ts';
 import type { TerminalStore } from './terminals.ts';
 import { boundedText, TeamError } from './team.ts';
-import { buildContext, workingDir } from './launch.ts';
+import { bridgeNode, buildContext, workingDir } from './launch.ts';
 import { HARNESS_SPECS, harnessExecutable, harnessInstalled, harnessInstallState, harnessOutdated, harnessVersion, installerAvailable, harnessEnvironment, type HarnessName } from './harness-installer.ts';
 
 export type { HarnessName } from './harness-installer.ts';
@@ -62,7 +62,10 @@ export async function launchHarness(terms: TerminalStore, cfg: Config, detail: N
   writeFileSync(manifest, JSON.stringify({ harness, executable, cwd, prompt: context, taskPrompt, runId, runDir, contextFile, action: body.action, maxCalls, language: cfg.language }), { mode: 0o600 });
   const runner = join(dirname(fileURLToPath(import.meta.url)), 'harness-runner.mjs');
   const env = harnessEnvironment(cfg);
-  const term = await terms.spawn({ agent: 'shell', cwd, file: process.execPath, args: [runner, manifest], env: { PATH: env.PATH! }, nodeId: detail.id, title: `${HARNESS_LABELS[harness]} · ${detail.name}` });
+  // The runner lives as long as the terminal (it waits for the harness, then for the shell it leaves open): on the Node
+  // kept in the profile, like the MCP bridge of a session, it does not keep a copy of the app in use across an update.
+  // It imports only Node's own modules and reads only its manifest, which is in the profile.
+  const term = await terms.spawn({ agent: 'shell', cwd, file: bridgeNode(cfg.dataDir), args: [runner, manifest], env: { PATH: env.PATH! }, nodeId: detail.id, title: `${HARNESS_LABELS[harness]} · ${detail.name}` });
   term.info.name = HARNESS_LABELS[harness];
   return { termId: term.info.id, info: term.info };
 }
