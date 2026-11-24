@@ -30,9 +30,10 @@ export const BUNDLE_ID = 'com.jethr.visualbrain';
 const MAX_ARCHIVE = 400 * 1024 * 1024;
 const CHECK_EVERY = 6 * 60 * 60 * 1000;
 /**
- * How often the copies an installation moved aside are looked at again. A session started before an update keeps the copy
- * it was started from in use (its MCP bridge runs on the Node inside that copy) for as long as it stays open, which can be
- * days: the copy must leave when that session ends, not at the next launch or update.
+ * How often the copies an installation moved aside are looked at again. A copy can stay in use long after the update: by
+ * a session whose MCP bridge was started on the Node inside it (every session opened by a version up to 0.2.67; see
+ * bridgeNode in launch.ts) or by a harness terminal, for as long as that session stays open, which can be days. The copy
+ * must leave when its last user ends, not at the next launch or update.
  */
 export const SWEEP_EVERY = 30 * 60 * 1000;
 const APP_NAME = 'Visual Brain.app';

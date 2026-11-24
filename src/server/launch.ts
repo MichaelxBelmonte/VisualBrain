@@ -1,5 +1,5 @@
 // Launching Claude Code, Codex CLI or Hermes from a node, with the node's context as the first prompt.
-import { accessSync, closeSync, constants, mkdirSync, openSync, readdirSync, readSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { accessSync, chmodSync, closeSync, constants, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
@@ -11,6 +11,7 @@ import type { TerminalStore } from './terminals.ts';
 import { teamInstructions } from './team.ts';
 import { accountById, accountEnv, agentHome } from './accounts.ts';
 import { sharedClaudeSettings, syncShared } from './account-share.ts';
+import { appBundleOf } from './updater.ts';
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -136,7 +137,7 @@ export function launchEmbedded(terms: TerminalStore, agent: AgentName, cfg: Conf
   // Claude takes its conversation id from us, so "Riprendi" finds it without guessing; Codex is found later from its own records.
   const resumeId = agent === 'claude' ? randomUUID() : undefined;
   if (resumeId) command.args.unshift('--session-id', resumeId);
-  const { file, args } = embeddedCommand(agent, command, options.role, memory, options.account, cwd);
+  const { file, args } = embeddedCommand(agent, command, options.role, memory, options.account, cwd, cfg.dataDir);
   return terms.spawn({ ...options, id, teamToken, resumeId, branch, agent, cwd, file, args, env: embeddedEnv(cfg, agent, detail.id, id, teamToken, options.role, memory, options.account), title: `${agentTitle(agent, options.account)} · ${detail.name}`, nodeId: detail.id, cols: size?.cols, rows: size?.rows });
 }
 
@@ -155,12 +156,45 @@ export function resumeEmbedded(terms: TerminalStore, cfg: Config, info: Terminal
   const prompt = notice !== undefined ? notice || undefined : info.role ? (cfg.language === 'en'
     ? 'Visual Brain restarted this session after its process ended. Read the board before resuming. Check each task’s current owner, blocker and checkpoint. Claim available work before starting.'
     : 'Visual Brain ha riavviato questa sessione dopo la chiusura del processo. Prima di riprendere, rileggi la bacheca. Verifica proprietario, blocco e checkpoint di ogni incarico. Rivendica il lavoro disponibile prima di iniziare.') : undefined;
-  const { file, args } = embeddedCommand(agent, resumeCommand(agent, cfg, info.cwd, resumeId, options, prompt), info.role, memory, info.account, info.cwd);
+  const { file, args } = embeddedCommand(agent, resumeCommand(agent, cfg, info.cwd, resumeId, options, prompt), info.role, memory, info.account, info.cwd, cfg.dataDir);
   return terms.spawn({ ...options, id: info.id, createdAt: info.createdAt, branch: info.branch, teamToken, seenMessage, resumeId, agent, cwd: info.cwd, file, args, env: embeddedEnv(cfg, agent, info.nodeId ?? null, info.id, teamToken, info.role, memory, info.account), title: info.title, nodeId: info.nodeId, cols: size?.cols, rows: size?.rows });
 }
 
+/**
+ * The Node the MCP bridge of a session runs on. A bridge lives as long as its session, across updates of the app; started
+ * on the Node inside the app, it kept the whole copy of the app it came from in use, and every update left one more copy
+ * (350 MB) in running-app-backups for as long as a session opened before it stayed open. The executable is the only file a
+ * bridge keeps open (team-mcp.mjs imports nothing but node:readline and reads no file), so it runs on one copy of that
+ * Node kept in the profile, `agent-runtime/node`. The copy is replaced only when the app brings another Node version, with
+ * a rename: a bridge already running keeps the file it started from until it ends.
+ * Outside an app bundle (a development run) no copy of the app can be held: the bridge runs on this server's own Node.
+ */
+export function bridgeNode(dataDir: string | undefined, execPath = process.execPath, version = `${process.version} ${process.arch}`): string {
+  if (!dataDir || !appBundleOf(execPath)) return execPath;
+  try {
+    const dir = join(dataDir, 'agent-runtime'), node = join(dir, 'node'), stamp = join(dir, 'node.version');
+    let kept = '';
+    try { kept = readFileSync(stamp, 'utf8'); } catch { /* first time */ }
+    if (kept !== version || !existsSync(node)) {
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      const fresh = `${node}.new-${process.pid}`;
+      rmSync(fresh, { force: true });
+      copyFileSync(execPath, fresh, constants.COPYFILE_FICLONE);
+      chmodSync(fresh, 0o700);
+      renameSync(fresh, node);
+      writeFileSync(`${stamp}.new-${process.pid}`, version, { mode: 0o600 });
+      renameSync(`${stamp}.new-${process.pid}`, stamp);
+    }
+    return node;
+  } catch (error) {
+    // the bridge still works from the app, it only keeps that copy in use
+    console.warn('[launch] Node per il collegamento MCP non copiato nel profilo:', (error as Error).message);
+    return execPath;
+  }
+}
+
 /** Claude and Codex get the visual_brain MCP bridge (and Claude the turn hooks of a team member); Codex starts from the login shell. */
-function embeddedCommand(agent: AgentName, command: { file: string; args: string[] }, role?: AgentRole, memory?: string, account?: string, cwd = ''): { file: string; args: string[] } {
+function embeddedCommand(agent: AgentName, command: { file: string; args: string[] }, role?: AgentRole, memory?: string, account?: string, cwd = '', dataDir?: string): { file: string; args: string[] } {
   let { file, args } = command;
   // An extra account that borrows skills and plugins from the main one: links made now, so a new entry of the main
   // folder is seen too. A failure (a file in the way) never stops the launch.
@@ -168,6 +202,7 @@ function embeddedCommand(agent: AgentName, command: { file: string; args: string
   if (borrowing && borrowing.agent === agent) try { syncShared(borrowing); } catch (error) { console.warn('[account] condivisione non aggiornata:', (error as Error).message); }
   if (agent === 'codex' || agent === 'claude') {
     const bridge = fileURLToPath(new URL('./team-mcp.mjs', import.meta.url));
+    const node = bridgeNode(dataDir);
     const variables = ['VB_EXPLORE_URL', ...(role ? ['VB_STATE_URL', 'VB_SESSION_ID', 'VB_TEAM_TOKEN'] : [])];
     if (agent === 'codex') {
       // Overrides go after the subcommand, so `codex resume` reads them too.
@@ -180,12 +215,12 @@ function embeddedCommand(agent: AgentName, command: { file: string; args: string
       ]) : [];
       args = [...args.slice(0, at),
         ...turnHooks,
-        '-c', `mcp_servers.visual_brain.command=${JSON.stringify(process.execPath)}`,
+        '-c', `mcp_servers.visual_brain.command=${JSON.stringify(node)}`,
         '-c', `mcp_servers.visual_brain.args=${JSON.stringify([bridge])}`,
         '-c', `mcp_servers.visual_brain.env_vars=${JSON.stringify(variables)}`,
         ...args.slice(at)];
     } else args = [...claudeSettingsFlag(role, memory, account, cwd), '--mcp-config', JSON.stringify({ mcpServers: { visual_brain: {
-      type: 'stdio', command: process.execPath, args: [bridge],
+      type: 'stdio', command: node, args: [bridge],
       env: Object.fromEntries(variables.map(name => [name, '${' + name + '}'])),
     } } }), ...args];
   }
