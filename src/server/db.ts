@@ -281,8 +281,10 @@ export class Db {
    * Rows marked before `deleted_at` existed start waiting at the first call.
    * The candidates are listed once, then removed `chunk` at a time, each chunk in its own short transaction: other
    * connections can write in between and the write-ahead log never has to hold the whole clean-up.
+   * `keep`: rows that stay whatever their age, because something outside this database is filed under their id (see
+   * profileNodes in cli.ts).
    */
-  pruneDeleted(now = Date.now(), filesAfterMs = PRUNE_FILES_AFTER_MS, dirsAfterMs = PRUNE_DIRS_AFTER_MS, chunk = 50_000): number {
+  pruneDeleted(now = Date.now(), filesAfterMs = PRUNE_FILES_AFTER_MS, dirsAfterMs = PRUNE_DIRS_AFTER_MS, chunk = 50_000, keep: readonly number[] = []): number {
     // `NOT attached` is checked when the candidates are listed and again when each chunk is removed: a row that got a
     // note, or whose path came back, between the two is left alone
     const free = `n.deleted = 1 AND n.kind IN ('file', 'dir', 'symlink')
@@ -297,6 +299,7 @@ export class Db {
     this.exec('DELETE FROM prune_ids');
     this.run(`INSERT INTO prune_ids SELECT n.id FROM nodes n
       WHERE ${free} AND n.deleted_at <= CASE n.kind WHEN 'dir' THEN ?2 ELSE ?1 END`, now - filesAfterMs, now - dirsAfterMs);
+    if (keep.length) this.run('DELETE FROM prune_ids WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(keep));
     let removed = 0;
     for (;;) {
       const done = this.tx(() => {
