@@ -8,8 +8,9 @@
 // open file valid) and the new bundle is cloned at the same path: the running server keeps its processes and the next
 // reload (⌘R) already serves the new UI from the same path. Backend changes and the new engine start with the next full
 // launch, which is the only moment sessions end. The moved-aside bundle goes to the profile's running-app-backups, the same
-// folder the app's updater uses: it is deleted by the next update (or this one, or the app at its next start) as soon as no
-// process uses it any more, and leaves Launch Services with it. Nothing accumulates.
+// folder the app's updater uses: it is deleted by the next update (or this one, or the app at its next start and then every
+// half hour) as soon as no process uses it any more, and leaves Launch Services with it. A session opened before the update
+// keeps its copy in use until it is closed.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';

@@ -257,6 +257,28 @@ if (process.platform === 'darwin') {
     holder.kill(); await new Promise(r => holder.once('exit', r));
     await u.cleanup();
     eq(readdirSync(join(temp, 'good/running-app-backups')).length, 0, 'it is removed once no process uses it: always one app on disk');
+    // While the app runs: a session opened before an update keeps its copy in use for as long as it stays open, and the
+    // copy leaves by itself when that session ends, without waiting for the next launch or the next update.
+    {
+      const periodic = make('periodic', async () => { throw new Error('offline'); }, { sweepEvery: 150 });
+      const copy = join(temp, 'periodic/running-app-backups/20260101000000');
+      const idle = join(temp, 'periodic/running-app-backups/20260102000000');
+      for (const dir of [copy, idle]) { mkdirSync(join(dir, 'Visual Brain.app/Contents/Resources'), { recursive: true }); writeFileSync(join(dir, 'Visual Brain.app/Contents/Resources/marker.txt'), 'old'); }
+      const session = (await import('node:child_process')).spawn('/bin/sh', ['-c', 'cd "$0" && exec sleep 30', join(copy, 'Visual Brain.app/Contents/Resources')], { stdio: 'ignore' });
+      await new Promise(r => setTimeout(r, 300));
+      periodic.start();
+      for (let i = 0; i < 80 && existsSync(idle); i++) await new Promise(r => setTimeout(r, 50));
+      await new Promise(r => setTimeout(r, 400));
+      eq([existsSync(idle), existsSync(copy)], [false, true], 'the periodic cleanup removes a copy nobody uses and keeps the one a session still uses');
+      session.kill(); await new Promise(r => session.once('exit', r));
+      for (let i = 0; i < 120 && existsSync(copy); i++) await new Promise(r => setTimeout(r, 50));
+      ok(!existsSync(copy), 'and removes that one too, by itself, once the session has ended');
+      periodic.stop();
+      mkdirSync(join(copy, 'Visual Brain.app'), { recursive: true });
+      await new Promise(r => setTimeout(r, 500));
+      ok(existsSync(copy), 'a stopped updater no longer cleans');
+      rmSync(copy, { recursive: true, force: true });
+    }
     ok(!existsSync(join(temp, 'good/updates', 'Visual-Brain-0.2.6-mac-universal.zip')), 'the downloaded package is removed after installing');
     await rejects(u.install(), /Nessun aggiornamento pronto/, 'installing twice is refused');
     eq(u.snapshot.progress, null, 'no progress is left behind after the download');

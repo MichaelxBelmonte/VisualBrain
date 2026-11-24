@@ -29,6 +29,12 @@ export const FEED_URL = `https://github.com/${UPDATE_REPO}/releases/latest/downl
 export const BUNDLE_ID = 'com.jethr.visualbrain';
 const MAX_ARCHIVE = 400 * 1024 * 1024;
 const CHECK_EVERY = 6 * 60 * 60 * 1000;
+/**
+ * How often the copies an installation moved aside are looked at again. A session started before an update keeps the copy
+ * it was started from in use (its MCP bridge runs on the Node inside that copy) for as long as it stays open, which can be
+ * days: the copy must leave when that session ends, not at the next launch or update.
+ */
+export const SWEEP_EVERY = 30 * 60 * 1000;
 const APP_NAME = 'Visual Brain.app';
 /** Errors of a path that cannot be changed (read-only volume, permissions): the update goes to Applications instead. */
 const LOCKED = new Set(['EROFS', 'EACCES', 'EPERM']);
@@ -224,6 +230,8 @@ export interface UpdaterOptions {
   quit?: (() => void) | null;
   /** Profile the reopened app must use (see reopenProfile); null for the default one. */
   profile?: string | null;
+  /** Interval of the periodic cleanup (default SWEEP_EVERY). Tests pass a short one. */
+  sweepEvery?: number;
 }
 
 /** Resolves once the process runs; a failure to start (EAGAIN, missing /bin/sh) rejects instead of being an unhandled 'error'. */
@@ -249,13 +257,14 @@ export class Updater {
   /** A newer version downloading behind the one that is ready (exposed for tests). */
   replacing: Promise<void> | null = null;
   private timer: NodeJS.Timeout | null = null;
+  private sweeper: NodeJS.Timeout | null = null;
   state: UpdateState;
 
   constructor(options: UpdaterOptions) {
     this.o = {
       execPath: process.execPath, enabled: startedByShell(), feedUrl: FEED_URL, publicKey: UPDATE_PUBLIC_KEY, fetchImpl: fetch, persistentTerminals: false,
       applicationFolders: ['/Applications', join(homedir(), 'Applications')], shellPid: process.ppid,
-      spawnImpl: startedByShell() ? spawnDetached : null, profile: reopenProfile(),
+      spawnImpl: startedByShell() ? spawnDetached : null, profile: reopenProfile(), sweepEvery: SWEEP_EVERY,
       ...options,
     };
     const given = options.bundle ?? process.env.VISUAL_BRAIN_APP ?? appBundleOf(this.o.execPath);
@@ -274,15 +283,24 @@ export class Updater {
   private get updatesDir(): string { return join(this.o.dataDir, 'updates'); }
   private get asideDir(): string { return join(this.o.dataDir, 'running-app-backups'); }
 
-  /** Checks 30 s after start and then every 6 hours; also removes copies left by a previous installation. */
+  /**
+   * Checks 30 s after start and then every 6 hours; also removes the copies left by previous installations, now and then
+   * every half hour (see SWEEP_EVERY).
+   */
   start(): void {
     if (!this.state.enabled) return;
     void this.cleanup();
     setTimeout(() => void this.check().catch(() => {}), 30_000).unref();
     this.timer = setInterval(() => void this.check().catch(() => {}), CHECK_EVERY);
     this.timer.unref();
+    this.sweeper = setInterval(() => void this.cleanup(), this.o.sweepEvery);
+    this.sweeper.unref();
   }
-  stop(): void { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  stop(): void {
+    if (this.timer) clearInterval(this.timer);
+    if (this.sweeper) clearInterval(this.sweeper);
+    this.timer = this.sweeper = null;
+  }
 
   private fail(error: unknown): never {
     this.state = { ...this.state, status: 'error', progress: null, error: error instanceof Error ? error.message : String(error) };
