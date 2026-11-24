@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { PROJECT_ROOT, type Config } from './config.ts';
 import { TeamError } from './team.ts';
+import { bridgeNode } from './launch.ts';
 
 export const HARNESS_SPECS = {
   deepseek: { label: 'DeepSeek Harness', folder: 'dsh', executable: 'node_modules/.bin/dsh', version: '0.2.1-rc.5' },
@@ -71,14 +72,18 @@ export function bootstrapTools() {
   return { npm, uv };
 }
 
-/** Also used at launch: a clean Mac need not have `node` on PATH for dsh's shebang. */
+/**
+ * Also used at launch: a clean Mac need not have `node` on PATH for dsh's shebang. That `node` is the copy kept in the
+ * profile (see bridgeNode): dsh, and whatever is started from the shell of a harness terminal, can run for hours, and on
+ * the Node inside the app it would keep a whole copy of the app in use after an update.
+ */
 export function harnessEnvironment(cfg: Config): NodeJS.ProcessEnv {
   const root = harnessRoot(cfg), bin = join(root, 'tools');
   mkdirSync(bin, { recursive: true });
   const link = join(bin, 'node');
   const pending = join(bin, `node-${process.pid}.tmp`);
   try { unlinkSync(pending); } catch {}
-  symlinkSync(process.execPath, pending);
+  symlinkSync(bridgeNode(cfg.dataDir), pending);
   renameSync(pending, link);
   const npm = bootstrapTools().npm;
   if (npm) {
