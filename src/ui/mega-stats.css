@@ -32,7 +32,6 @@
 .mega-stats-tabs > button { display: inline-flex; align-items: center; gap: 6px; padding: 9px 12px 10px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--g4); font: inherit; font-size: 13px; font-weight: 520; white-space: nowrap; cursor: pointer; }
 .mega-stats-tabs > button:hover { color: var(--fg); }
 .mega-stats-tabs > button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fg); }
-.mega-stats-badge { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--role-attention); color: var(--bg); font-size: 11px; font-weight: 650; line-height: 18px; text-align: center; }
 .mega-stats-tabpanel[hidden] { display: none; }
 .mega-stats-tabpanel { display: grid; gap: 22px; }
 .mega-stats-status:not(:empty) { color: var(--g4); padding: 8px 0; font-size: 12px; }
@@ -65,8 +64,7 @@
 .mega-stats-attention-text { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
 
 /* Status pill: a coloured dot and the state. */
-.mega-stats-pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--tone, var(--g3)) 14%, transparent); color: var(--fg); font-size: 12px; font-weight: 540; white-space: nowrap; }
-.mega-stats-pill > i { width: 7px; height: 7px; border-radius: 50%; background: var(--tone, var(--g3)); flex: none; }
+.mega-stats-pill { border-color: transparent; background: color-mix(in srgb, var(--tone) 14%, transparent); }
 
 /* Bars: parts of a whole (tokens, tasks) and ranked lines (projects, accounts). */
 .mega-stats-stack { display: grid; gap: 8px; margin-top: 8px; }

@@ -34,7 +34,7 @@ function graphSvg(commit: GitCommit, row: ReturnType<typeof graphRows>[number]):
 /** At most three badges per commit; the rest (often a run of release tags) collapse into "+N" with the names in its tooltip. */
 function badges(refs: string[], remotes: string[]): string {
   const all = refBadges(refs, remotes);
-  const shown = all.slice(0, 3).map(r => `<span class="git-ref ${r.kind}">${esc(r.text)}</span>`).join('');
+  const shown = all.slice(0, 3).map(r => `<span class="git-ref ref-${r.kind}">${esc(r.text)}</span>`).join('');
   return all.length > 3 ? `${shown}<span class="git-ref more" title="${esc(all.slice(3).map(r => r.text).join(', '))}">+${all.length - 3}</span>` : shown;
 }
 
@@ -90,7 +90,7 @@ export function mountGitView(root: HTMLElement, cb: { reveal(id: number): void }
     const ch = repo.changes;
     const changes = [ch.staged && ui`${ch.staged} in stage`, ch.unstaged && ui`${ch.unstaged} modificati`, ch.untracked && ui`${ch.untracked} nuovi`, ch.conflicts && ui`${ch.conflicts} conflitti`].filter(Boolean).join(' · ') || tr('Nessuna modifica');
     const sync = repo.upstream ? (repo.ahead || repo.behind ? ui`↑${repo.ahead} ↓${repo.behind} rispetto a ${esc(repo.upstream)}` : ui`Allineato a ${esc(repo.upstream)}`) : tr('Nessun ramo remoto collegato');
-    head.innerHTML = ui`<div class="git-title"><strong>${esc(repo.top.split('/').pop() || repo.top)}</strong><span class="git-chip" title="Ramo corrente">⎇ ${esc(repo.branch ?? tr('HEAD staccato'))}</span><span class="git-meta">${sync}</span><span class="git-meta ${ch.conflicts ? 'warn' : ''}">${changes}</span></div><div class="git-actions">${error ? ui`<span class="git-error" role="alert">${esc(error)}</span>` : ''}<button class="btn small" data-fetch ${fetching || !repo.remotes.length ? 'disabled' : ''} title="git fetch: scarica rami e commit remoti, senza toccare i tuoi file">${fetching ? tr('Aggiornamento…') : repo.github ? tr('Aggiorna da GitHub') : tr('Aggiorna dai remoti')}</button>${repo.github ? ui`<button class="btn small" data-url="${esc(repo.github.web)}">Apri su GitHub</button>` : ''}</div>`;
+    head.innerHTML = ui`<div class="git-title"><strong>${esc(repo.top.split('/').pop() || repo.top)}</strong><span class="tag git-chip" title="Ramo corrente">⎇ ${esc(repo.branch ?? tr('HEAD staccato'))}</span><span class="git-meta">${sync}</span><span class="git-meta ${ch.conflicts ? 'warn' : ''}">${changes}</span></div><div class="git-actions">${error ? ui`<span class="git-error" role="alert">${esc(error)}</span>` : ''}<button class="btn small" data-fetch ${fetching || !repo.remotes.length ? 'disabled' : ''} title="git fetch: scarica rami e commit remoti, senza toccare i tuoi file">${fetching ? tr('Aggiornamento…') : repo.github ? tr('Aggiorna da GitHub') : tr('Aggiorna dai remoti')}</button>${repo.github ? ui`<button class="btn small" data-url="${esc(repo.github.web)}">Apri su GitHub</button>` : ''}</div>`;
   }
 
   function agentBadge(branch?: string): string {
