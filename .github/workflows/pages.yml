@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      pages: read
+      pages: write
     steps:
       - uses: actions/checkout@v4
       - name: Stamp the latest release
